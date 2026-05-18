@@ -1,0 +1,12 @@
+-- 001_initial_schema.sql
+-- TODO: define all tables for DevCollab
+-- Suggested tables:
+--   users, refresh_tokens
+--   workspaces, workspace_members
+--   projects
+--   tasks, task_comments
+--   wiki_pages, wiki_page_versions
+--   snippets
+--   editor_sessions, editor_files
+--   activities
+--   subscriptions, orders
