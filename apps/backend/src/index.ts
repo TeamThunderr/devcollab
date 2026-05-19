@@ -8,6 +8,7 @@ import cookie from "@fastify/cookie";
 import { pool } from "./db/client";
 import { redis } from "./redis/client";
 import initSocket from "./socket/socket";
+import { aiConfig } from "./config/ai.config";
 
 // Module route imports
 import authRoutes from "./modules/auth/auth.routes";
@@ -81,15 +82,16 @@ async function bootstrap() {
     console.error("❌ Socket.IO initialization failed:", err);
   }
 
-  // AI configuration summary
-  console.log(
-    `🤖 AI Mode: ${
-      process.env.AI_MOCK_MODE === "true"
-        ? "MOCK (no API calls)"
-        : "LIVE (Gemini API)"
-    }`
-  );
-  console.log(`🤖 AI Model: ${process.env.GEMINI_MODEL ?? "not set"}`);
+  // AI startup check
+  if (!aiConfig.apiKey && !aiConfig.mockMode) {
+    console.warn(
+      "⚠️  GEMINI_API_KEY not set and AI_MOCK_MODE is false — AI features will fail"
+    );
+  } else if (aiConfig.mockMode) {
+    console.log("🤖 AI running in MOCK mode — no API calls will be made");
+  } else {
+    console.log(`🤖 AI running in LIVE mode — using ${aiConfig.model}`);
+  }
 }
 
 bootstrap().catch((err) => {

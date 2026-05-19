@@ -1,149 +1,91 @@
-// TEMP — replace with real implementation (Module 7 — Claude AI integration)
+// TEMP (real data integration pending) — AI features are functional in mock mode
 
-import React, { useState } from "react";
+import React from "react";
+import ProGate from "../../components/common/ProGate";
+import CodeReviewPanel from "../../components/ai/CodeReviewPanel";
+import ProjectSummaryPanel from "../../components/ai/ProjectSummaryPanel";
+import StandupPanel from "../../components/ai/StandupPanel";
+import TaskBreakdownPanel from "../../components/ai/TaskBreakdownPanel";
 
-// ─── Shared sub-components ────────────────────────────────────────────────────
+// ─── Panel wrapper ────────────────────────────────────────────────────────────
 
-function AICard({
-  title,
+function PanelCard({
   children,
 }: {
-  title: string;
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div className="bg-white dark:bg-gray-900
-                    border border-gray-200 dark:border-gray-800
-                    rounded-xl p-5 space-y-4">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-        {title}
-      </h3>
+    <div
+      className="bg-white dark:bg-gray-900
+                 border border-gray-200 dark:border-gray-800
+                 rounded-2xl p-5 shadow-sm"
+    >
       {children}
     </div>
   );
 }
 
-function ResultArea(): React.ReactElement {
-  return (
-    <div className="min-h-[80px] rounded-lg
-                    border-2 border-dashed border-gray-200 dark:border-gray-700
-                    flex items-center justify-center">
-      <p className="text-xs text-gray-400 dark:text-gray-600">
-        Results will appear here
-      </p>
-    </div>
-  );
-}
-
-function DisabledButton({ label }: { label: string }): React.ReactElement {
-  return (
-    <button
-      type="button"
-      disabled
-      title="Coming soon..."
-      className="px-4 py-2 text-sm font-medium rounded-lg
-                 bg-gray-100 dark:bg-gray-800
-                 text-gray-400 dark:text-gray-500
-                 cursor-not-allowed border border-dashed
-                 border-gray-300 dark:border-gray-700"
-    >
-      {label} — Coming soon…
-    </button>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Page component ───────────────────────────────────────────────────────────
 
 export default function AIAssistantView(): React.ReactElement {
-  const [reviewCode, setReviewCode] = useState("");
-  const [reviewLang, setReviewLang] = useState("JavaScript");
-  const [taskDesc, setTaskDesc] = useState("");
+  // During development, AI_MOCK_MODE is always true on the backend.
+  // Show the mock indicator in the UI so the team knows what's active.
+  const isMockMode = true; // TODO: read from backend config endpoint
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
+    <div className="p-6 space-y-6">
       {/* Page header */}
-      <div>
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-          AI Assistant
-        </h2>
-
-        {/* Coming soon banner */}
-        <div className="mt-3 flex items-start gap-2
-                        bg-amber-50 dark:bg-amber-950/30
-                        border border-amber-200 dark:border-amber-800
-                        rounded-lg px-4 py-3 text-xs
-                        text-amber-700 dark:text-amber-300">
-          <span aria-hidden="true">⚡</span>
-          <p>
-            AI features will be enabled in the next build. Connect your Claude
-            API key in <code className="font-mono">.env</code> to activate.
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            🤖 AI Assistant
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Powered by Gemini — your intelligent project companion
           </p>
         </div>
+
+        {/* AI mode indicator */}
+        {isMockMode && (
+          <div
+            title="Switch AI_MOCK_MODE=false in .env for real AI"
+            className="flex items-center gap-1.5
+                       bg-amber-100 dark:bg-amber-900/30
+                       text-amber-700 dark:text-amber-400
+                       text-xs font-medium
+                       px-3 py-1 rounded-full
+                       cursor-help select-none"
+          >
+            ⚡ Mock Mode
+          </div>
+        )}
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {/* Card 1 — Code Reviewer */}
-        <AICard title="Code Reviewer">
-          <textarea
-            value={reviewCode}
-            onChange={(e) => setReviewCode(e.target.value)}
-            rows={5}
-            placeholder="Paste your code here..."
-            className="w-full px-3 py-2 text-xs font-mono rounded-lg resize-none
-                       bg-gray-50 dark:bg-gray-800
-                       border border-gray-200 dark:border-gray-700
-                       text-gray-800 dark:text-gray-200
-                       placeholder-gray-400 dark:placeholder-gray-600
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      {/* 2×2 feature grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <PanelCard>
+          <ProGate feature="Code Reviewer">
+            <CodeReviewPanel />
+          </ProGate>
+        </PanelCard>
 
-          <select
-            value={reviewLang}
-            onChange={(e) => setReviewLang(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg
-                       bg-gray-50 dark:bg-gray-800
-                       border border-gray-200 dark:border-gray-700
-                       text-gray-700 dark:text-gray-300
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="Programming language"
-          >
-            {["JavaScript", "Python", "Java", "C++", "Go"].map((lang) => (
-              <option key={lang} value={lang}>{lang}</option>
-            ))}
-          </select>
+        <PanelCard>
+          <ProGate feature="Project Summary">
+            <ProjectSummaryPanel />
+          </ProGate>
+        </PanelCard>
 
-          <DisabledButton label="Review with AI" />
-          <ResultArea />
-        </AICard>
+        <PanelCard>
+          <ProGate feature="Standup Generator">
+            <StandupPanel />
+          </ProGate>
+        </PanelCard>
 
-        {/* Card 2 — Project Summariser */}
-        <AICard title="Project Summariser">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Generates an AI summary of all tasks, activity, and progress in
-            this project.
-          </p>
-          <DisabledButton label="Summarise Project" />
-          <ResultArea />
-        </AICard>
-
-        {/* Card 3 — Task Breakdown */}
-        <AICard title="Task Breakdown">
-          <textarea
-            value={taskDesc}
-            onChange={(e) => setTaskDesc(e.target.value)}
-            rows={5}
-            placeholder="Describe a feature..."
-            className="w-full px-3 py-2 text-sm rounded-lg resize-none
-                       bg-gray-50 dark:bg-gray-800
-                       border border-gray-200 dark:border-gray-700
-                       text-gray-800 dark:text-gray-200
-                       placeholder-gray-400 dark:placeholder-gray-600
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <DisabledButton label="Break Down" />
-          <ResultArea />
-        </AICard>
+        <PanelCard>
+          <ProGate feature="Task Breakdown">
+            <TaskBreakdownPanel />
+          </ProGate>
+        </PanelCard>
       </div>
     </div>
   );

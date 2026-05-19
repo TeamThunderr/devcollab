@@ -10,11 +10,11 @@ export const aiConfig = {
   apiKey: process.env.GEMINI_API_KEY ?? "",
 
   /** Primary model — highest capability */
-  model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash-preview-05-20",
+  model: process.env.GEMINI_MODEL ?? "gemini-3-flash-preview",
 
   /** Fallback model — used when the primary hits rate limits (500 RPD free tier) */
   fallbackModel:
-    process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.1-flash-lite-preview-06-17",
+    process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.1-flash-lite",
 
   /**
    * When true, all AI routes return pre-defined mock responses instead of

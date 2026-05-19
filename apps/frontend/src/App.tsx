@@ -35,7 +35,9 @@ function ProtectedRoute({
 
 function App(): React.ReactElement {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         {/* Public auth routes */}
         <Route element={<AuthLayout />}>
