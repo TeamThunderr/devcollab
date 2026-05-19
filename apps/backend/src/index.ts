@@ -80,6 +80,16 @@ async function bootstrap() {
   } catch (err) {
     console.error("❌ Socket.IO initialization failed:", err);
   }
+
+  // AI configuration summary
+  console.log(
+    `🤖 AI Mode: ${
+      process.env.AI_MOCK_MODE === "true"
+        ? "MOCK (no API calls)"
+        : "LIVE (Gemini API)"
+    }`
+  );
+  console.log(`🤖 AI Model: ${process.env.GEMINI_MODEL ?? "not set"}`);
 }
 
 bootstrap().catch((err) => {
