@@ -1,29 +1,94 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyReply, FastifyRequest } from 'fastify';
+import { TaskService } from './task.service';
+import {
+  createCommentSchema,
+  createTaskSchema,
+  getTasksQuerySchema,
+  taskIdParamSchema,
+  taskProjectParamSchema,
+  updateTaskSchema,
+} from './task.schema';
 
-export async function createTask(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: create task in project
-}
+const taskService = new TaskService();
 
-export async function listTasks(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: list tasks with filters
-}
+export class TaskController {
+  async createTask(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = createTaskSchema.parse(request.body);
+      const task = await taskService.createTask(data);
+      return reply.status(201).send(task);
+    } catch (error: any) {
+      return reply.status(400).send({ error: error.message });
+    }
+  }
 
-export async function getTask(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: get task by id
-}
+  async getTasksByProject(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { projectId } = taskProjectParamSchema.parse(request.params);
+      const filters = getTasksQuerySchema.parse(request.query);
+      const tasks = await taskService.getTasksByProject(projectId, filters);
+      return reply.send(tasks);
+    } catch (error: any) {
+      return reply.status(400).send({ error: error.message });
+    }
+  }
 
-export async function updateTask(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: update task fields
-}
+  async getTaskById(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = taskIdParamSchema.parse(request.params);
+      const task = await taskService.getTaskById(id);
 
-export async function deleteTask(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: delete task
-}
+      if (!task) {
+        return reply.status(404).send({ error: 'Task not found' });
+      }
 
-export async function assignTask(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: assign task to member
-}
+      return reply.send(task);
+    } catch (error: any) {
+      return reply.status(400).send({ error: error.message });
+    }
+  }
 
-export async function moveTask(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: move task to different column/status
+  async updateTask(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = taskIdParamSchema.parse(request.params);
+      const data = updateTaskSchema.parse(request.body);
+      const task = await taskService.updateTask(id, data);
+      return reply.send(task);
+    } catch (error: any) {
+      const statusCode = error.message === 'Task not found' ? 404 : 400;
+      return reply.status(statusCode).send({ error: error.message });
+    }
+  }
+
+  async deleteTask(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = taskIdParamSchema.parse(request.params);
+      await taskService.deleteTask(id);
+      return reply.status(204).send();
+    } catch (error: any) {
+      const statusCode = error.message === 'Task not found' ? 404 : 400;
+      return reply.status(statusCode).send({ error: error.message });
+    }
+  }
+
+  async addComment(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = taskIdParamSchema.parse(request.params);
+      const data = createCommentSchema.parse(request.body);
+      const comment = await taskService.addComment(id, data.content);
+      return reply.status(201).send(comment);
+    } catch (error: any) {
+      return reply.status(400).send({ error: error.message });
+    }
+  }
+
+  async getComments(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = taskIdParamSchema.parse(request.params);
+      const comments = await taskService.getTaskComments(id);
+      return reply.send(comments);
+    } catch (error: any) {
+      return reply.status(400).send({ error: error.message });
+    }
+  }
 }
