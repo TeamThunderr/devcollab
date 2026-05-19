@@ -7,6 +7,7 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import { pool } from "./db/client";
 import { redis } from "./redis/client";
+import initSocket from "./socket/socket";
 
 // Module route imports
 import authRoutes from "./modules/auth/auth.routes";
@@ -70,6 +71,15 @@ async function bootstrap() {
 
   await server.listen({ port, host: "0.0.0.0" });
   console.log(`🚀 DevCollab backend running on port ${port}`);
+
+  // Initialize Socket.IO server with Redis adapter
+  // Must be called after server.listen() so fastify.server is bound to the port
+  try {
+    await initSocket(server.server);
+    console.log("✅ Socket.IO initialized");
+  } catch (err) {
+    console.error("❌ Socket.IO initialization failed:", err);
+  }
 }
 
 bootstrap().catch((err) => {
