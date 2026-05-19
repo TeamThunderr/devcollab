@@ -8,6 +8,7 @@
  */
 
 import { io, Socket } from "socket.io-client";
+import useRealtimeStore, { Notification } from "../stores/realtimeStore";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -66,6 +67,13 @@ socket.on("disconnect", () => {
 
 socket.on("connect_error", (err: Error) => {
   console.log(`Socket error: ${err.message}`);
+});
+
+// ─── Global notification listener ────────────────────────────────────────────
+// Set up once at module load. Zustand's getState() is safe outside React.
+
+socket.on("notification:new", (data: unknown) => {
+  useRealtimeStore.getState().addNotification(data as Notification);
 });
 
 // ─── Exported helpers ────────────────────────────────────────────────────────
