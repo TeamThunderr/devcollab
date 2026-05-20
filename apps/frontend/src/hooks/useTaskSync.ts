@@ -55,11 +55,11 @@ interface TaskStoppedViewingPayload {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useTaskSync(projectId: string): void {
-  const addTask = useTaskStore((s) => s.addTask);
-  const updateTask = useTaskStore((s) => s.updateTask);
-  const moveTask = useTaskStore((s) => s.moveTask);
-  const deleteTask = useTaskStore((s) => s.deleteTask);
-  const addComment = useTaskStore((s) => s.addComment);
+  const addTask = useTaskStore((s) => s.addTaskState);
+  const updateTask = useTaskStore((s) => s.updateTaskState);
+  const moveTask = useTaskStore((s) => s.moveTaskState);
+  const deleteTask = useTaskStore((s) => s.deleteTaskState);
+  const addComment = useTaskStore((s) => s.addCommentState);
 
   const addTaskViewer = useRealtimeStore((s) => s.addTaskViewer);
   const removeTaskViewer = useRealtimeStore((s) => s.removeTaskViewer);

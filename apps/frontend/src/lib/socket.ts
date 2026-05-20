@@ -52,6 +52,7 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
+    transports: ["websocket"],
   }
 );
 

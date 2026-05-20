@@ -111,21 +111,18 @@ let io: DevCollabServer;
 
 export async function initSocket(httpServer: http.Server): Promise<void> {
   // 1. Create dedicated Redis pub/sub clients for the adapter
+  if (!redis) {
+    throw new Error(
+      "Redis client is not available. Socket.IO requires Redis for pub/sub."
+    );
+  }
   const pubClient = redis.duplicate();
   const subClient = pubClient.duplicate();
 
-  // Ensure both clients are connected before attaching the adapter
+  // Connect both clients since they inherit lazyConnect: true
   await Promise.all([
-    new Promise<void>((resolve, reject) => {
-      if (pubClient.status === "ready") return resolve();
-      pubClient.once("ready", resolve);
-      pubClient.once("error", reject);
-    }),
-    new Promise<void>((resolve, reject) => {
-      if (subClient.status === "ready") return resolve();
-      subClient.once("ready", resolve);
-      subClient.once("error", reject);
-    }),
+    pubClient.connect(),
+    subClient.connect()
   ]);
 
   // 2. Initialize Socket.IO server
@@ -139,8 +136,8 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
       origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
       credentials: true,
     },
-    // Prefer WebSocket, fall back to long-polling
-    transports: ["websocket", "polling"],
+    // WebSocket only to bypass Fastify HTTP request intercept
+    transports: ["websocket"],
   });
 
   // Attach Redis adapter for horizontal scaling across multiple server instances

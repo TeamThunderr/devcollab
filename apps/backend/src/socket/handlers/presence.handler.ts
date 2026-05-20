@@ -63,6 +63,8 @@ const ttlKey = (workspaceId: string, userId: string) =>
  * Stale entries whose SETEX key has expired are pruned from the hash.
  */
 async function getActivePresence(workspaceId: string): Promise<PresenceEntry[]> {
+  if (!redis) return []; // Redis unavailable — degraded mode
+
   const hash = await redis.hgetall(hashKey(workspaceId));
   if (!hash) return [];
 
@@ -72,7 +74,7 @@ async function getActivePresence(workspaceId: string): Promise<PresenceEntry[]> 
   await Promise.all(
     Object.entries(hash).map(async ([userId, raw]) => {
       try {
-        const isAlive = await redis.exists(ttlKey(workspaceId, userId));
+        const isAlive = await redis!.exists(ttlKey(workspaceId, userId));
         if (isAlive) {
           const entry = JSON.parse(raw) as PresenceEntry;
           activeUsers.push(entry);
@@ -88,7 +90,7 @@ async function getActivePresence(workspaceId: string): Promise<PresenceEntry[]> 
 
   // Clean up stale entries from the hash so it doesn't grow unbounded
   if (expiredUserIds.length > 0) {
-    await redis.hdel(hashKey(workspaceId), ...expiredUserIds).catch((err) => {
+    await redis!.hdel(hashKey(workspaceId), ...expiredUserIds).catch((err) => {
       console.error("[presence] Failed to prune stale entries:", err);
     });
   }
@@ -129,6 +131,8 @@ export function registerPresenceHandlers(
     "presence:ping",
     async (payload: { workspaceId: string; projectId?: string }) => {
       try {
+        if (!redis) return; // Redis unavailable — skip presence update
+
         const pingWorkspaceId = payload?.workspaceId ?? workspaceId;
         if (!pingWorkspaceId) return;
 
@@ -180,17 +184,19 @@ export async function handlePresenceDisconnect(
 
   if (!workspaceId || !userId) return;
 
-  try {
-    // Remove user from the workspace presence hash
-    await redis.hdel(hashKey(workspaceId), userId);
+  if (redis) {
+    try {
+      // Remove user from the workspace presence hash
+      await redis.hdel(hashKey(workspaceId), userId);
 
-    // Delete the heartbeat TTL marker
-    await redis.del(ttlKey(workspaceId, userId));
+      // Delete the heartbeat TTL marker
+      await redis.del(ttlKey(workspaceId, userId));
 
-    // Broadcast updated (user-removed) presence list
-    await broadcastPresence(io, workspaceId);
-  } catch (err) {
-    console.error(`[presence disconnect] Redis cleanup failed for user ${userId}:`, err);
+      // Broadcast updated (user-removed) presence list
+      await broadcastPresence(io, workspaceId);
+    } catch (err) {
+      console.error(`[presence disconnect] Redis cleanup failed for user ${userId}:`, err);
+    }
   }
 
   // Notify all task rooms this user was viewing that they stopped viewing

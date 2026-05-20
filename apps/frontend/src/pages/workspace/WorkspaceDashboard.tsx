@@ -46,7 +46,6 @@ const PRIORITY_STYLES: Record<FakeTask["priority"], string> = {
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
-import { Link, useParams } from 'react-router-dom';
 
 export default function WorkspaceDashboard(): React.ReactElement {
   const { user, isAuthenticated } = useAuthStore();

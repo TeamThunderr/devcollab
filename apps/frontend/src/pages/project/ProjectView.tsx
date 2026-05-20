@@ -137,19 +137,10 @@ export default function ProjectView(): React.ReactElement {
 
   // Seed store once on mount if not already seeded
   useEffect(() => {
-    const alreadySeeded = Object.values(tasks).some((bucket) => bucket.length > 0);
+    const alreadySeeded = tasks.length > 0;
     if (alreadySeeded) return;
 
-    const byStatus: Record<string, Task[]> = {
-      todo: [],
-      inprogress: [],
-      inreview: [],
-      done: [],
-    };
-    for (const task of SEED_TASKS) {
-      byStatus[task.status].push(task);
-    }
-    setTasks(byStatus);
+    setTasks(SEED_TASKS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -173,7 +164,7 @@ export default function ProjectView(): React.ReactElement {
       {/* Kanban grid */}
       <div className="grid grid-cols-4 gap-4 min-h-[60vh]">
         {COLUMNS.map((col) => {
-          const columnTasks = tasks[col.key] ?? [];
+          const columnTasks = tasks.filter((task) => task.status === col.key);
           return (
             <div
               key={col.key}

@@ -56,6 +56,17 @@ async function bootstrap() {
   try {
     await pool.query("SELECT 1");
     console.log("✅ PostgreSQL connected successfully");
+
+    // Automatically seed the default test project used by the frontend development server
+    const projectCheck = await pool.query("SELECT id FROM projects WHERE id = $1 LIMIT 1", ["project-test-456"]);
+    if (projectCheck.rowCount === 0) {
+      await pool.query(
+        `INSERT INTO projects (id, name, description, workspace_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+        ["project-test-456", "Test Project", "Automatically created development test project", "workspace-test-123"]
+      );
+      console.log("🌱 Automatically seeded test project 'project-test-456' for local development.");
+    }
   } catch (err) {
     console.error("❌ PostgreSQL connection failed:", err);
   }
