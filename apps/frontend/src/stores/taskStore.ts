@@ -122,7 +122,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
       tasks: state.tasks.map((t) => (t.id === task.id ? { ...t, ...task } : t)),
     })),
 
-  moveTaskState: (taskId, newStatus, newPosition) =>
+  moveTaskState: (taskId, newStatus, _newPosition) =>
     set((state) => ({
       tasks: state.tasks.map((t) =>
         t.id === taskId ? { ...t, status: newStatus as TaskStatus } : t
