@@ -127,6 +127,7 @@ const PRIORITY_STYLES: Record<Task["priority"], string> = {
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
+import ProjectsPage from './ProjectsPage';
 
 export default function ProjectView(): React.ReactElement {
   const { tasks, setTasks } = useTaskStore();
@@ -149,7 +150,7 @@ export default function ProjectView(): React.ReactElement {
       byStatus[task.status].push(task);
     }
     setTasks(byStatus);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isConnected = socket.connected;

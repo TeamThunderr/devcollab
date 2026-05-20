@@ -1,7 +1,7 @@
 // TEMP — replace with real implementation (real sidebar with workspace data, active nav state)
 
 import React from "react";
-import { Link, Outlet, useNavigate, Navigate } from "react-router-dom";
+import { Link, Outlet, useNavigate, Navigate, NavLink, useParams } from "react-router-dom";
 import useAuthStore from "../stores/authStore";
 import { disconnectSocket } from "../lib/socket";
 import Topbar from "../components/topbar/Topbar";
@@ -17,6 +17,8 @@ const NAV_ITEMS = [
 ] as const;
 
 export default function AppLayout(): React.ReactElement {
+  const { workspaceSlug = 'default-workspace' } = useParams<{ workspaceSlug: string }>();
+
   const navigate = useNavigate();
   const { user, isAuthenticated, clearAuth } = useAuthStore();
 

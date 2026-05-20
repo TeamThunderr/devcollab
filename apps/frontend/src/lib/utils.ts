@@ -10,7 +10,9 @@ export function formatRelativeTime(date: Date | string): string {
   return '';
 }
 
-export function cn(...classes: (string | undefined | null | false)[]): string {
-  // TODO: filter and join class names (classnames helper)
-  return classes.filter(Boolean).join(' ');
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }

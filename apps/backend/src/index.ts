@@ -6,7 +6,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import { pool } from "./db/client";
-import { redis } from "./redis/client";
+import { redis, isRedisAvailable } from "./redis/client";
 import initSocket from "./socket/socket";
 import { aiConfig } from "./config/ai.config";
 
@@ -60,18 +60,29 @@ async function bootstrap() {
     console.error("❌ PostgreSQL connection failed:", err);
   }
 
-  // Verify Redis connection
-  try {
-    await redis.ping();
-    console.log("✅ Redis connected successfully");
-  } catch (err) {
-    console.error("❌ Redis connection failed:", err);
+  // Verify Redis connection (optional - graceful degradation)
+  if (redis) {
+    try {
+      await redis.connect();
+      await redis.ping();
+      console.log("✅ Redis connected successfully");
+    } catch (err) {
+      // Redis connection failed - this is OK in development
+      // The warning was already logged by the Redis client
+      // Backend will continue running without realtime features
+    }
   }
 
   const port = Number(process.env.PORT ?? 3000);
 
   await server.listen({ port, host: "0.0.0.0" });
-  console.log(`🚀 DevCollab backend running on port ${port}`);
+
+  const redisStatus = isRedisAvailable()
+    ? "✅ with realtime features"
+    : "⚠️  without realtime features (Redis unavailable)";
+  console.log(
+    `\n🚀 DevCollab backend running on port ${port} ${redisStatus}\n`
+  );
 
   // Initialize Socket.IO server with Redis adapter
   // Must be called after server.listen() so fastify.server is bound to the port
