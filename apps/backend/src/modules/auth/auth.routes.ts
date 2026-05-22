@@ -1,5 +1,14 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyPluginAsync } from 'fastify';
+import { authController } from './auth.controller';
+import { verifyAuth } from '../../middleware/auth.middleware';
 
-export default async function register(fastify: FastifyInstance): Promise<void> {
-  // TODO: register auth routes (POST /register, POST /login, POST /logout, POST /refresh, GET /me)
-}
+const authRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.post('/register', authController.register);
+  fastify.post('/login', authController.login);
+  fastify.post('/logout', authController.logout);
+  fastify.post('/refresh', authController.refresh);
+  
+  fastify.get('/me', { preHandler: [verifyAuth] }, authController.getMe);
+};
+
+export default authRoutes;
