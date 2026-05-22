@@ -1,35 +1,45 @@
 // TEMP — replace with real implementation (real sidebar with workspace data, active nav state)
 
 import React from "react";
-import { Link, Outlet, useNavigate, Navigate, NavLink, useParams } from "react-router-dom";
+import { Link, Outlet, useNavigate, Navigate, useParams, useLocation } from "react-router-dom";
 import useAuthStore from "../stores/authStore";
-import { disconnectSocket } from "../lib/socket";
 import Topbar from "../components/topbar/Topbar";
+import WorkspaceSwitcher from "../components/workspace/WorkspaceSwitcher";
+import { useBillingStore } from "../stores/billingStore";
+import SubscriptionBadge from "../components/billing/SubscriptionBadge";
 
 const NAV_ITEMS = [
-  { emoji: "🏠", label: "Dashboard", to: "/" },
-  { emoji: "📋", label: "Project", to: "/test-workspace/projects/project-test-456" },
-  { emoji: "✏️", label: "Editor", to: "/test-workspace/editor/project-test-456" },
-  { emoji: "📝", label: "Wiki", to: "/test-workspace/wiki/project-test-456" },
-  { emoji: "💾", label: "Snippets", to: "/test-workspace/snippets/project-test-456" },
-  { emoji: "📊", label: "Activity", to: "/test-workspace/activity" },
-  { emoji: "🤖", label: "AI Assistant", to: "/test-workspace/ai" },
+  { emoji: "🏠", label: "Dashboard", getTo: (wid: string) => `/${wid}` },
+  { emoji: "📋", label: "Project", getTo: (wid: string) => `/${wid}/projects/project-test-456` },
+  { emoji: "✏️", label: "Editor", getTo: (wid: string) => `/${wid}/editor/project-test-456` },
+  { emoji: "📝", label: "Wiki", getTo: (wid: string) => `/${wid}/wiki/project-test-456` },
+  { emoji: "💾", label: "Snippets", getTo: (wid: string) => `/${wid}/snippets/project-test-456` },
+  { emoji: "📊", label: "Activity", getTo: (wid: string) => `/${wid}/activity` },
+  { emoji: "🤖", label: "AI Assistant", getTo: (wid: string) => `/${wid}/ai` },
+  { emoji: "💳", label: "Billing", getTo: (wid: string) => `/${wid}/settings/billing` },
 ] as const;
 
 export default function AppLayout(): React.ReactElement {
-  const { workspaceSlug = 'default-workspace' } = useParams<{ workspaceSlug: string }>();
-
   const navigate = useNavigate();
-  const { user, isAuthenticated, clearAuth } = useAuthStore();
+  const { workspaceId } = useParams();
+  const location = useLocation();
+  const { user, isAuthenticated, logout } = useAuthStore();
+  const { fetchSubscription, subscription } = useBillingStore();
+
+  // Fetch subscription whenever workspace changes
+  React.useEffect(() => {
+    if (workspaceId) {
+      fetchSubscription(workspaceId);
+    }
+  }, [workspaceId, fetchSubscription]);
 
   // Auth guard — redirect unauthenticated users to /login
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  function handleLogout(): void {
-    clearAuth();
-    disconnectSocket();
+  async function handleLogout(): Promise<void> {
+    await logout();
     navigate("/login");
   }
 
@@ -43,29 +53,44 @@ export default function AppLayout(): React.ReactElement {
                    border-r border-gray-800"
       >
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-gray-800">
-          <span className="text-lg font-bold tracking-tight text-white">
+        <div className="px-5 py-5 border-b border-gray-800 flex items-center justify-between">
+          <span className="text-lg font-bold tracking-tight text-white cursor-pointer" onClick={() => navigate('/')}>
             DevCollab
           </span>
+          {subscription?.plan === 'PRO' && <SubscriptionBadge plan="PRO" />}
+        </div>
+
+        {/* Workspace Switcher */}
+        <div className="px-3 py-3 border-b border-gray-800">
+          <WorkspaceSwitcher />
         </div>
 
         {/* Nav */}
         <nav className="flex-1 py-4 overflow-y-auto">
-          <ul className="space-y-0.5 px-2">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg
-                             text-sm text-gray-300 hover:text-white
-                             hover:bg-gray-800 transition-colors duration-150"
-                >
-                  <span aria-hidden="true">{item.emoji}</span>
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {workspaceId ? (
+            <ul className="space-y-0.5 px-2">
+              {NAV_ITEMS.map((item) => {
+                const to = item.getTo(workspaceId);
+                const isActive = location.pathname === to || (item.label !== 'Dashboard' && location.pathname.startsWith(to.split('/project-test-456')[0]));
+                return (
+                  <li key={item.label}>
+                    <Link
+                      to={to}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors duration-150
+                        ${isActive ? 'bg-gray-800 text-white font-medium' : 'text-gray-300 hover:text-white hover:bg-gray-800/50'}`}
+                    >
+                      <span aria-hidden="true">{item.emoji}</span>
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="px-5 py-4 text-xs text-gray-500">
+              Select a workspace to view its tools.
+            </div>
+          )}
         </nav>
 
         {/* Bottom — user + logout */}

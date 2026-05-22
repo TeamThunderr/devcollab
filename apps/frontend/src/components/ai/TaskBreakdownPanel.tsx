@@ -18,13 +18,13 @@ const TEST_PROJECT_ID = "project-test-456";
 export interface GeneratedTask {
   title: string;
   description: string;
-  priority: "p0" | "p1" | "p2";
+  priority: "P0" | "P1" | "P2";
 }
 
 const PRIORITY_STYLES: Record<GeneratedTask["priority"], string> = {
-  p0: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
-  p1: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
-  p2: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
+  P0: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
+  P1: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
+  P2: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
 };
 
 // ─── Spinner ─────────────────────────────────────────────────────────────────
@@ -58,6 +58,7 @@ function Spinner(): React.ReactElement {
 
 export default function TaskBreakdownPanel(): React.ReactElement {
   const addTask = useTaskStore((s) => s.addTask);
+  const currentUser = useAuthStore((s) => s.user);
 
   const [featureDescription, setFeatureDescription] = useState("");
   const [generatedTasks, setGeneratedTasks] = useState<GeneratedTask[]>([]);
@@ -112,12 +113,15 @@ export default function TaskBreakdownPanel(): React.ReactElement {
         projectId: TEST_PROJECT_ID,
         title: task.title,
         description: task.description,
-        status: "todo",
+        status: "TODO",
         priority: task.priority,
-        position: index + 1,
-        assigneeId: null,
-        dueDate: null,
-        labels: [],
+        dueDate: undefined,
+        createdBy: {
+          id: currentUser?.id || "unknown",
+          name: currentUser?.name || "Unknown",
+          email: currentUser?.email || "Unknown",
+        },
+        comments: [],
         createdAt: now,
         updatedAt: now,
       });

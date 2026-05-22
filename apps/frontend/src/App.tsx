@@ -1,7 +1,7 @@
 // TEMP — replace with real implementation (route guards, lazy loading, error boundaries)
 
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import useAuthStore from "./stores/authStore";
 
 import AppLayout from "./layouts/AppLayout";
@@ -9,32 +9,27 @@ import AuthLayout from "./layouts/AuthLayout";
 
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import WorkspaceList from "./pages/workspace/WorkspaceList";
 import WorkspaceDashboard from "./pages/workspace/WorkspaceDashboard";
 import ProjectView from "./pages/project/ProjectView";
 import TasksView from './pages/project/TasksView';
 import EditorView from "./pages/editor/EditorView";
 import SnippetsView from "./pages/snippets/SnippetsView";
 import WikiView from "./pages/wiki/WikiView";
-import ActivityFeedView from "./pages/activity/ActivityFeedView";
+import ActivityFeedPage from "./pages/activity/ActivityFeedPage";
 import AIAssistantView from "./pages/ai/AIAssistantView";
 import SettingsView from "./pages/settings/SettingsView";
+import BillingPage from "./pages/settings/BillingPage";
 
-/**
- * ProtectedRoute — redirects to /login if not authenticated.
- * AppLayout also guards itself, but this gives a clean outer redirect
- * so unauthenticated direct URL hits don't flash layout chrome.
- */
-function ProtectedRoute({
-  children,
-}: {
-  children: React.ReactElement;
-}): React.ReactElement {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return children;
-}
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 function App(): React.ReactElement {
+  const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
+
+  React.useEffect(() => {
+    fetchCurrentUser();
+  }, [fetchCurrentUser]);
+
   return (
     <BrowserRouter
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -54,15 +49,16 @@ function App(): React.ReactElement {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<WorkspaceDashboard />} />
-          <Route path="/:workspaceSlug" element={<WorkspaceDashboard />} />
-          <Route path="/:workspaceSlug/projects" element={<ProjectView />} />
-          <Route path="/:workspaceSlug/projects/:pid" element={<TasksView />} />
-          <Route path="/:workspaceSlug/editor/:pid" element={<EditorView />} />
-          <Route path="/:workspaceSlug/snippets/:pid" element={<SnippetsView />} />
-          <Route path="/:workspaceSlug/wiki/:pid" element={<WikiView />} />
-          <Route path="/:workspaceSlug/activity" element={<ActivityFeedView />} />
-          <Route path="/:workspaceSlug/ai" element={<AIAssistantView />} />
+          <Route path="/" element={<WorkspaceList />} />
+          <Route path="/:workspaceId" element={<WorkspaceDashboard />} />
+          <Route path="/:workspaceId/projects" element={<ProjectView />} />
+          <Route path="/:workspaceId/projects/:pid" element={<TasksView />} />
+          <Route path="/:workspaceId/editor/:pid" element={<EditorView />} />
+          <Route path="/:workspaceId/snippets/:pid" element={<SnippetsView />} />
+          <Route path="/:workspaceId/wiki/:pid" element={<WikiView />} />
+          <Route path="/:workspaceId/activity" element={<ActivityFeedPage />} />
+          <Route path="/:workspaceId/ai" element={<AIAssistantView />} />
+          <Route path="/:workspaceId/settings/billing" element={<BillingPage />} />
           <Route path="/settings" element={<SettingsView />} />
         </Route>
       </Routes>

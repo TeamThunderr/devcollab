@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { DndContext, DragEndEvent, closestCorners } from '@dnd-kit/core';
 import { useTaskStore } from '../../stores/taskStore';
+import useWorkspaceStore from '../../stores/workspaceStore';
+import useAuthStore from '../../stores/authStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import { DatePicker } from '../../components/ui/DatePicker';
@@ -21,7 +23,13 @@ function isTaskStatus(value: string): value is TaskStatus {
 export default function TasksPage(): React.ReactElement {
   const { workspaceSlug, pid } = useParams<{ workspaceSlug: string; pid: string }>();
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
+  const { members } = useWorkspaceStore();
+  const { user } = useAuthStore();
   
+  const currentUserMember = members.find((m) => m.userId === user?.id);
+  const userRole = currentUserMember?.role || 'VIEWER';
+  const canEditTasks = userRole !== 'VIEWER';
+
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showForm, setShowForm] = useState(false);
   
@@ -39,6 +47,7 @@ export default function TasksPage(): React.ReactElement {
   }, [fetchTasksByProject, pid]);
 
   function handleDragEnd(event: DragEndEvent) {
+    if (!canEditTasks) return;
     const { active, over } = event;
     if (!over) return;
 
@@ -89,16 +98,18 @@ export default function TasksPage(): React.ReactElement {
               Manage tasks for this project across the delivery pipeline.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowForm(current => !current)}
-            className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-cyan-100"
-          >
-            {showForm ? 'Close Form' : 'New Task'}
-          </button>
+          {canEditTasks && (
+            <button
+              type="button"
+              onClick={() => setShowForm(current => !current)}
+              className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-cyan-100"
+            >
+              {showForm ? 'Close Form' : 'New Task'}
+            </button>
+          )}
         </div>
 
-        {showForm ? (
+        {showForm && canEditTasks ? (
           <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-slate-900">Create Task</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">

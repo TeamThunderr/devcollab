@@ -47,7 +47,7 @@ export default function TaskViewers({
   }, [taskId]);
 
   const viewers = (taskViewers[taskId] ?? []).filter(
-    (u) => u.userId !== currentUser?.userId
+    (u) => u.userId !== currentUser?.id
   );
 
   if (viewers.length === 0) return null;

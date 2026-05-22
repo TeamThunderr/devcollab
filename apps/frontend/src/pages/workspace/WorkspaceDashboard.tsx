@@ -1,219 +1,197 @@
-// TEMP — replace with real implementation (real workspace data, proper kanban board)
-
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import useAuthStore from "../../stores/authStore";
-import useRealtimeStore from "../../stores/realtimeStore";
-import { socket } from "../../lib/socket";
-import OnlineAvatars from "../../components/presence/OnlineAvatars";
-import NotificationBell from "../../components/notifications/NotificationBell";
-import TaskViewers from "../../components/presence/TaskViewers";
+import useWorkspaceStore from "../../stores/workspaceStore";
+import { WorkspaceRole } from "../../types";
+import InviteMemberModal from "../../components/workspace/InviteMemberModal";
+import LoadingSpinner from "../../components/ui/LoadingSpinner";
 
-const TEST_WORKSPACE_ID = "workspace-test-123";
-const TEST_PROJECT_ID = "project-test-456";
-
-// ─── Fake task data ───────────────────────────────────────────────────────────
-
-interface FakeTask {
-  id: string;
-  title: string;
-  status: "todo" | "inprogress" | "inreview" | "done";
-  priority: "p0" | "p1" | "p2";
-}
-
-const FAKE_TASKS: FakeTask[] = [
-  { id: "ft1", title: "Setup Redis adapter", status: "todo", priority: "p0" },
-  { id: "ft2", title: "Write API docs", status: "todo", priority: "p1" },
-  { id: "ft3", title: "Build Socket.IO rooms", status: "inprogress", priority: "p0" },
-  { id: "ft4", title: "Presence system", status: "inprogress", priority: "p1" },
-  { id: "ft5", title: "Frontend socket client", status: "inreview", priority: "p1" },
-  { id: "ft6", title: "Review PR #42", status: "inreview", priority: "p2" },
-  { id: "ft7", title: "Notification bell UI", status: "done", priority: "p2" },
-  { id: "ft8", title: "Socket auth middleware", status: "done", priority: "p0" },
-];
-
-const COLUMNS: { key: FakeTask["status"]; label: string; color: string }[] = [
-  { key: "todo", label: "Todo", color: "bg-gray-500" },
-  { key: "inprogress", label: "In Progress", color: "bg-blue-500" },
-  { key: "inreview", label: "In Review", color: "bg-amber-500" },
-  { key: "done", label: "Done", color: "bg-green-500" },
-];
-
-const PRIORITY_STYLES: Record<FakeTask["priority"], string> = {
-  p0: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
-  p1: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
-  p2: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
+const ROLE_BADGES: Record<WorkspaceRole, string> = {
+  OWNER: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+  ADMIN: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+  MEMBER: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800",
+  VIEWER: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700",
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function WorkspaceDashboard(): React.ReactElement {
-  const { user, isAuthenticated } = useAuthStore();
-  const addNotification = useRealtimeStore((s) => s.addNotification);
-  const [connected, setConnected] = useState(socket.connected);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const { workspaceId } = useParams();
+  const { user } = useAuthStore();
+  const { activeWorkspace, members, isLoading, fetchWorkspaceDetails, updateMemberRole, removeMember } = useWorkspaceStore();
+  
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // Poll socket connection status every 2 seconds
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setConnected(socket.connected);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    if (workspaceId && (!activeWorkspace || activeWorkspace.id !== workspaceId)) {
+      fetchWorkspaceDetails(workspaceId).catch(console.error);
+    }
+  }, [workspaceId, activeWorkspace, fetchWorkspaceDetails]);
 
-  if (!isAuthenticated || !user) {
+  // Determine current user's permissions
+  const currentUserMember = members.find((m) => m.userId === user?.id);
+  const userRole = currentUserMember?.role || 'VIEWER';
+  const canManageMembers = userRole === 'OWNER' || userRole === 'ADMIN';
+
+  const handleUpdateRole = async (memberId: string, newRole: WorkspaceRole) => {
+    if (!workspaceId) return;
+    setProcessingId(memberId);
+    try {
+      await updateMemberRole(workspaceId, memberId, newRole);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!workspaceId) return;
+    if (!window.confirm("Are you sure you want to remove this member?")) return;
+    setProcessingId(memberId);
+    try {
+      await removeMember(workspaceId, memberId);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (isLoading && (!activeWorkspace || activeWorkspace.id !== workspaceId)) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 py-20">
-        <p className="text-gray-600 dark:text-gray-400 text-sm">
-          Please login first
-        </p>
-        <Link
-          to="/login"
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          Go to Login →
-        </Link>
+      <div className="flex h-full items-center justify-center">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  function triggerTestNotification(): void {
-    addNotification({
-      id: Date.now().toString(),
-      type: "mention",
-      title: "Test Notification",
-      body: "Someone mentioned you in a task",
-      read: false,
-      createdAt: new Date().toISOString(),
-    });
+  if (!activeWorkspace) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Workspace not found or you don't have access.
+      </div>
+    );
   }
-
-  function simulatePresencePing(): void {
-    socket.emit("presence:ping", {
-      workspaceId: TEST_WORKSPACE_ID,
-      projectId: TEST_PROJECT_ID,
-    });
-  }
-
-  const tasksByStatus = COLUMNS.reduce<Record<string, FakeTask[]>>((acc, col) => {
-    acc[col.key] = FAKE_TASKS.filter((t) => t.status === col.key);
-    return acc;
-  }, {});
 
   return (
-    <div className="p-6 space-y-6">
-      {/* ── Top section ──────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Welcome back, {user.name} 👋
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Workspace: {TEST_WORKSPACE_ID}
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+            {activeWorkspace.name}
+            <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              {userRole}
+            </span>
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Manage your workspace settings and team members here.
           </p>
         </div>
-
-        <div className="flex items-center gap-4">
-          <OnlineAvatars workspaceId={TEST_WORKSPACE_ID} projectId={TEST_PROJECT_ID} />
-          <NotificationBell />
-
-          {/* Connection status */}
-          <div className="flex items-center gap-1.5 text-xs font-medium">
-            <span
-              className={`w-2 h-2 rounded-full ${connected ? "bg-green-400" : "bg-red-400"}`}
-            />
-            <span className={connected ? "text-green-600 dark:text-green-400" : "text-red-500"}>
-              {connected ? "Connected" : "Disconnected"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Selected task viewer banner */}
-      {selectedTaskId && (
-        <div className="space-y-2">
-          <TaskViewers taskId={selectedTaskId} />
+        
+        {canManageMembers && (
           <button
-            type="button"
-            onClick={() => setSelectedTaskId(null)}
-            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            onClick={() => setIsInviteModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            ✕ Deselect task
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            </svg>
+            Invite Member
           </button>
+        )}
+      </div>
+
+      {/* Members Section */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Team Members ({members.length})</h2>
         </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">User</th>
+                <th scope="col" className="px-6 py-3">Role</th>
+                <th scope="col" className="px-6 py-3">Joined</th>
+                {canManageMembers && <th scope="col" className="px-6 py-3 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((member) => {
+                const isMe = member.userId === user?.id;
+                const isOwner = member.role === 'OWNER';
+                
+                return (
+                  <tr key={member.id} className="bg-white border-b dark:bg-gray-900 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center text-white font-bold text-xs">
+                          {member.user.name ? member.user.name.substring(0, 2).toUpperCase() : member.user.email.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                            {member.user.name || 'Unnamed User'}
+                            {isMe && (
+                              <span className="text-[10px] font-bold bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300">
+                                YOU
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">{member.user.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {canManageMembers && !isOwner && !isMe ? (
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleUpdateRole(member.userId, e.target.value as WorkspaceRole)}
+                          disabled={processingId === member.userId}
+                          className="bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 dark:bg-gray-800 dark:border-gray-700 dark:placeholder-gray-400 dark:text-white disabled:opacity-50"
+                        >
+                          <option value="ADMIN">Admin</option>
+                          <option value="MEMBER">Member</option>
+                          <option value="VIEWER">Viewer</option>
+                        </select>
+                      ) : (
+                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-md border ${ROLE_BADGES[member.role]}`}>
+                          {member.role}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-xs">
+                      {new Date(member.joinedAt).toLocaleDateString()}
+                    </td>
+                    {canManageMembers && (
+                      <td className="px-6 py-4 text-right">
+                        {!isOwner && !isMe && (
+                          <button
+                            onClick={() => handleRemoveMember(member.userId)}
+                            disabled={processingId === member.userId}
+                            className="font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {workspaceId && (
+        <InviteMemberModal 
+          isOpen={isInviteModalOpen} 
+          onClose={() => setIsInviteModalOpen(false)} 
+          workspaceId={workspaceId}
+        />
       )}
-
-      {/* ── Kanban preview ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-4">
-        {COLUMNS.map((col) => (
-          <div
-            key={col.key}
-            className="bg-white dark:bg-gray-900
-                       border border-gray-200 dark:border-gray-800
-                       rounded-xl overflow-hidden"
-          >
-            {/* Column header */}
-            <div className={`px-4 py-2.5 flex items-center justify-between`}>
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${col.color}`} />
-                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {col.label}
-                </span>
-              </div>
-              <span className="text-xs text-gray-400 font-medium">
-                {tasksByStatus[col.key]?.length ?? 0}
-              </span>
-            </div>
-
-            {/* Tasks */}
-            <div className="p-2 space-y-2">
-              {(tasksByStatus[col.key] ?? []).map((task) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  onClick={() => setSelectedTaskId(task.id)}
-                  className="w-full text-left p-3 rounded-lg
-                             bg-gray-50 dark:bg-gray-800
-                             hover:bg-gray-100 dark:hover:bg-gray-700
-                             border border-gray-200 dark:border-gray-700
-                             transition-colors duration-100 group"
-                >
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-snug">
-                    {task.title}
-                  </p>
-                  <div className="mt-2">
-                    <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${PRIORITY_STYLES[task.priority]}`}>
-                      {task.priority}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Test controls ────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3 pt-2">
-        <button
-          type="button"
-          onClick={triggerTestNotification}
-          className="px-4 py-2 text-sm font-medium rounded-lg
-                     bg-blue-600 hover:bg-blue-700 text-white
-                     transition-colors duration-150"
-        >
-          🔔 Trigger Test Notification
-        </button>
-        <button
-          type="button"
-          onClick={simulatePresencePing}
-          className="px-4 py-2 text-sm font-medium rounded-lg
-                     bg-gray-700 hover:bg-gray-600 text-white
-                     transition-colors duration-150"
-        >
-          👁 Simulate Presence Ping
-        </button>
-      </div>
     </div>
   );
 }
