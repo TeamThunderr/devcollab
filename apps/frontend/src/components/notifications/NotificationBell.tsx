@@ -4,15 +4,26 @@
  * Bell icon with unread count badge. Toggles NotificationPanel on click.
  */
 
-import React, { useState } from "react";
-import useRealtimeStore from "../../stores/realtimeStore";
+import React, { useState, useEffect } from "react";
+import { useNotificationStore } from "../../stores/notificationStore";
 import NotificationPanel from "./NotificationPanel";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function NotificationBell(): React.ReactElement {
-  const unreadCount = useRealtimeStore((s) => s.unreadCount);
+  const { unreadCount, fetchUnreadCount } = useNotificationStore();
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    
+    // Poll for unread count every 60 seconds (fallback until Socket.IO)
+    const interval = setInterval(() => {
+      fetchUnreadCount();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   const badgeLabel = unreadCount > 9 ? "9+" : String(unreadCount);
 

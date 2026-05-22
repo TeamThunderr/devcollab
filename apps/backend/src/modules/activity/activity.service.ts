@@ -71,7 +71,7 @@ export const activityService = {
     ]);
 
     return {
-      activities,
+      data: activities,
       meta: {
         total: totalCount,
         page: filters.page,

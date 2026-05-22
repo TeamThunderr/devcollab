@@ -69,7 +69,65 @@ export interface Snippet {
   description?: string;
   tags: string[];
   projectId: string;
+  project?: Project;
   createdAt: string;
   updatedAt: string;
   createdBy: User;
+}
+
+export interface Activity {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata?: any;
+  createdAt: string;
+  user?: User;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: string;
+  message: string;
+  metadata?: any;
+  readAt: string | null;
+  createdAt: string;
+  user?: User;
+}
+
+export interface Subscription {
+  id: string;
+  workspaceId: string;
+  plan: 'FREE' | 'PRO';
+  status: 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'UNPAID';
+  currentPeriodEnd?: string;
+  razorpaySubscriptionId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RazorpayOrder {
+  id: string;
+  amount: number;
+  currency: string;
+}
+
+export interface VerifyPaymentPayload {
+  workspaceId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }

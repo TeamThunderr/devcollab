@@ -2,33 +2,28 @@
  * apps/frontend/src/components/notifications/NotificationPanel.tsx
  *
  * Dropdown panel showing recent notifications.
- * Closes when clicking outside or when the consumer calls onClose().
  */
 
 import React, { useEffect, useRef } from "react";
-import useRealtimeStore, { Notification } from "../../stores/realtimeStore";
-import { socket } from "../../lib/socket";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { useNotificationStore } from "../../stores/notificationStore";
+import { Notification } from "../../types";
 
 export interface NotificationPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const TYPE_COLORS: Record<Notification["type"], string> = {
-  mention: "#3266ad",
-  assignment: "#1D9E75",
-  task_moved: "#BA7517",
-  comment: "#534AB7",
+const TYPE_COLORS: Record<string, string> = {
+  WORKSPACE_INVITE: "#3266ad",
+  ROLE_UPDATED: "#BA7517",
+  MEMBER_REMOVED: "#E53E3E",
+  MENTION: "#1D9E75",
+  ASSIGNMENT: "#534AB7",
+  DEFAULT: "#718096"
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Relative time string — "just now", "2m ago", "3h ago", "5d ago" */
 function relativeTime(isoString: string): string {
+  if (!isoString) return '';
   const diffMs = Date.now() - new Date(isoString).getTime();
   const diffSec = Math.floor(diffMs / 1000);
   if (diffSec < 60) return "just now";
@@ -41,10 +36,9 @@ function relativeTime(isoString: string): string {
 }
 
 function getInitial(title: string): string {
+  if (!title) return 'N';
   return (title.trim()[0] ?? "N").toUpperCase();
 }
-
-// ─── Notification Item ────────────────────────────────────────────────────────
 
 interface NotificationItemProps {
   notification: Notification;
@@ -57,19 +51,19 @@ function NotificationItem({
   isLast,
   onItemClick,
 }: NotificationItemProps): React.ReactElement {
-  const bgColor = TYPE_COLORS[notification.type];
+  const bgColor = TYPE_COLORS[notification.type] || TYPE_COLORS.DEFAULT;
+  const isUnread = !notification.readAt;
 
   return (
     <button
       type="button"
       onClick={() => onItemClick(notification)}
-      className={`w-full text-left flex gap-3 px-4 py-3
+      className={`w-full text-left flex items-start gap-4 px-4 py-4
                   transition-colors duration-100
                   hover:bg-gray-50 dark:hover:bg-gray-800/60
                   ${!isLast ? "border-b border-gray-100 dark:border-gray-800" : ""}
-                  ${!notification.read ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
+                  ${isUnread ? "bg-blue-50/50 dark:bg-blue-900/10" : ""}`}
     >
-      {/* Colored initial avatar */}
       <div
         className="flex-shrink-0 w-8 h-8 rounded-full
                    flex items-center justify-center
@@ -77,24 +71,19 @@ function NotificationItem({
         style={{ backgroundColor: bgColor }}
         aria-hidden="true"
       >
-        {getInitial(notification.title)}
+        {getInitial(notification.type.replace('_', ' '))}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-          {notification.title}
+      <div className="flex-1 min-w-0 pr-2">
+        <p className={`text-sm leading-snug break-words ${isUnread ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+          {notification.message}
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
-          {notification.body}
-        </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 font-medium">
           {relativeTime(notification.createdAt)}
         </p>
       </div>
 
-      {/* Unread dot */}
-      {!notification.read && (
+      {isUnread && (
         <div
           className="flex-shrink-0 self-center w-2 h-2 rounded-full bg-blue-500"
           aria-hidden="true"
@@ -104,47 +93,47 @@ function NotificationItem({
   );
 }
 
-// ─── Panel ───────────────────────────────────────────────────────────────────
-
 export default function NotificationPanel({
   isOpen,
   onClose,
-}: NotificationPanelProps): React.ReactElement | null {
-  const notifications = useRealtimeStore((s) => s.notifications);
-  const unreadCount = useRealtimeStore((s) => s.unreadCount);
-  const markRead = useRealtimeStore((s) => s.markRead);
-  const markAllRead = useRealtimeStore((s) => s.markAllRead);
+}: NotificationPanelProps): React.ReactElement {
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead, 
+    fetchNotifications,
+    isLoading,
+    hasMore,
+    loadMore
+  } = useNotificationStore();
 
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close when clicking outside the panel
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications(true);
+    }
+  }, [isOpen, fetchNotifications]);
+
   useEffect(() => {
     if (!isOpen) return;
 
     function handleOutsideClick(e: MouseEvent): void {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target as Node)
-      ) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onClose();
       }
     }
 
-    // Use capture phase so it fires before any other click handlers
     document.addEventListener("mousedown", handleOutsideClick, true);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick, true);
-    };
+    return () => document.removeEventListener("mousedown", handleOutsideClick, true);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   function handleItemClick(notification: Notification): void {
-    markRead(notification.id);
-    if (notification.relatedTaskId) {
-      socket.emit("join:task", { taskId: notification.relatedTaskId });
+    if (!notification.readAt) {
+      markAsRead(notification.id);
     }
-    onClose();
+    // TODO: Navigate based on metadata.workspaceId or metadata.taskId if applicable
   }
 
   return (
@@ -152,44 +141,39 @@ export default function NotificationPanel({
       ref={panelRef}
       role="dialog"
       aria-label="Notifications"
-      className="absolute right-0 top-full mt-2
-                 w-80 max-h-96 overflow-y-auto
-                 bg-white dark:bg-gray-900
-                 border border-gray-200 dark:border-gray-700
-                 shadow-lg rounded-xl z-50"
+      className={`absolute right-0 top-full mt-2 w-[400px] max-h-[32rem] overflow-y-auto
+                  bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700
+                  shadow-xl rounded-xl z-50 transform transition-all duration-200 origin-top-right
+                  ${isOpen ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"}`}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3
-                      border-b border-gray-100 dark:border-gray-800
-                      sticky top-0 bg-white dark:bg-gray-900 z-10">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur z-10">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Notifications
         </h2>
         {unreadCount > 0 && (
           <button
             type="button"
-            onClick={markAllRead}
-            className="text-xs text-blue-600 dark:text-blue-400
-                       hover:underline transition-colors duration-100
-                       focus:outline-none focus-visible:underline"
+            onClick={() => markAllAsRead()}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline transition-colors duration-100 focus:outline-none focus-visible:underline"
           >
             Mark all read
           </button>
         )}
       </div>
 
-      {/* Notification list */}
-      {notifications.length === 0 ? (
+      {isLoading && notifications.length === 0 ? (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+        </div>
+      ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 gap-2">
-          <span className="text-3xl" aria-hidden="true">
-            🔔
-          </span>
+          <span className="text-3xl" aria-hidden="true">🔔</span>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             You&apos;re all caught up!
           </p>
         </div>
       ) : (
-        <div>
+        <div className="pb-2">
           {notifications.map((notification, idx) => (
             <NotificationItem
               key={notification.id}
@@ -198,6 +182,14 @@ export default function NotificationPanel({
               onItemClick={handleItemClick}
             />
           ))}
+          {hasMore && (
+            <button
+              onClick={() => loadMore()}
+              className="w-full text-center py-3 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Load older notifications
+            </button>
+          )}
         </div>
       )}
     </div>

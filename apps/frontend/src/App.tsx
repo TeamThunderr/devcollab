@@ -16,9 +16,10 @@ import TasksView from './pages/project/TasksView';
 import EditorView from "./pages/editor/EditorView";
 import SnippetsView from "./pages/snippets/SnippetsView";
 import WikiView from "./pages/wiki/WikiView";
-import ActivityFeedView from "./pages/activity/ActivityFeedView";
+import ActivityFeedPage from "./pages/activity/ActivityFeedPage";
 import AIAssistantView from "./pages/ai/AIAssistantView";
 import SettingsView from "./pages/settings/SettingsView";
+import BillingPage from "./pages/settings/BillingPage";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -55,8 +56,9 @@ function App(): React.ReactElement {
           <Route path="/:workspaceId/editor/:pid" element={<EditorView />} />
           <Route path="/:workspaceId/snippets/:pid" element={<SnippetsView />} />
           <Route path="/:workspaceId/wiki/:pid" element={<WikiView />} />
-          <Route path="/:workspaceId/activity" element={<ActivityFeedView />} />
+          <Route path="/:workspaceId/activity" element={<ActivityFeedPage />} />
           <Route path="/:workspaceId/ai" element={<AIAssistantView />} />
+          <Route path="/:workspaceId/settings/billing" element={<BillingPage />} />
           <Route path="/settings" element={<SettingsView />} />
         </Route>
       </Routes>

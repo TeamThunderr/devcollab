@@ -22,6 +22,8 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+let refreshPromise: Promise<string> | null = null;
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -35,23 +37,33 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
 
-      try {
-        const response = await axios.post<{ accessToken: string }>(
+      if (!refreshPromise) {
+        refreshPromise = axios.post<{ accessToken: string }>(
           `${baseURL}/auth/refresh`,
           {},
           { withCredentials: true }
-        );
+        )
+        .then(response => {
+          const { accessToken } = response.data;
+          useAuthStore.getState().setAuthToken(accessToken);
+          return accessToken;
+        })
+        .catch(refreshError => {
+          useAuthStore.getState().clearAuth();
+          throw refreshError;
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
+      }
 
-        const { accessToken } = response.data;
-        useAuthStore.getState().setAuthToken(accessToken);
-
+      try {
+        const accessToken = await refreshPromise;
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         }
-
         return apiClient(originalRequest);
       } catch (refreshError) {
-        useAuthStore.getState().clearAuth();
         return Promise.reject(refreshError);
       }
     }

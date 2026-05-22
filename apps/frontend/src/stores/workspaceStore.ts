@@ -102,7 +102,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
     try {
       const updatedMember = await workspaceService.updateRole(workspaceId, memberId, role);
       set((state) => ({
-        members: state.members.map((m) => m.userId === memberId ? updatedMember : m),
+        members: state.members.map((m) => m.userId === memberId ? { ...m, ...updatedMember } : m),
         isLoading: false
       }));
     } catch (error: any) {

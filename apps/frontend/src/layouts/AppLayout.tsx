@@ -5,6 +5,8 @@ import { Link, Outlet, useNavigate, Navigate, useParams, useLocation } from "rea
 import useAuthStore from "../stores/authStore";
 import Topbar from "../components/topbar/Topbar";
 import WorkspaceSwitcher from "../components/workspace/WorkspaceSwitcher";
+import { useBillingStore } from "../stores/billingStore";
+import SubscriptionBadge from "../components/billing/SubscriptionBadge";
 
 const NAV_ITEMS = [
   { emoji: "🏠", label: "Dashboard", getTo: (wid: string) => `/${wid}` },
@@ -14,6 +16,7 @@ const NAV_ITEMS = [
   { emoji: "💾", label: "Snippets", getTo: (wid: string) => `/${wid}/snippets/project-test-456` },
   { emoji: "📊", label: "Activity", getTo: (wid: string) => `/${wid}/activity` },
   { emoji: "🤖", label: "AI Assistant", getTo: (wid: string) => `/${wid}/ai` },
+  { emoji: "💳", label: "Billing", getTo: (wid: string) => `/${wid}/settings/billing` },
 ] as const;
 
 export default function AppLayout(): React.ReactElement {
@@ -21,6 +24,14 @@ export default function AppLayout(): React.ReactElement {
   const { workspaceId } = useParams();
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuthStore();
+  const { fetchSubscription, subscription } = useBillingStore();
+
+  // Fetch subscription whenever workspace changes
+  React.useEffect(() => {
+    if (workspaceId) {
+      fetchSubscription(workspaceId);
+    }
+  }, [workspaceId, fetchSubscription]);
 
   // Auth guard — redirect unauthenticated users to /login
   if (!isAuthenticated) {
@@ -46,6 +57,7 @@ export default function AppLayout(): React.ReactElement {
           <span className="text-lg font-bold tracking-tight text-white cursor-pointer" onClick={() => navigate('/')}>
             DevCollab
           </span>
+          {subscription?.plan === 'PRO' && <SubscriptionBadge plan="PRO" />}
         </div>
 
         {/* Workspace Switcher */}
