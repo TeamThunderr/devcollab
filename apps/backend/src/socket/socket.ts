@@ -116,8 +116,14 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
       "Redis client is not available. Socket.IO requires Redis for pub/sub."
     );
   }
-  const pubClient = redis.duplicate();
-  const subClient = pubClient.duplicate();
+  const pubClient = redis.duplicate({
+    enableOfflineQueue: true,
+    maxRetriesPerRequest: null,
+  });
+  const subClient = redis.duplicate({
+    enableOfflineQueue: true,
+    maxRetriesPerRequest: null,
+  });
 
   // Connect both clients since they inherit lazyConnect: true
   await Promise.all([
