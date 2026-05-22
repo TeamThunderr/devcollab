@@ -2,16 +2,20 @@ import { prisma } from '../../db/prisma';
 import { AppError } from '../../utils/errors';
 import { CreateWorkspaceInput, InviteMemberInput, AcceptInviteInput, UpdateRoleInput } from './workspace.schema';
 import crypto from 'crypto';
-import { Role, InviteStatus } from '@prisma/client';
+import { InviteStatus, Role } from '@prisma/client';
+import { activityService } from '../activity/activity.service';
+import { notificationService } from '../notification/notification.service';
 
 export const workspaceService = {
   async createWorkspace(userId: string, data: CreateWorkspaceInput) {
-    const ownedWorkspacesCount = await prisma.workspace.count({
-      where: { createdBy: userId }
+    const userOwnedWorkspaces = await prisma.workspace.findMany({
+      where: { createdBy: userId },
+      include: { subscription: true }
     });
 
-    if (ownedWorkspacesCount >= 1) {
-      throw new AppError(403, 'Free plan limit reached: You can only create 1 workspace.');
+    const hasPro = userOwnedWorkspaces.some(w => w.subscription?.plan === 'PRO');
+    if (!hasPro && userOwnedWorkspaces.length >= 1) {
+      throw new AppError(403, 'Free plan limit reached: You can only create 1 workspace. Upgrade an existing workspace to PRO to create more.');
     }
 
     const existingSlug = await prisma.workspace.findUnique({ where: { slug: data.slug } });
@@ -38,6 +42,14 @@ export const workspaceService = {
           role: Role.OWNER
         }
       });
+      
+      activityService.createActivity({
+        workspaceId: workspace.id,
+        userId,
+        action: 'WORKSPACE_CREATED',
+        entityType: 'WORKSPACE',
+        entityId: workspace.id
+      });
 
       return workspace;
     });
@@ -63,12 +75,16 @@ export const workspaceService = {
     return workspace;
   },
 
-  async inviteMember(workspaceId: string, data: InviteMemberInput) {
-    const membersCount = await prisma.workspaceMember.count({ where: { workspaceId } });
-    const pendingInvites = await prisma.invite.count({ where: { workspaceId, status: InviteStatus.PENDING } });
+  async inviteMember(workspaceId: string, inviterId: string, data: InviteMemberInput) {
+    const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
     
-    if (membersCount + pendingInvites >= 5) {
-      throw new AppError(403, 'Free plan limit reached: Maximum 5 members allowed per workspace.');
+    if (subscription?.plan !== 'PRO') {
+      const membersCount = await prisma.workspaceMember.count({ where: { workspaceId } });
+      const pendingInvites = await prisma.invite.count({ where: { workspaceId, status: InviteStatus.PENDING } });
+      
+      if (membersCount + pendingInvites >= 5) {
+        throw new AppError(403, 'Free plan limit reached: Maximum 5 members allowed per workspace. Upgrade to PRO for unlimited members.');
+      }
     }
 
     const existingMember = await prisma.workspaceMember.findFirst({
@@ -92,6 +108,25 @@ export const workspaceService = {
     });
 
     console.log(`[Email Mock] Sent invite to ${data.email}. Token: ${token}`);
+    
+    activityService.createActivity({
+      workspaceId,
+      userId: inviterId,
+      action: 'MEMBER_INVITED',
+      entityType: 'INVITE',
+      entityId: invite.id,
+      metadata: { email: data.email, role: data.role }
+    });
+
+    const userToInvite = await prisma.user.findUnique({ where: { email: data.email } });
+    if (userToInvite) {
+      notificationService.createNotification({
+        userId: userToInvite.id,
+        type: 'WORKSPACE_INVITE',
+        message: `You have been invited to join a workspace as ${data.role}`,
+        metadata: { workspaceId, role: data.role }
+      });
+    }
 
     return invite;
   },
@@ -119,6 +154,14 @@ export const workspaceService = {
           userId,
           role: invite.role
         }
+      });
+      
+      activityService.createActivity({
+        workspaceId: invite.workspaceId,
+        userId,
+        action: 'INVITE_ACCEPTED',
+        entityType: 'MEMBER',
+        entityId: membership.id
       });
 
       return membership;
@@ -148,10 +191,28 @@ export const workspaceService = {
        throw new AppError(403, 'Only owners can grant owner role');
     }
 
-    return await prisma.workspaceMember.update({
+    const updated = await prisma.workspaceMember.update({
       where: { id: targetMembership.id },
       data: { role: newRole }
     });
+    
+    activityService.createActivity({
+      workspaceId,
+      userId: currentMembership.userId,
+      action: 'ROLE_UPDATED',
+      entityType: 'MEMBER',
+      entityId: targetMembership.id,
+      metadata: { oldRole: targetMembership.role, newRole }
+    });
+    
+    notificationService.createNotification({
+      userId: targetUserId,
+      type: 'ROLE_UPDATED',
+      message: `Your role in the workspace was updated to ${newRole}`,
+      metadata: { workspaceId, oldRole: targetMembership.role, newRole }
+    });
+    
+    return updated;
   },
 
   async removeMember(workspaceId: string, targetUserId: string, currentMembership: any) {
@@ -175,6 +236,22 @@ export const workspaceService = {
 
     await prisma.workspaceMember.delete({
       where: { id: targetMembership.id }
+    });
+    
+    activityService.createActivity({
+      workspaceId,
+      userId: currentMembership.userId,
+      action: 'MEMBER_REMOVED',
+      entityType: 'MEMBER',
+      entityId: targetMembership.id,
+      metadata: { removedUserId: targetUserId }
+    });
+    
+    notificationService.createNotification({
+      userId: targetUserId,
+      type: 'MEMBER_REMOVED',
+      message: `You have been removed from the workspace`,
+      metadata: { workspaceId }
     });
   }
 };

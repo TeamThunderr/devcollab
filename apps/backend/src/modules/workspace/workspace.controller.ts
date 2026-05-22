@@ -38,7 +38,7 @@ export const workspaceController = {
   async invite(request: FastifyRequest<{ Params: { workspaceId: string } }>, reply: FastifyReply) {
     try {
       const data = inviteMemberSchema.parse(request.body);
-      const invite = await workspaceService.inviteMember(request.params.workspaceId, data);
+      const invite = await workspaceService.inviteMember(request.params.workspaceId, request.user!.userId, data);
       return reply.status(201).send({ message: 'Invite sent', invite });
     } catch (error: any) {
       if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });

@@ -12,6 +12,9 @@ import { prisma } from "./db/prisma";
 // Module route imports
 import authRoutes from "./modules/auth/auth.routes";
 import workspaceRoutes from "./modules/workspace/workspace.routes";
+import activityRoutes from "./modules/activity/activity.routes";
+import notificationRoutes from "./modules/notification/notification.routes";
+import billingRoutes from "./modules/billing/billing.routes";
 // import projectRoutes from "./modules/project/project.routes";
 // import taskRoutes from "./modules/task/task.routes";
 // import wikiRoutes from "./modules/wiki/wiki.routes";
@@ -37,6 +40,9 @@ async function bootstrap() {
   // Register module routes
   server.register(authRoutes, { prefix: "/api/auth" });
   server.register(workspaceRoutes, { prefix: "/api/workspaces" });
+  server.register(activityRoutes, { prefix: "/api/activities" });
+  server.register(notificationRoutes, { prefix: "/api/notifications" });
+  server.register(billingRoutes, { prefix: "/api/billing" });
   // server.register(projectRoutes, { prefix: "/api/projects" });
   // server.register(taskRoutes, { prefix: "/api/tasks" });
   // server.register(wikiRoutes, { prefix: "/api/wiki" });
