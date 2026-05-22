@@ -2,6 +2,26 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  avatar?: string;
+}
+
+export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  role: WorkspaceRole;
+  joinedAt: string;
+  user: User;
 }
 
 export interface Project {

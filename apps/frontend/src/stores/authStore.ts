@@ -1,51 +1,97 @@
-/**
- * apps/frontend/src/stores/authStore.ts
- *
- * Zustand auth store.
- * Holds the authenticated user, the JWT access token, and auth state.
- * On clearAuth the socket is disconnected to avoid orphaned connections.
- */
-
 import { create } from "zustand";
-import { disconnectSocket } from "../lib/socket";
-
-// ─── Interfaces ──────────────────────────────────────────────────────────────
-
-export interface AuthUser {
-  userId: string;
-  name: string;
-  email: string;
-  avatar: string | null;
-}
+import { disconnectSocket, connectSocket } from "../lib/socket";
+import { authService, AuthUser } from "../services/api/auth.service";
 
 export interface AuthStore {
   user: AuthUser | null;
   accessToken: string | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  isInitialized: boolean;
+  error: string | null;
 
-  setAuth: (user: AuthUser, token: string) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  fetchCurrentUser: () => Promise<void>;
+  setAuthToken: (token: string) => void;
   clearAuth: () => void;
 }
 
-// ─── Store ───────────────────────────────────────────────────────────────────
-
 const useAuthStore = create<AuthStore>()((set) => ({
-  // ── Initial state ──────────────────────────────────────────────────────────
   user: null,
   accessToken: null,
   isAuthenticated: false,
+  isLoading: false,
+  isInitialized: false,
+  error: null,
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  setAuthToken: (token: string) => set({ accessToken: token, isAuthenticated: true }),
 
-  /** Persist user + token after a successful login or token refresh */
-  setAuth: (user, token) =>
-    set({ user, accessToken: token, isAuthenticated: true }),
+  login: async (email, password) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { user, accessToken } = await authService.login({ email, password });
+      set({ user, accessToken, isAuthenticated: true, isLoading: false });
+      // Temporary connect pattern, ideally connected per workspace later
+      connectSocket(accessToken, "workspace-test-123");
+    } catch (error: any) {
+      set({ 
+        error: error.response?.data?.error || "Failed to login", 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
 
-  /**
-   * Clear all auth state on logout.
-   * Also disconnects the Socket.IO connection so the server cleans up
-   * the presence entry immediately (rather than waiting for the TTL).
-   */
+  register: async (email, password, name) => {
+    set({ isLoading: true, error: null });
+    try {
+      await authService.register({ email, password, name });
+      
+      const { user, accessToken } = await authService.login({ email, password });
+      set({ user, accessToken, isAuthenticated: true, isLoading: false });
+      connectSocket(accessToken, "workspace-test-123");
+    } catch (error: any) {
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : errData || "Failed to register";
+      set({ error: errMsg, isLoading: false });
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await authService.logout();
+    } catch (e) {
+      // ignore errors on logout
+    } finally {
+      disconnectSocket();
+      set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
+    }
+  },
+
+  fetchCurrentUser: async () => {
+    set({ isInitialized: false, error: null });
+    try {
+      // Calling getMe without a token will result in a 401. 
+      // The Axios interceptor will automatically catch the 401, call /auth/refresh using the httpOnly cookie, 
+      // set the new accessToken in the store, and retry the request transparently!
+      const user = await authService.getMe();
+      set({ user, isAuthenticated: true, isInitialized: true });
+      
+      // Also connect socket if we have the token
+      const token = useAuthStore.getState().accessToken;
+      if (token) {
+        connectSocket(token, "workspace-test-123");
+      }
+    } catch (error) {
+      disconnectSocket();
+      set({ user: null, accessToken: null, isAuthenticated: false, isInitialized: true });
+    }
+  },
+
   clearAuth: () => {
     disconnectSocket();
     set({ user: null, accessToken: null, isAuthenticated: false });

@@ -9,7 +9,7 @@ import cookie from "@fastify/cookie";
 import { redis, isRedisAvailable } from "./redis/client";
 import initSocket from "./socket/socket";
 import { aiConfig } from "./config/ai.config";
-import { prisma } from "./db/prisma";
+import { prisma, pool } from "./db/prisma";
 
 // Module route imports
 import authRoutes from "./modules/auth/auth.routes";

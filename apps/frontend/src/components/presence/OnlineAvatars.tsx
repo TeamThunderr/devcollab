@@ -51,7 +51,7 @@ export default function OnlineAvatars({
 
   // Exclude the signed-in user from the list
   const others = onlineUsers.filter(
-    (u: OnlineUser) => u.userId !== currentUser?.userId
+    (u: OnlineUser) => u.userId !== currentUser?.id
   );
 
   if (others.length === 0) return null;
