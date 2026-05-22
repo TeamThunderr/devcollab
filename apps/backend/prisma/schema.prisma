@@ -152,6 +152,7 @@ model Notification {
   userId      String
   type        String
   message     String
+  metadata    Json?
   readAt      DateTime? // Read timestamp instead of boolean
   createdAt   DateTime  @default(now())
 
