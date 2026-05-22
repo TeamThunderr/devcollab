@@ -110,22 +110,7 @@ let io: DevCollabServer;
 // ─── Init ────────────────────────────────────────────────────────────────────
 
 export async function initSocket(httpServer: http.Server): Promise<void> {
-  // 1. Create dedicated Redis pub/sub clients for the adapter
-  if (!redis) {
-    throw new Error(
-      "Redis client is not available. Socket.IO requires Redis for pub/sub."
-    );
-  }
-  const pubClient = redis.duplicate();
-  const subClient = pubClient.duplicate();
-
-  // Connect both clients since they inherit lazyConnect: true
-  await Promise.all([
-    pubClient.connect(),
-    subClient.connect()
-  ]);
-
-  // 2. Initialize Socket.IO server
+  // 1. Initialize Socket.IO server
   io = new Server<
     ClientToServerEvents,
     ServerToClientEvents,
@@ -140,8 +125,27 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
     transports: ["websocket"],
   });
 
-  // Attach Redis adapter for horizontal scaling across multiple server instances
-  io.adapter(createAdapter(pubClient, subClient));
+  // 2. Attach Redis adapter if available
+  if (redis) {
+    try {
+      const pubClient = redis.duplicate();
+      const subClient = pubClient.duplicate();
+
+      // Connect both clients since they inherit lazyConnect: true
+      await Promise.all([
+        pubClient.connect(),
+        subClient.connect()
+      ]);
+
+      // Attach Redis adapter for horizontal scaling across multiple server instances
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log("✅ Socket.IO server initialized with Redis adapter");
+    } catch (err) {
+      console.warn("⚠️ Redis adapter initialization failed. Socket.IO will run in standalone mode.");
+    }
+  } else {
+    console.log("⚠️ Redis not available. Socket.IO initialized in standalone mode.");
+  }
 
   // 3. JWT authentication middleware — runs before every connection is accepted
   io.use((socket: DevCollabSocket, next) => {
@@ -283,7 +287,7 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
     });
   });
 
-  console.log("✅ Socket.IO server initialized with Redis adapter");
+  // Initialization complete
 }
 
 // ─── Typed emit helpers ──────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ function mapSnippet(snippet: Prisma.SnippetGetPayload<Record<string, never>>) {
     language: snippet.language,
     code: snippet.code,
     description: snippet.description ?? undefined,
-    tags: snippet.tags,
+    tags: snippet.tags || [],
     projectId: snippet.projectId,
     createdAt: snippet.createdAt.toISOString(),
     updatedAt: snippet.updatedAt.toISOString(),
@@ -24,7 +24,7 @@ export class SnippetService {
         language: data.language,
         code: data.code,
         description: data.description,
-        tags: data.tags,
+        tags: data.tags || [],
         project: {
           connect: {
             id: data.projectId,
@@ -57,7 +57,13 @@ export class SnippetService {
     try {
       const snippet = await prisma.snippet.update({
         where: { id: snippetId },
-        data,
+        data: {
+          title: data.title,
+          language: data.language,
+          code: data.code,
+          description: data.description,
+          tags: data.tags !== undefined ? data.tags : undefined,
+        },
       });
 
       return mapSnippet(snippet);

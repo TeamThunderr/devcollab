@@ -2,11 +2,12 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Project {
@@ -18,28 +19,10 @@ model Project {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   tasks       Task[]
   snippets    Snippet[]
+  files       ProjectFile[]
 
-  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([workspaceId, createdAt])
   @@map("projects")
-}
-
-model Task {
-  id          String       @id @default(cuid())
-  title       String
-  description String?
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(P1)
-  dueDate     DateTime?    @map("due_date")
-  projectId   String       @map("project_id")
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  comments    Comment[]
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-
-  @@index([projectId, createdAt(sort: Desc)])
-  @@index([projectId, status])
-  @@index([projectId, priority])
-  @@map("tasks")
 }
 
 enum TaskStatus {
@@ -55,6 +38,26 @@ enum TaskPriority {
   P2
 }
 
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(P1)
+  dueDate     DateTime?    @map("due_date")
+  projectId   String       @map("project_id")
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  files       ProjectFile[]
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+  @@index([projectId, priority])
+  @@map("tasks")
+}
+
 model Comment {
   id        String   @id @default(cuid())
   content   String
@@ -63,7 +66,7 @@ model Comment {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  @@index([taskId, createdAt(sort: Desc)])
+  @@index([taskId, createdAt])
   @@map("comments")
 }
 
@@ -79,7 +82,61 @@ model Snippet {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@index([projectId, createdAt(sort: Desc)])
+  @@index([projectId, createdAt])
   @@index([projectId, title])
   @@map("snippets")
 }
+
+model ProjectFile {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId    String?  @map("parent_id")
+  name        String
+  type        String   @default("file")
+  content     String?  @default("")
+  language    String?  @default("plaintext")
+  createdBy   String?  @map("created_by")
+  taskId      String?  @map("linkedTaskId")
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@map("files")
+}
+
+model WikiPage {
+  id           String        @id @default(cuid())
+  workspaceId  String        @map("workspace_id")
+  projectId    String        @map("project_id")
+  title        String        @default("Untitled")
+  slug         String        @unique
+  content      String        @default("")
+  linkedTaskId String?       @map("linked_task_id")
+  linkedFileId String?       @map("linked_file_id")
+  createdBy    String        @map("created_by")
+  updatedBy    String        @map("updated_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  versions     WikiVersion[]
+
+  @@index([projectId])
+  @@index([workspaceId])
+  @@map("wiki_pages")
+}
+
+model WikiVersion {
+  id              String   @id @default(cuid())
+  pageId          String   @map("page_id")
+  page            WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  contentSnapshot String   @map("content_snapshot")
+  versionNumber   Int      @map("version_number")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([pageId])
+  @@map("wiki_versions")
+}
+

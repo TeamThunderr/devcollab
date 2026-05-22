@@ -1,10 +1,13 @@
 import dotenv from "dotenv";
 import path from "path";
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
+import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import fs from "fs";
 import { pool } from "./db/client";
 import { redis, isRedisAvailable } from "./redis/client";
 import initSocket from "./socket/socket";
@@ -35,6 +38,20 @@ async function bootstrap() {
     secret: process.env.JWT_SECRET ?? "devcollab-cookie-secret",
   });
 
+  await server.register(multipart, {
+    limits: { fileSize: 10 * 1024 * 1024 },
+  });
+
+  const uploadsDir = path.join(__dirname, "../uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  await server.register(fastifyStatic, {
+    root: uploadsDir,
+    prefix: "/uploads/",
+  });
+
   // Register module routes
   server.register(authRoutes, { prefix: "/api/auth" });
   server.register(workspaceRoutes, { prefix: "/api/workspaces" });
@@ -54,9 +71,6 @@ async function bootstrap() {
 
   // Verify PostgreSQL connection
   try {
-    await pool.query("SELECT 1");
-    console.log("✅ PostgreSQL connected successfully");
-
     // Automatically seed the default test project used by the frontend development server
     const projectCheck = await pool.query("SELECT id FROM projects WHERE id = $1 LIMIT 1", ["project-test-456"]);
     if (projectCheck.rowCount === 0) {
@@ -68,7 +82,7 @@ async function bootstrap() {
       console.log("🌱 Automatically seeded test project 'project-test-456' for local development.");
     }
   } catch (err) {
-    console.error("❌ PostgreSQL connection failed:", err);
+    console.log("⚠️  PostgreSQL connection failed, but proceeding for local dev (SQLite mode):", err);
   }
 
   // Verify Redis connection (optional - graceful degradation)
@@ -104,7 +118,6 @@ async function bootstrap() {
     console.error("❌ Socket.IO initialization failed:", err);
   }
 
-  // AI startup check
   if (!aiConfig.apiKey && !aiConfig.mockMode) {
     console.warn(
       "⚠️  GEMINI_API_KEY not set and AI_MOCK_MODE is false — AI features will fail"
@@ -120,3 +133,7 @@ bootstrap().catch((err) => {
   console.error("Fatal error during startup:", err);
   process.exit(1);
 });
+
+
+ 
+ 

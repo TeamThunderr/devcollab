@@ -1,4 +1,4 @@
-import { Prisma, TaskPriority, TaskStatus } from '@prisma/client';
+import { Prisma, TaskStatus, TaskPriority } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { CreateTaskInput, UpdateTaskInput } from './task.schema';
 
@@ -53,8 +53,8 @@ export class TaskService {
       data: {
         title: data.title,
         description: data.description,
-        status: data.status as TaskStatus,
-        priority: data.priority as TaskPriority,
+        ...(data.status !== undefined ? { status: data.status as TaskStatus } : {}),
+        ...(data.priority !== undefined ? { priority: data.priority as TaskPriority } : {}),
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
         project: {
           connect: {
@@ -70,19 +70,19 @@ export class TaskService {
 
   async getTasksByProject(
     projectId: string,
-    filters?: { status?: TaskStatus; priority?: TaskPriority }
+    filters?: { status?: string; priority?: string }
   ) {
     const tasks = await prisma.task.findMany({
       where: {
         projectId,
-        ...(filters?.status ? { status: filters.status } : {}),
-        ...(filters?.priority ? { priority: filters.priority } : {}),
+        ...(filters?.status ? { status: filters.status as Prisma.EnumTaskStatusFilter | TaskStatus } : {}),
+        ...(filters?.priority ? { priority: filters.priority as Prisma.EnumTaskPriorityFilter | TaskPriority } : {}),
       },
       include: taskInclude,
       orderBy: { createdAt: 'desc' },
     });
 
-    return tasks.map(mapTask);
+    return (tasks as any[]).map(mapTask);
   }
 
   async getTaskById(taskId: string) {
