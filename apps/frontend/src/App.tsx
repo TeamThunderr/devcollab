@@ -1,32 +1,63 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+// TEMP — replace with real implementation (route guards, lazy loading, error boundaries)
 
-import AppLayout from './layouts/AppLayout';
-import AuthLayout from './layouts/AuthLayout';
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import useAuthStore from "./stores/authStore";
 
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import WorkspaceDashboard from './pages/workspace/WorkspaceDashboard';
-import ProjectView from './pages/project/ProjectView';
-import EditorView from './pages/editor/EditorView';
-import SnippetsView from './pages/snippets/SnippetsView';
-import WikiView from './pages/wiki/WikiView';
-import ActivityFeedView from './pages/activity/ActivityFeedView';
-import AIAssistantView from './pages/ai/AIAssistantView';
-import SettingsView from './pages/settings/SettingsView';
+import AppLayout from "./layouts/AppLayout";
+import AuthLayout from "./layouts/AuthLayout";
+
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
+import WorkspaceDashboard from "./pages/workspace/WorkspaceDashboard";
+import ProjectView from "./pages/project/ProjectView";
+import TasksView from './pages/project/TasksView';
+import EditorView from "./pages/editor/EditorView";
+import SnippetsView from "./pages/snippets/SnippetsView";
+import WikiView from "./pages/wiki/WikiView";
+import ActivityFeedView from "./pages/activity/ActivityFeedView";
+import AIAssistantView from "./pages/ai/AIAssistantView";
+import SettingsView from "./pages/settings/SettingsView";
+
+/**
+ * ProtectedRoute — redirects to /login if not authenticated.
+ * AppLayout also guards itself, but this gives a clean outer redirect
+ * so unauthenticated direct URL hits don't flash layout chrome.
+ */
+function ProtectedRoute({
+  children,
+}: {
+  children: React.ReactElement;
+}): React.ReactElement {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return children;
+}
 
 function App(): React.ReactElement {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
+        {/* Public auth routes */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
-        <Route element={<AppLayout />}>
+
+        {/* Protected app routes — AppLayout handles its own guard too */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route path="/" element={<WorkspaceDashboard />} />
           <Route path="/:workspaceSlug" element={<WorkspaceDashboard />} />
-          <Route path="/:workspaceSlug/projects/:pid" element={<ProjectView />} />
+          <Route path="/:workspaceSlug/projects" element={<ProjectView />} />
+          <Route path="/:workspaceSlug/projects/:pid" element={<TasksView />} />
           <Route path="/:workspaceSlug/editor/:pid" element={<EditorView />} />
           <Route path="/:workspaceSlug/snippets/:pid" element={<SnippetsView />} />
           <Route path="/:workspaceSlug/wiki/:pid" element={<WikiView />} />

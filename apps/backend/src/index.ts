@@ -6,7 +6,9 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 // import { pool } from "./db/client";
-import { redis } from "./redis/client";
+import { redis, isRedisAvailable } from "./redis/client";
+import initSocket from "./socket/socket";
+import { aiConfig } from "./config/ai.config";
 import { prisma } from "./db/prisma";
 
 // Module route imports
@@ -59,24 +61,68 @@ async function bootstrap() {
 
   // Verify PostgreSQL connection via Prisma
   try {
+    await pool.query("SELECT 1");
+    console.log("✅ PostgreSQL connected successfully");
+
+    // Automatically seed the default test project used by the frontend development server
+    const projectCheck = await pool.query("SELECT id FROM projects WHERE id = $1 LIMIT 1", ["project-test-456"]);
+    if (projectCheck.rowCount === 0) {
+      await pool.query(
+        `INSERT INTO projects (id, name, description, workspace_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+        ["project-test-456", "Test Project", "Automatically created development test project", "workspace-test-123"]
+      );
+      console.log("🌱 Automatically seeded test project 'project-test-456' for local development.");
+    }
     await prisma.$queryRaw`SELECT 1`;
     console.log("✅ PostgreSQL connected successfully via Prisma");
   } catch (err) {
     console.error("❌ PostgreSQL connection failed:", err);
   }
 
-  // Verify Redis connection
-  try {
-    await redis.ping();
-    console.log("✅ Redis connected successfully");
-  } catch (err) {
-    console.error("❌ Redis connection failed:", err);
+  // Verify Redis connection (optional - graceful degradation)
+  if (redis) {
+    try {
+      await redis.connect();
+      await redis.ping();
+      console.log("✅ Redis connected successfully");
+    } catch (err) {
+      // Redis connection failed - this is OK in development
+      // The warning was already logged by the Redis client
+      // Backend will continue running without realtime features
+    }
   }
 
   const port = Number(process.env.PORT ?? 3000);
 
   await server.listen({ port, host: "0.0.0.0" });
-  console.log(`🚀 DevCollab backend running on port ${port}`);
+
+  const redisStatus = isRedisAvailable()
+    ? "✅ with realtime features"
+    : "⚠️  without realtime features (Redis unavailable)";
+  console.log(
+    `\n🚀 DevCollab backend running on port ${port} ${redisStatus}\n`
+  );
+
+  // Initialize Socket.IO server with Redis adapter
+  // Must be called after server.listen() so fastify.server is bound to the port
+  try {
+    await initSocket(server.server);
+    console.log("✅ Socket.IO initialized");
+  } catch (err) {
+    console.error("❌ Socket.IO initialization failed:", err);
+  }
+
+  // AI startup check
+  if (!aiConfig.apiKey && !aiConfig.mockMode) {
+    console.warn(
+      "⚠️  GEMINI_API_KEY not set and AI_MOCK_MODE is false — AI features will fail"
+    );
+  } else if (aiConfig.mockMode) {
+    console.log("🤖 AI running in MOCK mode — no API calls will be made");
+  } else {
+    console.log(`🤖 AI running in LIVE mode — using ${aiConfig.model}`);
+  }
 }
 
 bootstrap().catch((err) => {

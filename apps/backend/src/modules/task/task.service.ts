@@ -1,30 +1,152 @@
-import { pool } from '../../db/client';
+import { Prisma, TaskPriority, TaskStatus } from '@prisma/client';
+import { prisma } from '../../db/prisma';
+import { CreateTaskInput, UpdateTaskInput } from './task.schema';
 
-export async function createTask(): Promise<void> {
-  // TODO: insert task row with default status
-  void pool;
+const taskInclude = {
+  comments: {
+    orderBy: {
+      createdAt: 'desc',
+    },
+  },
+} satisfies Prisma.TaskInclude;
+
+function mapComment(comment: Prisma.CommentGetPayload<Record<string, never>>) {
+  return {
+    id: comment.id,
+    content: comment.content,
+    taskId: comment.taskId,
+    createdAt: comment.createdAt.toISOString(),
+    updatedAt: comment.updatedAt.toISOString(),
+  };
 }
 
-export async function listTasks(): Promise<void> {
-  // TODO: select tasks by projectId with filters
+function mapTask(task: Prisma.TaskGetPayload<{ include: typeof taskInclude }>) {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description ?? undefined,
+    status: task.status,
+    priority: task.priority,
+    dueDate: task.dueDate?.toISOString(),
+    projectId: task.projectId,
+    createdAt: task.createdAt.toISOString(),
+    updatedAt: task.updatedAt.toISOString(),
+    comments: task.comments.map(mapComment),
+  };
 }
 
-export async function getTaskById(): Promise<void> {
-  // TODO: select single task by id
+function toTaskUpdateData(data: UpdateTaskInput): Prisma.TaskUpdateInput {
+  return {
+    ...(data.title !== undefined ? { title: data.title } : {}),
+    ...(data.description !== undefined ? { description: data.description } : {}),
+    ...(data.status !== undefined ? { status: data.status as TaskStatus } : {}),
+    ...(data.priority !== undefined ? { priority: data.priority as TaskPriority } : {}),
+    ...(data.dueDate !== undefined
+      ? { dueDate: data.dueDate ? new Date(data.dueDate) : null }
+      : {}),
+  };
 }
 
-export async function updateTask(): Promise<void> {
-  // TODO: update task fields
-}
+export class TaskService {
+  async createTask(data: CreateTaskInput) {
+    const task = await prisma.task.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        status: data.status as TaskStatus,
+        priority: data.priority as TaskPriority,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+        project: {
+          connect: {
+            id: data.projectId,
+          },
+        },
+      },
+      include: taskInclude,
+    });
 
-export async function deleteTask(): Promise<void> {
-  // TODO: delete task row
-}
+    return mapTask(task);
+  }
 
-export async function assignTask(): Promise<void> {
-  // TODO: set assignee_id on task
-}
+  async getTasksByProject(
+    projectId: string,
+    filters?: { status?: TaskStatus; priority?: TaskPriority }
+  ) {
+    const tasks = await prisma.task.findMany({
+      where: {
+        projectId,
+        ...(filters?.status ? { status: filters.status } : {}),
+        ...(filters?.priority ? { priority: filters.priority } : {}),
+      },
+      include: taskInclude,
+      orderBy: { createdAt: 'desc' },
+    });
 
-export async function moveTask(): Promise<void> {
-  // TODO: update status and sort_order for kanban
+    return tasks.map(mapTask);
+  }
+
+  async getTaskById(taskId: string) {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: taskInclude,
+    });
+
+    return task ? mapTask(task) : null;
+  }
+
+  async updateTask(taskId: string, data: UpdateTaskInput) {
+    try {
+      const task = await prisma.task.update({
+        where: { id: taskId },
+        data: toTaskUpdateData(data),
+        include: taskInclude,
+      });
+
+      return mapTask(task);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new Error('Task not found');
+      }
+
+      throw error;
+    }
+  }
+
+  async deleteTask(taskId: string) {
+    try {
+      await prisma.task.delete({
+        where: { id: taskId },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new Error('Task not found');
+      }
+
+      throw error;
+    }
+  }
+
+  async addComment(taskId: string, content: string) {
+    const comment = await prisma.comment.create({
+      data: {
+        content,
+        task: {
+          connect: {
+            id: taskId,
+          },
+        },
+      },
+    });
+
+    return mapComment(comment);
+  }
+
+  async getTaskComments(taskId: string) {
+    const comments = await prisma.comment.findMany({
+      where: { taskId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return comments.map(mapComment);
+  }
 }

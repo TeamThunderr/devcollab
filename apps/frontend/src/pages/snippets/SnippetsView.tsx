@@ -1,5 +1,6 @@
 import React from 'react';
+import SnippetsPage from './SnippetsPage';
 
 export default function SnippetsView(): React.ReactElement {
-  return <div>SnippetsView</div>;
+  return <SnippetsPage />;
 }
