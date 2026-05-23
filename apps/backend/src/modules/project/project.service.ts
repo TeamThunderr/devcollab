@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { CreateProjectInput, UpdateProjectInput } from './project.schema';
 
@@ -9,9 +8,9 @@ const projectInclude = {
       snippets: true,
     },
   },
-} satisfies Prisma.ProjectInclude;
+};
 
-function mapProject(project: Prisma.ProjectGetPayload<{ include: typeof projectInclude }>) {
+function mapProject(project: any) {
   return {
     id: project.id,
     name: project.name,
@@ -65,8 +64,8 @@ export class ProjectService {
       });
 
       return mapProject(project);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+    } catch (error: any) {
+      if (error.code === 'P2025') {
         throw new Error('Project not found');
       }
 
@@ -79,8 +78,8 @@ export class ProjectService {
       await prisma.project.delete({
         where: { id: projectId },
       });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+    } catch (error: any) {
+      if (error.code === 'P2025') {
         throw new Error('Project not found');
       }
 

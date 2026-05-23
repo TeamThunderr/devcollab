@@ -1,22 +1,51 @@
-import { pool } from '../../db/client';
+import { prisma } from '../../db/prisma';
 
-export async function getFileTree(): Promise<void> {
-  // TODO: read file tree from DB or filesystem for project
-  void pool;
-}
+export class EditorService {
+  async getFileTree(projectId: string) {
+    const files = await prisma.projectFile.findMany({
+      where: { projectId },
+      select: { id: true, name: true, parentId: true, type: true, language: true, content: true, taskId: true }
+    });
+    return files;
+  }
 
-export async function getFileContent(): Promise<void> {
-  // TODO: retrieve file content by path
-}
+  async getFile(projectId: string, fileId: string) {
+    const file = await prisma.projectFile.findFirst({
+      where: { id: fileId, projectId }
+    });
+    return file;
+  }
 
-export async function saveFileContent(): Promise<void> {
-  // TODO: persist file content and broadcast to collaborators
-}
+  async createFile(data: { projectId: string; name: string; type?: string; parentId?: string; content?: string; language?: string; createdBy?: string; taskId?: string }) {
+    return await prisma.projectFile.create({
+      data: {
+        projectId: data.projectId,
+        name: data.name,
+        type: data.type || 'file',
+        parentId: data.parentId || null,
+        content: data.content || '',
+        language: data.language || 'plaintext',
+        createdBy: data.createdBy,
+        taskId: data.taskId
+      }
+    });
+  }
 
-export async function createFile(): Promise<void> {
-  // TODO: create file or directory entry
-}
+  async updateFile(projectId: string, fileId: string, data: { name?: string; content?: string; language?: string; taskId?: string | null }) {
+    return await prisma.projectFile.update({
+      where: { id: fileId, projectId },
+      data
+    });
+  }
 
-export async function deleteFile(): Promise<void> {
-  // TODO: remove file or directory entry
+  async deleteFile(projectId: string, fileId: string) {
+    // Delete file and any children if it is a directory
+    await prisma.projectFile.deleteMany({
+      where: { parentId: fileId, projectId }
+    });
+    
+    return await prisma.projectFile.delete({
+      where: { id: fileId, projectId }
+    });
+  }
 }
