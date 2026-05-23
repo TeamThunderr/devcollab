@@ -1,19 +1,19 @@
-import { apiClient } from './client';
-import { Subscription, RazorpayOrder, VerifyPaymentPayload } from '../../types';
+import api from '../../lib/axios';
+import { Subscription, VerifyPaymentPayload } from '../../types';
 
 export const billingService = {
   getSubscription: async (workspaceId: string) => {
-    const response = await apiClient.get<Subscription>(`/billing/${workspaceId}`);
+    const response = await api.get<Subscription>(`/api/billing/${workspaceId}`);
     return response.data;
   },
 
   createOrder: async (workspaceId: string) => {
-    const response = await apiClient.post<{ id: string; amount: number; currency: string; keyId: string }>('/billing/orders', { workspaceId });
+    const response = await api.post<{ id: string; amount: number; currency: string; keyId: string }>('/api/billing/orders', { workspaceId });
     return response.data;
   },
 
   verifyPayment: async (payload: VerifyPaymentPayload) => {
-    const response = await apiClient.post<{ message: string; subscription: Subscription }>('/billing/verify', payload);
+    const response = await api.post<{ message: string; subscription: Subscription }>('/api/billing/verify', payload);
     return response.data;
   }
 };

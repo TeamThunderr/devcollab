@@ -1,3 +1,93 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Tiptap Tables */
+.tiptap table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.tiptap table td,
+.tiptap table th {
+  min-width: 1em;
+  border: 1px solid #3c3c3c;
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.tiptap table th {
+  font-weight: bold;
+  text-align: left;
+  background-color: #2d2d2d;
+}
+
+.tiptap table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #007aff;
+  pointer-events: none;
+}
+
+.tiptap table p {
+  margin: 0;
+}
+
+/* Tiptap Code Block (lowlight) */
+.tiptap pre {
+  background: #181818;
+  color: #e4e4e4;
+  font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #333;
+}
+
+.tiptap pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+  font-size: 0.875rem;
+}
+
+.tiptap pre .hljs-comment,
+.tiptap pre .hljs-quote {
+  color: #8b949e;
+  font-style: italic;
+}
+
+.tiptap pre .hljs-keyword,
+.tiptap pre .hljs-selector-tag {
+  color: #ff7b72;
+}
+
+.tiptap pre .hljs-string,
+.tiptap pre .hljs-attr {
+  color: #a5d6ff;
+}
+
+.tiptap pre .hljs-number {
+  color: #79c0ff;
+}
+
+.tiptap pre .hljs-title,
+.tiptap pre .hljs-section {
+  color: #d2a8ff;
+}
+
+/* Placeholder */
+.tiptap p.is-editor-empty:first-child::before {
+  color: #555;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

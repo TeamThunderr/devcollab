@@ -1,9 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { TaskController } from './task.controller';
+import { verifyAuth } from '../../middleware/auth.middleware';
 
 const taskController = new TaskController();
 
 export default async function register(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('preHandler', verifyAuth);
   fastify.post('/', (request, reply) => taskController.createTask(request, reply));
   fastify.get('/project/:projectId', (request, reply) =>
     taskController.getTasksByProject(request, reply),

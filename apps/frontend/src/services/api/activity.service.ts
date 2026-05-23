@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import api from '../../lib/axios';
 import { Activity, PaginatedResponse } from '../../types';
 
 export interface ActivityFilters {
@@ -24,9 +24,9 @@ export const activityService = {
     }
 
     const queryString = params.toString();
-    const url = `/activities/${workspaceId}${queryString ? `?${queryString}` : ''}`;
+    const url = `/api/activity/${workspaceId}${queryString ? `?${queryString}` : ''}`;
     
-    const response = await apiClient.get<PaginatedResponse<Activity>>(url);
+    const response = await api.get<PaginatedResponse<Activity>>(url);
     return response.data;
   }
 };

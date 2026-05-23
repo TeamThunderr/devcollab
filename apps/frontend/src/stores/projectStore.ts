@@ -26,7 +26,7 @@ export const useProjectStore = create<ProjectStore>((set) => ({
     set({ loading: true, error: undefined });
 
     try {
-      const response = await api.get<Project[]>('/projects', {
+      const response = await api.get<Project[]>('/api/projects', {
         params: { workspaceId },
       });
       set({ projects: response.data, loading: false });
@@ -36,7 +36,7 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   },
 
   createProject: async (payload) => {
-    const response = await api.post<Project>('/projects', payload);
+    const response = await api.post<Project>('/api/projects', payload);
     set((state) => ({
       projects: [response.data, ...state.projects],
     }));
@@ -44,7 +44,7 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   },
 
   deleteProject: async (id) => {
-    await api.delete(`/projects/${id}`);
+    await api.delete(`/api/projects/${id}`);
     set((state) => ({
       projects: state.projects.filter((project) => project.id !== id),
     }));

@@ -1,34 +1,56 @@
-import { Pool, QueryResult, QueryResultRow } from "pg";
+import { Pool, PoolClient, QueryResultRow } from 'pg'
+import dotenv from 'dotenv'
+import path from 'path'
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') })
 
-export const pool = new Pool({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 20,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,
-});
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+})
 
-pool.on("error", (err) => {
-  console.error("Unexpected PostgreSQL pool error:", err);
-});
+pool.on('error', (err) => {
+  console.error('PostgreSQL pool error:', err)
+})
 
-/**
- * Execute a parameterised SQL query using the shared connection pool.
- *
- * @param text   - SQL query string (use $1, $2 … for parameters)
- * @param params - Optional array of parameter values
- * @returns      QueryResult typed to the row shape T
- */
-export async function query<T extends QueryResultRow = QueryResultRow>(
-  text: string,
-  params?: unknown[]
-): Promise<QueryResult<T>> {
-  const start = Date.now();
-  const result = await pool.query<T>(text, params);
-  const duration = Date.now() - start;
-  console.debug(`Executed query in ${duration}ms — rows: ${result.rowCount}`);
-  return result;
+export async function query<T extends QueryResultRow = QueryResultRow>(text: string, params?: any[]) {
+  const start = Date.now()
+  try {
+    const result = await pool.query<T>(text, params)
+    const duration = Date.now() - start
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Query executed', { text: text.slice(0, 50), duration, rows: result.rowCount })
+    }
+    return result
+  } catch (err) {
+    console.error('Query error:', { text: text.slice(0, 50), error: err })
+    throw err
+  }
 }
+
+export async function getClient() {
+  const client = await pool.connect()
+  return client
+}
+
+export async function transaction<T>(
+  callback: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await callback(client)
+    await client.query('COMMIT')
+    return result
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+export { pool }
+export default pool

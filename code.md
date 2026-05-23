@@ -1,0 +1,50 @@
+# DevCollab Development Documentation
+
+This document serves as a comprehensive record of the architectural features, modules, and integrations developed for the **DevCollab** platform, specifically focusing on the **Monaco Code Editor** and the **Documentation Wiki** modules.
+
+---
+
+## 1. Monaco Code Editor Module
+
+The code editor module was built to provide a lightweight, single-user, IDE-like experience directly in the browser, powered by the core VS Code engine.
+
+### Core Features & UI
+- **VS Code Engine Integration**: Utilized `@monaco-editor/react` to embed the full Monaco editor, providing native syntax highlighting, autocomplete, and code folding for multiple languages including JavaScript, Python, Java, C++, and Go.
+- **Theme Management**: Integrated a Dark / Light theme toggle that dynamically switches the Monaco editor instance between `vs-dark` and `light` themes to match the user's preference.
+- **Multi-File Tabs**: Engineered a tabbed interface allowing users to open multiple files simultaneously. State is managed via Zustand (`editorStore`), keeping track of the `activeFileId` and the array of `openFiles`.
+- **Single-User Architecture**: Intentionally omitted real-time co-editing (e.g., Yjs/WebRTC) to ensure a streamlined, conflict-free, single-user development environment per file.
+
+### File System & Auto-Save
+- **Project-Based File Tree**: Created a hierarchical file explorer sidebar. Users can seamlessly create new files, create folders, rename existing items, and delete files directly from the UI.
+- **Debounced Auto-Save**: Implemented a background auto-save mechanism. As the user types in the Monaco editor, changes are debounced (typically 1-2 seconds) and automatically synced to the PostgreSQL database via the Fastify backend, preventing data loss without overwhelming the network.
+
+### Task Integration
+- **Task Linking**: Added a dropdown utility directly in the editor header. This allows users to link the currently open file to a specific Agile Task/Ticket from the project's task board, bridging the gap between project management and code execution.
+
+---
+
+## 2. Documentation Wiki Module
+
+The Wiki module was designed to replicate a Notion-style, block-based rich text editing experience for project documentation, API specs, and team notes.
+
+### Rich Text Editor (Tiptap Integration)
+- **Core Engine**: Replaced basic textareas with `Tiptap`, a headless wrapper around ProseMirror, providing a highly customizable and robust rich-text foundation.
+- **Markdown Support (`tiptap-markdown`)**: Implemented seamless markdown parsing. Typing markdown symbols (like `# ` for headings or ` ``` ` for code blocks) automatically translates the block into the correct visual formatting.
+- **Slash Commands (`@tiptap/suggestion` + `tippy.js`)**: Engineered a custom floating menu. Typing `/` anywhere in the editor triggers a keyboard-navigable popup to quickly insert Headings, Lists (Bullets, Numbers, Checklists), Tables, Quotes, and Code Blocks.
+- **Advanced Code Blocks (`lowlight`)**: Code blocks feature accurate, multi-language syntax highlighting using `lowlight`, styled with custom dark-mode CSS overrides.
+- **Dynamic Tables (`@tiptap/extension-table`)**: Users can insert tables that come with contextual toolbar buttons. When the cursor is inside a table, tools dynamically appear allowing the user to add/remove columns and rows.
+- **Memoized Extensions**: Wrapped the Tiptap `extensions` array in a `useMemo` hook to satisfy React strict-mode constraints, preventing duplicate extension instantiation warnings and performance degradation on re-renders.
+
+### Image Uploads & Backend Support
+- **Multipart Parsing (`@fastify/multipart`)**: Upgraded the Fastify backend to support `FormData` parsing for direct image uploads.
+- **Upload Endpoint**: Created the `POST /api/wiki/upload-image` endpoint. It uses `pump` to stream incoming images directly to the local `/uploads` directory, instantly responding with the public URL.
+- **Static File Serving (`@fastify/static`)**: Configured Fastify to serve the uploaded images publicly so they render immediately inside the Wiki editor.
+
+### State Management & Version History
+- **Historical Snapshots**: Users can explicitly click "Save Snapshot" to create immutable versions of the wiki page in the database.
+- **Version Restore Fix**: Solved a complex React-Tiptap lifecycle bug regarding version restoration. Introduced an `editorVersion` integer state inside the `useWikiStore` (Zustand). The backend increments this integer during a `restoreVersion` action. The `WikiEditor` listens to `editorVersion` as a `useEffect` dependency, perfectly synchronizing restored snapshots into the editor without disrupting the user while they type during standard auto-saves.
+
+### UI / UX Polish
+- **Sticky Toolbar**: The formatting toolbar was rebuilt to be `sticky top-0` with a `z-10` index, ensuring tools are always accessible even when scrolling through massive documents.
+- **Organic History Button**: The "History" toggle button was integrated organically into the editor's sticky header next to the "Save Snapshot" button, fixing previous z-index occlusion bugs.
+- **Centered Typography**: Content is centralized into a `max-w-4xl` column with `prose-invert` tailwind typography for an optimized, distraction-free reading experience.

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useBillingStore } from '../../stores/billingStore';
 import useAuthStore from '../../stores/authStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
@@ -8,7 +8,6 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 export default function BillingPage(): React.ReactElement {
   const { workspaceId } = useParams();
-  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { activeWorkspace, fetchWorkspaceDetails } = useWorkspaceStore();
   
@@ -106,7 +105,7 @@ export default function BillingPage(): React.ReactElement {
           buttonText={isProcessingPayment ? 'Processing...' : 'Upgrade to Pro'}
           onAction={() => {
             if (workspaceId && user) {
-              upgradeToPro(workspaceId, user.email, user.name);
+              upgradeToPro(workspaceId, user.email, user.name ?? undefined);
             }
           }}
         />

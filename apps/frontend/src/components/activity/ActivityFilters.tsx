@@ -1,4 +1,3 @@
-import React from 'react';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import { ActivityFilters } from '../../services/api/activity.service';
 

@@ -48,7 +48,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
   fetchTasksByProject: async (projectId) => {
     set({ loading: true, error: undefined });
     try {
-      const response = await api.get(`/tasks/project/${projectId}`);
+      const response = await api.get(`/api/tasks/project/${projectId}`);
       set({ tasks: response.data, loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });
@@ -57,7 +57,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
 
   createTask: async (data) => {
     try {
-      const response = await api.post('/tasks', data);
+      const response = await api.post('/api/tasks', data);
       set((state) => ({
         tasks: [response.data, ...state.tasks],
       }));
@@ -69,7 +69,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
 
   updateTask: async (id, updates) => {
     try {
-      const response = await api.patch(`/tasks/${id}`, updates);
+      const response = await api.patch(`/api/tasks/${id}`, updates);
       set((state) => ({
         tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...response.data } : t)),
       }));
@@ -81,7 +81,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
 
   deleteTask: async (id) => {
     try {
-      await api.delete(`/tasks/${id}`);
+      await api.delete(`/api/tasks/${id}`);
       set((state) => ({
         tasks: state.tasks.filter((t) => t.id !== id),
       }));
@@ -92,7 +92,7 @@ export const useTaskStore = create<TaskStore>((set) => ({
 
   addComment: async (taskId, content) => {
     try {
-      const response = await api.post(`/tasks/${taskId}/comments`, { content });
+      const response = await api.post(`/api/tasks/${taskId}/comments`, { content });
       set((state) => ({
         tasks: state.tasks.map((t) => {
           if (t.id === taskId) {

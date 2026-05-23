@@ -1,9 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { ProjectController } from './project.controller';
+import { verifyAuth } from '../../middleware/auth.middleware';
 
 const projectController = new ProjectController();
 
 export default async function register(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('preHandler', verifyAuth);
   fastify.post('/', (request, reply) => projectController.createProject(request, reply));
   fastify.get('/', (request, reply) => projectController.getProjects(request, reply));
   fastify.get('/:id', (request, reply) => projectController.getProjectById(request, reply));
