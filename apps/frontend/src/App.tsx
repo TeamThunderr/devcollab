@@ -11,7 +11,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import WorkspaceList from "./pages/workspace/WorkspaceList";
 import WorkspaceDashboard from "./pages/workspace/WorkspaceDashboard";
-import ProjectView from "./pages/project/ProjectView";
+import ProjectsPage from "./pages/project/ProjectsPage";
 import TasksView from './pages/project/TasksView';
 import EditorView from "./pages/editor/EditorView";
 import SnippetsView from "./pages/snippets/SnippetsView";
@@ -51,7 +51,7 @@ function App(): React.ReactElement {
         >
           <Route path="/" element={<WorkspaceList />} />
           <Route path="/:workspaceId" element={<WorkspaceDashboard />} />
-          <Route path="/:workspaceId/projects" element={<ProjectView />} />
+          <Route path="/:workspaceId/projects" element={<ProjectsPage />} />
           <Route path="/:workspaceId/projects/:pid" element={<TasksView />} />
           <Route path="/:workspaceId/editor/:pid" element={<EditorView />} />
           <Route path="/:workspaceId/snippets/:pid" element={<SnippetsView />} />

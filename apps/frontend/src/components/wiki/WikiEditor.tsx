@@ -19,8 +19,47 @@ import SlashCommands, { getSuggestionItems, renderItems } from './SlashCommands'
 import useWikiStore from '../../stores/wikiStore';
 import useTaskStore from '../../stores/taskStore';
 import useEditorStore from '../../stores/editorStore';
+import api from '../../lib/axios';
 
 const lowlight = createLowlight(common);
+
+const extensions = [
+  StarterKit.configure({
+    codeBlock: false,
+  }),
+  Markdown.configure({
+    html: true,
+    transformCopiedText: true,
+    transformPastedText: true,
+  }),
+  Image.configure({
+    HTMLAttributes: {
+      class: 'rounded-lg max-w-full h-auto',
+    },
+  }),
+  TaskList,
+  TaskItem.configure({ nested: true }),
+  Table.configure({
+    resizable: true,
+    HTMLAttributes: { class: 'border-collapse table-auto w-full' },
+  }),
+  TableRow,
+  TableHeader,
+  TableCell,
+  CodeBlockLowlight.configure({
+    lowlight,
+    HTMLAttributes: { class: 'bg-[#1e1e1e] rounded-lg p-4 font-mono text-sm shadow-inner' },
+  }),
+  Placeholder.configure({
+    placeholder: 'Press "/" for commands, or start typing...',
+  }),
+  SlashCommands.configure({
+    suggestion: {
+      items: getSuggestionItems,
+      render: renderItems,
+    },
+  }),
+];
 
 export default function WikiEditor({ projectId, onToggleHistory }: { projectId: string; onToggleHistory?: () => void }) {
   const { activePage, updatePage, saveStatus, createVersion, editorVersion } = useWikiStore();
@@ -51,53 +90,13 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
     [activePage, updatePage]
   );
 
-  const extensions = useMemo(() => [
-    StarterKit.configure({
-      codeBlock: false,
-    }),
-    Markdown.configure({
-      html: true,
-      transformCopiedText: true,
-      transformPastedText: true,
-    }),
-    Underline,
-    Link.configure({ openOnClick: false }),
-    Image.configure({
-      HTMLAttributes: {
-        class: 'rounded-lg max-w-full h-auto',
-      },
-    }),
-    TaskList,
-    TaskItem.configure({ nested: true }),
-    Table.configure({
-      resizable: true,
-      HTMLAttributes: { class: 'border-collapse table-auto w-full' },
-    }),
-    TableRow,
-    TableHeader,
-    TableCell,
-    CodeBlockLowlight.configure({
-      lowlight,
-      HTMLAttributes: { class: 'bg-[#1e1e1e] rounded-lg p-4 font-mono text-sm shadow-inner' },
-    }),
-    Placeholder.configure({
-      placeholder: 'Press "/" for commands, or start typing...',
-    }),
-    SlashCommands.configure({
-      suggestion: {
-        items: getSuggestionItems,
-        render: renderItems,
-      },
-    }),
-  ], []);
-
   const editor = useEditor({
     extensions,
     content: activePage?.content || '',
     onUpdate: handleUpdate,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert prose-headings:font-bold prose-a:text-blue-400 max-w-none focus:outline-none min-h-[500px] leading-relaxed',
+        class: 'prose prose-invert prose-headings:font-bold prose-a:text-blue-400 max-w-none focus:outline-none min-h-[500px] leading-relaxed whitespace-pre-wrap',
       },
     },
   });
@@ -135,11 +134,10 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:3000/api/wiki/upload-image', {
-        method: 'POST',
-        body: formData,
+      const response = await api.post('/api/wiki/upload-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const data = await response.json();
+      const data = response.data;
       if (data.url) {
         editor.chain().focus().setImage({ src: `http://localhost:3000${data.url}` }).run();
       }

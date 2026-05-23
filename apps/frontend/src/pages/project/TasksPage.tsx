@@ -21,7 +21,7 @@ function isTaskStatus(value: string): value is TaskStatus {
 }
 
 export default function TasksPage(): React.ReactElement {
-  const { workspaceSlug, pid } = useParams<{ workspaceSlug: string; pid: string }>();
+  const { workspaceId, pid } = useParams<{ workspaceId: string; pid: string }>();
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
   const { members } = useWorkspaceStore();
   const { user } = useAuthStore();
@@ -90,7 +90,7 @@ export default function TasksPage(): React.ReactElement {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-800 p-8 text-white shadow-xl sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link to={`/${workspaceSlug}/projects`} className="text-sm uppercase tracking-widest text-cyan-200 hover:text-white transition">
+            <Link to={`/${workspaceId}/projects`} className="text-sm uppercase tracking-widest text-cyan-200 hover:text-white transition">
               ← Back to Projects
             </Link>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight">Project Tasks</h1>

@@ -75,16 +75,25 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   fetchCurrentUser: async () => {
     set({ isInitialized: false, error: null });
     try {
-      // Calling getMe without a token will result in a 401. 
-      // The Axios interceptor will automatically catch the 401, call /auth/refresh using the httpOnly cookie, 
-      // set the new accessToken in the store, and retry the request transparently!
+      let token = useAuthStore.getState().accessToken;
+      
+      // If we don't have an access token in memory (e.g. after a page reload),
+      // attempting to call getMe() will result in a 401 which logs to the console natively.
+      // To avoid this error spam, we proactively try to refresh the token first!
+      if (!token) {
+        const { api } = await import('../lib/axios');
+        const res = await api.post('/api/auth/refresh', {}, { _retry: true } as any);
+        token = res.data.accessToken;
+        set({ accessToken: token });
+      }
+
       const user = await authService.getMe();
       set({ user, isAuthenticated: true, isInitialized: true });
       
       // Also connect socket if we have the token
-      const token = useAuthStore.getState().accessToken;
-      if (token) {
-        connectSocket(token, "workspace-test-123");
+      const currentToken = useAuthStore.getState().accessToken;
+      if (currentToken) {
+        connectSocket(currentToken, "workspace-test-123");
       }
     } catch (error) {
       disconnectSocket();

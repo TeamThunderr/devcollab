@@ -6,10 +6,12 @@ import AIReviewBar from "../../components/editor/AIReviewBar";
 import useEditorStore from "../../stores/editorStore";
 import api from "../../lib/axios";
 
+import { useParams } from "react-router-dom";
+
 export default function EditorView() {
-  // Hardcoded for testing since user hasn't set up project navigation
-  const projectId = "project-test-456"; 
+  const { pid: projectId } = useParams();
   
+  if (!projectId) return null;
   const { files, activeFileId, updateFile } = useEditorStore();
   const [showAIBar, setShowAIBar] = useState(true);
   const [theme, setTheme] = useState<"vs-dark" | "light">("vs-dark");

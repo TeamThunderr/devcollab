@@ -72,7 +72,7 @@ let io: DevCollabServer;
 export async function initSocket(httpServer: http.Server): Promise<void> {
   io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, DevCollabSocketData>(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+      origin: [process.env.FRONTEND_URL ?? 'http://localhost:5173', 'http://localhost:5174'],
       credentials: true,
     },
     transports: ['websocket'],
@@ -81,7 +81,13 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
   let redisConnected = false;
 
   try {
-    const pubClient = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const pubClient = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      maxRetriesPerRequest: null,
+      retryStrategy: (times) => {
+        if (times > 3) return null; // Stop retrying after 3 attempts
+        return Math.min(times * 50, 2000);
+      }
+    });
     const subClient = pubClient.duplicate();
 
     await Promise.all([
