@@ -14,7 +14,7 @@ export class SnippetController {
   async createSnippet(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = createSnippetSchema.parse(request.body);
-      const snippet = await snippetService.createSnippet(data);
+      const snippet = await snippetService.createSnippet(data, request.user!.userId);
       return reply.status(201).send(snippet);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });

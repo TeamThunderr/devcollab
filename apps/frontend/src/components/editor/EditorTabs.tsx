@@ -1,4 +1,3 @@
-import React from "react";
 import useEditorStore from "../../stores/editorStore";
 
 function fileIcon(language: string): string {

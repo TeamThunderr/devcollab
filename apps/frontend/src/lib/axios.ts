@@ -1,8 +1,30 @@
-import axios from 'axios';
+import axios from 'axios'
+import { useAuthStore } from '../stores/authStore'
 
-const api = axios.create({
-  baseURL: '/api',
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
+export const api = axios.create({
+  baseURL: API_BASE,
   withCredentials: true,
-});
+})
 
-export default api;
+api.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().accessToken
+  if (token) {
+    config.headers.Authorization = 'Bearer ' + token
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      useAuthStore.getState().clearAuth()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export default api

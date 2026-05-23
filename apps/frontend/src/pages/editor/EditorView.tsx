@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import FileTree from "../../components/editor/FileTree";
 import EditorTabs from "../../components/editor/EditorTabs";
 import MonacoEditor from "../../components/editor/MonacoEditor";
@@ -17,7 +17,7 @@ export default function EditorView() {
 
   useEffect(() => {
     // Fetch tasks for task link dropdown
-    api.get(`/tasks/project/${projectId}`)
+    api.get(`/api/tasks/project/${projectId}`)
       .then(res => setTasks(res.data || []))
       .catch(console.error);
   }, [projectId]);

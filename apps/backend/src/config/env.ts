@@ -1,15 +1,14 @@
-import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
+const required = [
+  'DATABASE_URL',
+  'JWT_SECRET',
+  'JWT_REFRESH_SECRET',
+]
 
-const candidatePaths = [
-  path.resolve(__dirname, "../../../../.env"),
-  path.resolve(__dirname, "../../.env"),
-];
-
-for (const envPath of candidatePaths) {
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-    break;
+export function validateEnv() {
+  const missing = required.filter(key => !process.env[key])
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:', missing.join(', '))
+    process.exit(1)
   }
+  console.log('✅ Environment variables validated')
 }

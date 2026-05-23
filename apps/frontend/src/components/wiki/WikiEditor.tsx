@@ -26,7 +26,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
   const { activePage, updatePage, saveStatus, createVersion, editorVersion } = useWikiStore();
   const { tasks, fetchTasksByProject } = useTaskStore();
   const { files, fetchFileTree } = useEditorStore();
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

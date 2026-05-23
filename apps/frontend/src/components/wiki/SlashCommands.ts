@@ -140,7 +140,7 @@ export const renderItems = () => {
         return true;
       }
 
-      return component.ref?.onKeyDown(props);
+      return (component.ref as { onKeyDown?: (props: any) => boolean } | null)?.onKeyDown?.(props);
     },
 
     onExit() {

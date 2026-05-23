@@ -1,6 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { EditorService } from './editor.service';
-import { z } from 'zod';
 
 const editorService = new EditorService();
 
@@ -27,7 +26,7 @@ export async function createFileHandler(
 ) {
   try {
     const { projectId } = request.params;
-    const userId = (request as any).user?.id || 'unknown';
+    const userId = request.user!.userId;
     const data = { ...request.body, projectId, createdBy: userId };
     const newFile = await editorService.createFile(data);
     return reply.status(201).send(newFile);

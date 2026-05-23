@@ -38,7 +38,7 @@ const useEditorStore = create<EditorState>((set, get) => ({
   fetchFileTree: async (projectId) => {
     set({ isLoading: true });
     try {
-      const response = await api.get(`/editor/projects/${projectId}/files`);
+      const response = await api.get(`/api/editor/projects/${projectId}/files`);
       set({ files: response.data, isLoading: false });
     } catch (error) {
       console.error('Failed to fetch file tree:', error);
@@ -48,7 +48,7 @@ const useEditorStore = create<EditorState>((set, get) => ({
 
   createFile: async (projectId, data) => {
     try {
-      const response = await api.post(`/editor/projects/${projectId}/files`, data);
+      const response = await api.post(`/api/editor/projects/${projectId}/files`, data);
       set((state) => ({ files: [...state.files, response.data] }));
     } catch (error) {
       console.error('Failed to create file:', error);
@@ -58,7 +58,7 @@ const useEditorStore = create<EditorState>((set, get) => ({
 
   updateFile: async (projectId, fileId, data) => {
     try {
-      const response = await api.put(`/editor/projects/${projectId}/files/${fileId}`, data);
+      const response = await api.put(`/api/editor/projects/${projectId}/files/${fileId}`, data);
       set((state) => ({
         files: state.files.map((f) => (f.id === fileId ? { ...f, ...response.data } : f))
       }));
@@ -70,7 +70,7 @@ const useEditorStore = create<EditorState>((set, get) => ({
 
   deleteFile: async (projectId, fileId) => {
     try {
-      await api.delete(`/editor/projects/${projectId}/files/${fileId}`);
+      await api.delete(`/api/editor/projects/${projectId}/files/${fileId}`);
       set((state) => ({
         files: state.files.filter((f) => f.id !== fileId && f.parentId !== fileId),
         openTabs: state.openTabs.filter((id) => id !== fileId),

@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { Role } from '../../middleware/rbac.middleware';
 
 export const createWorkspaceSchema = z.object({
   name: z.string().min(3).max(50),
-  slug: z.string().min(3).max(30).regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric and hyphens only"),
+  slug: z.string().min(3).max(30).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric and hyphens only'),
 });
 
 export const inviteMemberSchema = z.object({

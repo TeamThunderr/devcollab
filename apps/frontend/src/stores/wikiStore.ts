@@ -62,7 +62,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
   fetchPages: async (projectId) => {
     set({ isLoading: true });
     try {
-      const response = await api.get(`/wiki/projects/${projectId}/pages`);
+      const response = await api.get(`/api/wiki/projects/${projectId}/pages`);
       set({ pages: response.data, isLoading: false });
     } catch (error) {
       console.error('Failed to fetch wiki pages:', error);
@@ -73,7 +73,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
   fetchPage: async (id) => {
     set({ isLoading: true });
     try {
-      const response = await api.get(`/wiki/pages/${id}`);
+      const response = await api.get(`/api/wiki/pages/${id}`);
       set({ activePage: response.data, isLoading: false, editorVersion: get().editorVersion + 1 });
     } catch (error) {
       console.error('Failed to fetch wiki page:', error);
@@ -83,7 +83,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
 
   createPage: async (projectId, title, workspaceId) => {
     try {
-      const response = await api.post(`/wiki/projects/${projectId}/pages`, { title, workspaceId });
+      const response = await api.post(`/api/wiki/projects/${projectId}/pages`, { title, workspaceId });
       set((state) => ({ pages: [response.data, ...state.pages] }));
       return response.data;
     } catch (error) {
@@ -95,7 +95,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
   updatePage: async (id, data) => {
     set({ isSaving: true, saveStatus: 'saving' });
     try {
-      const response = await api.put(`/wiki/pages/${id}`, data);
+      const response = await api.put(`/api/wiki/pages/${id}`, data);
       set((state) => ({
         pages: state.pages.map((p) => (p.id === id ? { ...p, ...response.data } : p)),
         activePage: state.activePage?.id === id ? { ...state.activePage, ...response.data } : state.activePage,
@@ -115,7 +115,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
 
   deletePage: async (id) => {
     try {
-      await api.delete(`/wiki/pages/${id}`);
+      await api.delete(`/api/wiki/pages/${id}`);
       set((state) => ({
         pages: state.pages.filter((p) => p.id !== id),
         activePageId: state.activePageId === id ? null : state.activePageId,
@@ -138,7 +138,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
 
   fetchVersions: async (pageId) => {
     try {
-      const response = await api.get(`/wiki/pages/${pageId}/versions`);
+      const response = await api.get(`/api/wiki/pages/${pageId}/versions`);
       set({ versions: response.data });
     } catch (error) {
       console.error('Failed to fetch versions:', error);
@@ -147,7 +147,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
 
   createVersion: async (pageId) => {
     try {
-      await api.post(`/wiki/pages/${pageId}/versions`);
+      await api.post(`/api/wiki/pages/${pageId}/versions`);
       get().fetchVersions(pageId);
     } catch (error) {
       console.error('Failed to create version:', error);
@@ -157,7 +157,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
 
   restoreVersion: async (pageId, versionId) => {
     try {
-      const response = await api.post(`/wiki/pages/${pageId}/restore/${versionId}`);
+      const response = await api.post(`/api/wiki/pages/${pageId}/restore/${versionId}`);
       set((state) => ({
         pages: state.pages.map((p) => (p.id === pageId ? { ...p, ...response.data } : p)),
         activePage: { ...state.activePage!, ...response.data },

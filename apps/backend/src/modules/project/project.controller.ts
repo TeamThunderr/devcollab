@@ -13,7 +13,7 @@ export class ProjectController {
   async createProject(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = createProjectSchema.parse(request.body);
-      const project = await projectService.createProject(data);
+      const project = await projectService.createProject(data, request.user!.userId);
       return reply.status(201).send(project);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });

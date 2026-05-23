@@ -15,7 +15,7 @@ export class TaskController {
   async createTask(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = createTaskSchema.parse(request.body);
-      const task = await taskService.createTask(data);
+      const task = await taskService.createTask(data, request.user!.userId);
       return reply.status(201).send(task);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });
@@ -75,7 +75,7 @@ export class TaskController {
     try {
       const { id } = taskIdParamSchema.parse(request.params);
       const data = createCommentSchema.parse(request.body);
-      const comment = await taskService.addComment(id, data.content);
+      const comment = await taskService.addComment(id, data.content, request.user!.userId);
       return reply.status(201).send(comment);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });

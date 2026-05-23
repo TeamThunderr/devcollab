@@ -51,7 +51,7 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
   fetchSnippetsByProject: async (projectId) => {
     set({ loading: true, error: undefined });
     try {
-      const response = await api.get(`/snippets/project/${projectId}`);
+      const response = await api.get(`/api/snippets/project/${projectId}`);
       set({ snippets: response.data, loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });
@@ -60,7 +60,7 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
 
   createSnippet: async (title, language, code, description, tags, projectId) => {
     try {
-      const response = await api.post('/snippets', {
+      const response = await api.post('/api/snippets', {
         title,
         language,
         code,
@@ -79,7 +79,7 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
 
   updateSnippet: async (id, updates) => {
     try {
-      const response = await api.patch(`/snippets/${id}`, updates);
+      const response = await api.patch(`/api/snippets/${id}`, updates);
       set((state) => ({
         snippets: state.snippets.map((s) => (s.id === id ? response.data : s)),
       }));
@@ -91,7 +91,7 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
 
   deleteSnippet: async (id) => {
     try {
-      await api.delete(`/snippets/${id}`);
+      await api.delete(`/api/snippets/${id}`);
       set((state) => ({
         snippets: state.snippets.filter((s) => s.id !== id),
       }));
@@ -103,7 +103,7 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
   searchSnippets: async (projectId, query) => {
     set({ loading: true, error: undefined });
     try {
-      const response = await api.get(`/snippets/project/${projectId}/search`, {
+      const response = await api.get(`/api/snippets/project/${projectId}/search`, {
         params: { q: query },
       });
       set({ snippets: response.data, loading: false });

@@ -7,8 +7,15 @@ export const authController = {
   async register(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = registerSchema.parse(request.body);
-      const user = await authService.register(data);
-      return reply.status(201).send({ message: 'User registered successfully', user });
+      const { user, accessToken, refreshToken } = await authService.register(data);
+      reply.setCookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/api/auth',
+        maxAge: 7 * 24 * 60 * 60
+      });
+      return reply.status(201).send({ message: 'User registered successfully', user, accessToken });
     } catch (error: any) {
       if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
       if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });

@@ -50,11 +50,7 @@ export const workspaceController = {
   async acceptInvite(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = acceptInviteSchema.parse(request.body);
-      const { prisma } = await import('../../db/prisma');
-      const user = await prisma.user.findUnique({ where: { id: request.user!.userId } });
-      if (!user) throw new AppError(404, 'User not found');
-
-      const membership = await workspaceService.acceptInvite(user.id, user.email, data);
+      const membership = await workspaceService.acceptInvite(request.user!.userId, request.user!.email, data);
       return reply.send({ message: 'Invite accepted', membership });
     } catch (error: any) {
       if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import useWikiStore from '../../stores/wikiStore';
 import { formatDistanceToNow } from 'date-fns';
 

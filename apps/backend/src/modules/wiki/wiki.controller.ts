@@ -43,7 +43,7 @@ export async function createPageHandler(
 ) {
   try {
     const { projectId } = request.params;
-    const userId = (request as any).user?.id || 'unknown';
+    const userId = request.user!.userId;
     const data = { ...request.body, projectId, createdBy: userId };
     const newPage = await wikiService.createPage(data);
     return reply.status(201).send(newPage);
@@ -62,7 +62,7 @@ export async function updatePageHandler(
 ) {
   try {
     const { id } = request.params;
-    const userId = (request as any).user?.id || 'unknown';
+    const userId = request.user!.userId;
     const updatedPage = await wikiService.updatePage(id, { ...request.body, updatedBy: userId });
     return reply.send(updatedPage);
   } catch (error) {
@@ -107,7 +107,7 @@ export async function createVersionHandler(
 ) {
   try {
     const { id } = request.params;
-    const userId = (request as any).user?.id || 'unknown';
+    const userId = request.user!.userId;
     const version = await wikiService.createVersion(id, userId);
     return reply.status(201).send(version);
   } catch (error) {
@@ -122,7 +122,7 @@ export async function restoreVersionHandler(
 ) {
   try {
     const { id, versionId } = request.params;
-    const userId = (request as any).user?.id || 'unknown';
+    const userId = request.user!.userId;
     const restoredPage = await wikiService.restoreVersion(id, versionId, userId);
     return reply.send(restoredPage);
   } catch (error) {

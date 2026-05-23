@@ -1,8 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { activityController } from './activity.controller';
 import { verifyAuth } from '../../middleware/auth.middleware';
-import { verifyRole } from '../../middleware/rbac.middleware';
-import { Role } from '@prisma/client';
+import { Role, verifyRole } from '../../middleware/rbac.middleware';
 
 const activityRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', verifyAuth);

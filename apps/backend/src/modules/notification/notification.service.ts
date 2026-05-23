@@ -1,4 +1,4 @@
-import { prisma } from '../../db/prisma';
+import { query } from '../../db/client';
 
 export interface CreateNotificationPayload {
   userId: string;
@@ -7,89 +7,124 @@ export interface CreateNotificationPayload {
   metadata?: any;
 }
 
+const allowedTypes = new Set(['mention', 'assignment', 'task_moved', 'comment']);
+
+function normalizeType(type: string): string {
+  const normalized = type.toLowerCase();
+  return allowedTypes.has(normalized) ? normalized : 'mention';
+}
+
+function mapNotification(row: any) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    message: row.title,
+    body: row.body,
+    metadata: row.metadata ?? {},
+    readAt: row.read_at?.toISOString?.() ?? row.read_at,
+    createdAt: row.created_at?.toISOString?.() ?? row.created_at,
+  };
+}
+
 export const notificationService = {
-  /**
-   * Logs a notification asynchronously.
-   * Includes the centralized placeholder for Socket.IO push events.
-   */
   async createNotification(payload: CreateNotificationPayload) {
     try {
-      const notification = await prisma.notification.create({
-        data: {
-          userId: payload.userId,
-          type: payload.type,
-          message: payload.message,
-          metadata: payload.metadata || {},
-        }
-      });
-      
-      // TODO: Centralized emitNotification placeholder
-      // io.to(`user_${payload.userId}`).emit('new_notification', notification);
-
-      return notification;
+      const result = await query(
+        `INSERT INTO notifications (user_id, type, title, body)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, user_id, type, title, body, read_at, created_at`,
+        [payload.userId, normalizeType(payload.type), payload.message, JSON.stringify(payload.metadata ?? {})]
+      );
+      return mapNotification(result.rows[0]);
     } catch (error) {
       console.error('[Notification Logging Failed]', error);
+      return undefined;
     }
   },
 
   async getNotifications(userId: string, filters: { page: number; limit: number; isRead?: string; type?: string }) {
-    const where: any = { userId };
+    const where: string[] = ['user_id = $1'];
+    const params: any[] = [userId];
 
     if (filters.isRead === 'true') {
-      where.readAt = { not: null };
+      where.push('read_at IS NOT NULL');
     } else if (filters.isRead === 'false') {
-      where.readAt = null;
+      where.push('read_at IS NULL');
     }
 
     if (filters.type) {
-      where.type = filters.type;
+      params.push(normalizeType(filters.type));
+      where.push(`type = $${params.length}`);
     }
 
     const skip = (filters.page - 1) * filters.limit;
+    const whereSql = where.join(' AND ');
 
     const [notifications, totalCount, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: filters.limit
-      }),
-      prisma.notification.count({ where }),
-      prisma.notification.count({ where: { userId, readAt: null } })
+      query(
+        `SELECT id, user_id, type, title, body, read_at, created_at
+         FROM notifications
+         WHERE ${whereSql}
+         ORDER BY created_at DESC
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, filters.limit, skip]
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count
+         FROM notifications
+         WHERE ${whereSql}`,
+        params
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count
+         FROM notifications
+         WHERE user_id = $1 AND read_at IS NULL`,
+        [userId]
+      ),
     ]);
 
+    const total = Number(totalCount.rows[0]?.count ?? 0);
     return {
-      notifications,
+      notifications: notifications.rows.map(mapNotification),
       meta: {
-        total: totalCount,
-        unread: unreadCount,
+        total,
+        unread: Number(unreadCount.rows[0]?.count ?? 0),
         page: filters.page,
         limit: filters.limit,
-        totalPages: Math.ceil(totalCount / filters.limit)
-      }
+        totalPages: Math.ceil(total / filters.limit),
+      },
     };
   },
 
   async markAsRead(userId: string, notificationId: string) {
-    // Only update if it belongs to the user and is currently unread
-    const updated = await prisma.notification.updateMany({
-      where: { id: notificationId, userId, readAt: null },
-      data: { readAt: new Date() }
-    });
-    return updated.count > 0;
+    const result = await query(
+      `UPDATE notifications
+       SET read_at = NOW()
+       WHERE id = $1 AND user_id = $2 AND read_at IS NULL
+       RETURNING id`,
+      [notificationId, userId]
+    );
+    return Boolean(result.rowCount);
   },
 
   async markAllAsRead(userId: string) {
-    const updated = await prisma.notification.updateMany({
-      where: { userId, readAt: null },
-      data: { readAt: new Date() }
-    });
-    return updated.count;
+    const result = await query(
+      `UPDATE notifications
+       SET read_at = NOW()
+       WHERE user_id = $1 AND read_at IS NULL`,
+      [userId]
+    );
+    return result.rowCount ?? 0;
   },
 
   async getUnreadCount(userId: string) {
-    return await prisma.notification.count({
-      where: { userId, readAt: null }
-    });
-  }
+    const result = await query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM notifications
+       WHERE user_id = $1 AND read_at IS NULL`,
+      [userId]
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  },
 };

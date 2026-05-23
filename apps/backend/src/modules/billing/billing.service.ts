@@ -1,35 +1,50 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
-import { prisma } from '../../db/prisma';
+import { query, transaction } from '../../db/client';
 import { AppError } from '../../utils/errors';
 import { CreateOrderInput, VerifyPaymentInput } from './billing.schema';
 import { activityService } from '../activity/activity.service';
 import { notificationService } from '../notification/notification.service';
-import { Plan } from '@prisma/client';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || 'test_key',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'test_secret'
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'test_secret',
 });
 
 const PRO_PLAN_PRICE = 999;
 const CURRENCY = 'INR';
 
+function mapSubscription(row: any) {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    plan: (row.type ?? row.plan ?? 'free').toUpperCase(),
+    status: 'ACTIVE',
+    currentPeriodEnd: row.expires_at?.toISOString?.() ?? row.expires_at ?? null,
+    razorpaySubscriptionId: row.razorpay_payment_id ?? null,
+    createdAt: row.started_at?.toISOString?.() ?? row.started_at ?? null,
+    updatedAt: row.started_at?.toISOString?.() ?? row.started_at ?? null,
+  };
+}
+
+async function requireOwner(workspaceId: string, userId: string) {
+  const result = await query<{ role: string }>(
+    `SELECT role
+     FROM workspace_members
+     WHERE workspace_id = $1 AND user_id = $2`,
+    [workspaceId, userId]
+  );
+  if (result.rows[0]?.role !== 'owner') {
+    throw new AppError(403, 'Only workspace owners can upgrade the plan');
+  }
+}
+
 export const billingService = {
   async createOrder(userId: string, data: CreateOrderInput) {
-    const membership = await prisma.workspaceMember.findUnique({
-      where: { workspaceId_userId: { workspaceId: data.workspaceId, userId } }
-    });
+    await requireOwner(data.workspaceId, userId);
 
-    if (!membership || membership.role !== 'OWNER') {
-      throw new AppError(403, 'Only workspace owners can upgrade the plan');
-    }
-
-    const subscription = await prisma.subscription.findUnique({
-      where: { workspaceId: data.workspaceId }
-    });
-
-    if (subscription?.plan === Plan.PRO) {
+    const workspace = await query<{ plan: string }>('SELECT plan FROM workspaces WHERE id = $1', [data.workspaceId]);
+    if (workspace.rows[0]?.plan === 'pro') {
       throw new AppError(400, 'Workspace is already on PRO plan');
     }
 
@@ -38,14 +53,14 @@ export const billingService = {
       order = await razorpay.orders.create({
         amount: PRO_PLAN_PRICE * 100,
         currency: CURRENCY,
-        receipt: `receipt_${data.workspaceId}_${Date.now()}`
+        receipt: `receipt_${data.workspaceId}_${Date.now()}`,
       });
     } catch (err) {
-      console.warn("Razorpay order creation failed, falling back to mock order. Reason:", err);
+      console.warn('Razorpay order creation failed, falling back to mock order. Reason:', err);
       order = {
         id: `mock_order_${Date.now()}`,
         amount: PRO_PLAN_PRICE * 100,
-        currency: CURRENCY
+        currency: CURRENCY,
       };
     }
 
@@ -53,22 +68,15 @@ export const billingService = {
       id: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID || 'mock_key'
+      keyId: process.env.RAZORPAY_KEY_ID || 'mock_key',
     };
   },
 
   async verifyPayment(userId: string, data: VerifyPaymentInput) {
-    const membership = await prisma.workspaceMember.findUnique({
-      where: { workspaceId_userId: { workspaceId: data.workspaceId, userId } }
-    });
-
-    if (!membership || membership.role !== 'OWNER') {
-      throw new AppError(403, 'Only workspace owners can upgrade the plan');
-    }
+    await requireOwner(data.workspaceId, userId);
 
     if (!data.razorpayOrderId.startsWith('mock_order_')) {
       const secret = process.env.RAZORPAY_KEY_SECRET || 'test_secret';
-      
       const generatedSignature = crypto
         .createHmac('sha256', secret)
         .update(data.razorpayOrderId + '|' + data.razorpayPaymentId)
@@ -79,55 +87,89 @@ export const billingService = {
       }
     }
 
-    const existingSub = await prisma.subscription.findUnique({
-      where: { workspaceId: data.workspaceId }
+    const subscription = await transaction(async (client) => {
+      await client.query('UPDATE workspaces SET plan = $1, updated_at = NOW() WHERE id = $2', ['pro', data.workspaceId]);
+      const existing = await client.query(
+        `SELECT id, workspace_id, type, razorpay_payment_id, started_at, expires_at
+         FROM plans
+         WHERE workspace_id = $1
+         ORDER BY started_at DESC
+         LIMIT 1`,
+        [data.workspaceId]
+      );
+
+      if (existing.rows[0]) {
+        const updated = await client.query(
+          `UPDATE plans
+           SET type = 'pro', razorpay_payment_id = $2, started_at = NOW()
+           WHERE id = $1
+           RETURNING id, workspace_id, type, razorpay_payment_id, started_at, expires_at`,
+          [existing.rows[0].id, data.razorpayPaymentId]
+        );
+        return updated.rows[0];
+      }
+
+      const created = await client.query(
+        `INSERT INTO plans (workspace_id, type, razorpay_payment_id)
+         VALUES ($1, 'pro', $2)
+         RETURNING id, workspace_id, type, razorpay_payment_id, started_at, expires_at`,
+        [data.workspaceId, data.razorpayPaymentId]
+      );
+      return created.rows[0];
     });
 
-    if (existingSub?.razorpaySubscriptionId === data.razorpayPaymentId && existingSub?.plan === Plan.PRO) {
-      return existingSub;
-    }
-
-    const upgradedSub = await prisma.$transaction(async (tx: any) => {
-      const sub = await tx.subscription.upsert({
-        where: { workspaceId: data.workspaceId },
-        update: {
-          plan: Plan.PRO,
-          razorpaySubscriptionId: data.razorpayPaymentId,
-        },
-        create: {
-          workspaceId: data.workspaceId,
-          plan: Plan.PRO,
-          razorpaySubscriptionId: data.razorpayPaymentId,
-        }
-      });
-
-      return sub;
-    });
-
-    activityService.createActivity({
+    await activityService.createActivity({
       workspaceId: data.workspaceId,
       userId,
       action: 'PLAN_UPGRADED',
       entityType: 'WORKSPACE',
       entityId: data.workspaceId,
-      metadata: { plan: Plan.PRO, paymentId: data.razorpayPaymentId }
+      metadata: { plan: 'PRO', paymentId: data.razorpayPaymentId },
     });
 
-    notificationService.createNotification({
+    await notificationService.createNotification({
       userId,
-      type: 'PLAN_UPGRADED',
+      type: 'assignment',
       message: 'Congratulations! Your workspace is now on the PRO plan.',
-      metadata: { workspaceId: data.workspaceId }
+      metadata: { workspaceId: data.workspaceId },
     });
 
-    return upgradedSub;
+    return mapSubscription(subscription);
   },
 
   async getSubscription(workspaceId: string) {
-    const sub = await prisma.subscription.findUnique({
-      where: { workspaceId }
-    });
-    if (!sub) throw new AppError(404, 'Subscription not found');
-    return sub;
-  }
+    const result = await query(
+      `SELECT id, workspace_id, type, razorpay_payment_id, started_at, expires_at
+       FROM plans
+       WHERE workspace_id = $1
+       ORDER BY started_at DESC
+       LIMIT 1`,
+      [workspaceId]
+    );
+
+    if (result.rows[0]) {
+      return mapSubscription(result.rows[0]);
+    }
+
+    const workspace = await query<{ id: string; plan: string; created_at: Date }>(
+      `SELECT id, plan, created_at
+       FROM workspaces
+       WHERE id = $1`,
+      [workspaceId]
+    );
+    if (!workspace.rows[0]) {
+      throw new AppError(404, 'Subscription not found');
+    }
+
+    return {
+      id: workspace.rows[0].id,
+      workspaceId: workspace.rows[0].id,
+      plan: workspace.rows[0].plan.toUpperCase(),
+      status: 'ACTIVE',
+      currentPeriodEnd: null,
+      razorpaySubscriptionId: null,
+      createdAt: workspace.rows[0].created_at.toISOString(),
+      updatedAt: workspace.rows[0].created_at.toISOString(),
+    };
+  },
 };

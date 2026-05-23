@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import api from '../../lib/axios';
 import { Notification, PaginatedResponse } from '../../types';
 
 export const notificationService = {
@@ -10,24 +10,24 @@ export const notificationService = {
     if (params?.type) query.append('type', params.type);
 
     const queryString = query.toString();
-    const url = `/notifications${queryString ? `?${queryString}` : ''}`;
+    const url = `/api/notifications${queryString ? `?${queryString}` : ''}`;
     
-    const response = await apiClient.get<PaginatedResponse<Notification>>(url);
+    const response = await api.get<PaginatedResponse<Notification>>(url);
     return response.data;
   },
 
   getUnreadCount: async () => {
-    const response = await apiClient.get<{ unread: number }>('/notifications/unread-count');
+    const response = await api.get<{ unread: number }>('/api/notifications/unread-count');
     return response.data.unread;
   },
 
   markAsRead: async (id: string) => {
-    const response = await apiClient.patch<Notification>(`/notifications/${id}/read`);
+    const response = await api.patch<Notification>(`/api/notifications/${id}/read`);
     return response.data;
   },
 
   markAllAsRead: async () => {
-    const response = await apiClient.patch<{ count: number }>('/notifications/read-all');
+    const response = await api.patch<{ count: number }>('/api/notifications/read-all');
     return response.data.count;
   }
 };

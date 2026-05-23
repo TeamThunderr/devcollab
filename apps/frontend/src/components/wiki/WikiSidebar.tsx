@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import useWikiStore from '../../stores/wikiStore';
 
 export default function WikiSidebar({ projectId, workspaceId }: { projectId: string; workspaceId: string }) {

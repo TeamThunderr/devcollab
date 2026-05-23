@@ -1,8 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { billingController } from './billing.controller';
 import { verifyAuth } from '../../middleware/auth.middleware';
-import { verifyRole } from '../../middleware/rbac.middleware';
-import { Role } from '@prisma/client';
+import { Role, verifyRole } from '../../middleware/rbac.middleware';
 
 const billingRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', verifyAuth);

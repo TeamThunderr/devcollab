@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import * as editorController from './editor.controller';
+import { verifyAuth } from '../../middleware/auth.middleware';
 
 export default async function register(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('preHandler', verifyAuth);
   fastify.get('/projects/:projectId/files', editorController.getFileTreeHandler);
   fastify.post('/projects/:projectId/files', editorController.createFileHandler);
   
