@@ -30,8 +30,11 @@ const server = Fastify({ logger: true });
 
 async function bootstrap() {
   // Register plugins
+  const defaultOrigins = ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"];
+  const configuredOrigin = process.env.FRONTEND_URL;
+  
   await server.register(cors, {
-    origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
+    origin: configuredOrigin ? [configuredOrigin, ...defaultOrigins] : defaultOrigins,
     credentials: true,
   });
 
