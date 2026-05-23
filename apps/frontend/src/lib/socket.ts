@@ -10,7 +10,7 @@
 import { io, Socket } from "socket.io-client";
 import useRealtimeStore, { Notification } from "../stores/realtimeStore";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const SOCKET_URL = import.meta.env.VITE_API_URL || "";
 
 // ─── Typed event maps (mirrors backend) ─────────────────────────────────────
 
