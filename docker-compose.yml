@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: devcollab
       POSTGRES_PASSWORD: devcollab123
       POSTGRES_DB: devcollab
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
     ports:
       - "5432:5432"
     volumes:
