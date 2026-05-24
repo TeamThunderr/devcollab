@@ -58,26 +58,6 @@ export const useBillingStore = create<BillingStore>((set) => ({
       }
 
       // 3. Open Razorpay Modal
-      if (order.id.startsWith('mock_order_')) {
-        // Simulate successful checkout for mock orders (e.g. invalid keys in dev)
-        setTimeout(async () => {
-          try {
-            const verifyRes = await billingService.verifyPayment({
-              workspaceId,
-              razorpayOrderId: order.id,
-              razorpayPaymentId: `mock_payment_${Date.now()}`,
-              razorpaySignature: 'mock_signature'
-            });
-            set({ subscription: verifyRes.subscription, isProcessingPayment: false });
-          } catch (verifyError: any) {
-            set({ 
-              error: verifyError.response?.data?.error || 'Mock verification failed', 
-              isProcessingPayment: false 
-            });
-          }
-        }, 1500);
-        return;
-      }
 
       const options = {
         key: order.keyId, // Fetched securely from the backend createOrder response

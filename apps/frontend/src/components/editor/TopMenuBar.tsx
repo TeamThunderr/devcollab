@@ -68,7 +68,7 @@ export default function TopMenuBar() {
   return (
     <div ref={menuRef} className={`h-[35px] flex items-center justify-between px-2 text-[13px] select-none ${settings.theme === 'vs-dark' ? 'bg-[#333333] text-[#cccccc]' : 'bg-[#dddddd] text-[#333333]'}`}>
       <div className="flex items-center h-full">
-        {/* VS Code Logo Mock */}
+        {/* VS Code Logo */}
         <div className="w-8 flex justify-center text-blue-500 mr-1">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 0l-12.5 4.5v15l12.5 4.5 6.5-5v-14l-6.5-5zM2 6.5l3.5-1.5v14l-3.5-1.5v-11z"/></svg>
         </div>

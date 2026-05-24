@@ -79,10 +79,8 @@ async function bootstrap() {
     console.error('❌ Socket.IO initialization failed:', err);
   }
 
-  if (!aiConfig.apiKey && !aiConfig.mockMode) {
-    console.warn('⚠️  GEMINI_API_KEY not set and AI_MOCK_MODE is false — AI features will fail');
-  } else if (aiConfig.mockMode) {
-    console.log('🤖 AI running in MOCK mode — no API calls will be made');
+  if (!aiConfig.apiKey) {
+    console.warn('⚠️  GEMINI_API_KEY not set — AI features will fail');
   } else {
     console.log(`🤖 AI running in LIVE mode — using ${aiConfig.model}`);
   }

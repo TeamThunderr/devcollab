@@ -7,72 +7,7 @@ import { socket } from "../../lib/socket";
 
 const PROJECT_ID = "project-test-456";
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
 
-const now = new Date().toISOString();
-
-const SEED_TASKS: Task[] = [
-  {
-    id: "t1",
-    projectId: PROJECT_ID,
-    title: "Setup Redis adapter",
-    status: "TODO",
-    priority: "P0",
-    description: "",
-    createdAt: now,
-    updatedAt: now,
-    createdBy: { id: "user-test-1", email: "test@devcollab.com", name: "Test User" },
-    comments: [],
-  },
-  {
-    id: "t2",
-    projectId: PROJECT_ID,
-    title: "Build Socket.IO rooms",
-    status: "IN_PROGRESS",
-    priority: "P0",
-    description: "",
-    createdAt: now,
-    updatedAt: now,
-    createdBy: { id: "user-test-1", email: "test@devcollab.com", name: "Test User" },
-    comments: [],
-  },
-  {
-    id: "t3",
-    projectId: PROJECT_ID,
-    title: "Presence system",
-    status: "IN_PROGRESS",
-    priority: "P1",
-    description: "",
-    createdAt: now,
-    updatedAt: now,
-    createdBy: { id: "user-test-1", email: "test@devcollab.com", name: "Test User" },
-    comments: [],
-  },
-  {
-    id: "t4",
-    projectId: PROJECT_ID,
-    title: "Frontend socket client",
-    status: "IN_REVIEW",
-    priority: "P1",
-    description: "",
-    createdAt: now,
-    updatedAt: now,
-    createdBy: { id: "user-test-1", email: "test@devcollab.com", name: "Test User" },
-    comments: [],
-  },
-  {
-    id: "t5",
-    projectId: PROJECT_ID,
-    title: "Notification bell UI",
-    status: "DONE",
-    priority: "P2",
-    description: "",
-    createdAt: now,
-    updatedAt: now,
-    createdBy: { id: "user-test-1", email: "test@devcollab.com", name: "Test User" },
-    comments: [],
-  },
-];
 
 // ─── Column config ────────────────────────────────────────────────────────────
 
@@ -124,14 +59,7 @@ export default function ProjectView(): React.ReactElement {
   // Wire up real-time task events for this project
   useTaskSync(PROJECT_ID);
 
-  // Seed store once on mount if not already seeded
-  useEffect(() => {
-    const alreadySeeded = tasks.length > 0;
-    if (alreadySeeded) return;
 
-    setTasks(SEED_TASKS);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const isConnected = socket.connected;
 

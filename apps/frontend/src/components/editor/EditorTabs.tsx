@@ -26,7 +26,6 @@ export default function EditorTabs() {
       <div className="flex overflow-x-auto scrollbar-hide flex-1">
         {openFiles.map((file) => {
           const isActive = activeFileId === file.id;
-          const isDirty = false; // Mock dirty state
 
           return (
             <button
@@ -44,9 +43,6 @@ export default function EditorTabs() {
               <span aria-hidden="true" className="opacity-80 text-xs">{fileIcon(file.language || 'plaintext')}</span>
               <span className="truncate flex-1 text-left">{file.name}</span>
 
-              {isDirty ? (
-                <span className="w-2 h-2 rounded-full bg-white opacity-80 flex-shrink-0 ml-1 group-hover:hidden" />
-              ) : null}
 
               <span
                 role="button"
@@ -58,7 +54,7 @@ export default function EditorTabs() {
                 className={`text-gray-400 hover:text-white hover:bg-white/10
                            rounded w-5 h-5 flex items-center justify-center
                            transition-colors flex-shrink-0 ml-1
-                           ${isDirty ? 'hidden group-hover:flex' : 'opacity-0 group-hover:opacity-100'}`}
+                           opacity-0 group-hover:opacity-100`}
               >
                 <X size={14} />
               </span>
