@@ -8,16 +8,7 @@ import WorkspaceSwitcher from "../components/workspace/WorkspaceSwitcher";
 import { useBillingStore } from "../stores/billingStore";
 import SubscriptionBadge from "../components/billing/SubscriptionBadge";
 
-const NAV_ITEMS = [
-  { emoji: "🏠", label: "Dashboard", getTo: (wid: string) => `/${wid}` },
-  { emoji: "📋", label: "Project", getTo: (wid: string) => `/${wid}/projects/project-test-456` },
-  { emoji: "✏️", label: "Editor", getTo: (wid: string) => `/${wid}/editor/project-test-456` },
-  { emoji: "📝", label: "Wiki", getTo: (wid: string) => `/${wid}/wiki/project-test-456` },
-  { emoji: "💾", label: "Snippets", getTo: (wid: string) => `/${wid}/snippets/project-test-456` },
-  { emoji: "📊", label: "Activity", getTo: (wid: string) => `/${wid}/activity` },
-  { emoji: "🤖", label: "AI Assistant", getTo: (wid: string) => `/${wid}/ai` },
-  { emoji: "💳", label: "Billing", getTo: (wid: string) => `/${wid}/settings/billing` },
-] as const;
+import { useProjectStore } from "../stores/projectStore";
 
 export default function AppLayout(): React.ReactElement {
   const navigate = useNavigate();
@@ -25,13 +16,29 @@ export default function AppLayout(): React.ReactElement {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { fetchSubscription, subscription } = useBillingStore();
+  const { fetchProjects, projects } = useProjectStore();
 
-  // Fetch subscription whenever workspace changes
+  // Fetch subscription and projects whenever workspace changes
   React.useEffect(() => {
     if (workspaceId) {
       fetchSubscription(workspaceId);
+      fetchProjects(workspaceId);
     }
-  }, [workspaceId, fetchSubscription]);
+  }, [workspaceId, fetchSubscription, fetchProjects]);
+
+  const activeProjectId = projects[0]?.id;
+  const navItems = workspaceId ? [
+    { emoji: "🏠", label: "Dashboard", to: `/${workspaceId}` },
+    { emoji: "📋", label: "Projects", to: `/${workspaceId}/projects` },
+    ...(activeProjectId ? [
+      { emoji: "✏️", label: "Editor", to: `/${workspaceId}/editor/${activeProjectId}` },
+      { emoji: "📝", label: "Wiki", to: `/${workspaceId}/wiki/${activeProjectId}` },
+      { emoji: "💾", label: "Snippets", to: `/${workspaceId}/snippets/${activeProjectId}` },
+    ] : []),
+    { emoji: "📊", label: "Activity", to: `/${workspaceId}/activity` },
+    { emoji: "🤖", label: "AI Assistant", to: `/${workspaceId}/ai` },
+    { emoji: "💳", label: "Billing", to: `/${workspaceId}/settings/billing` },
+  ] : [];
 
   // Auth guard — redirect unauthenticated users to /login
   if (!isAuthenticated) {
@@ -69,13 +76,12 @@ export default function AppLayout(): React.ReactElement {
         <nav className="flex-1 py-4 overflow-y-auto">
           {workspaceId ? (
             <ul className="space-y-0.5 px-2">
-              {NAV_ITEMS.map((item) => {
-                const to = item.getTo(workspaceId);
-                const isActive = location.pathname === to || (item.label !== 'Dashboard' && location.pathname.startsWith(to.split('/project-test-456')[0]));
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.to || (item.label !== 'Dashboard' && item.label !== 'Projects' && location.pathname.startsWith(item.to));
                 return (
                   <li key={item.label}>
                     <Link
-                      to={to}
+                      to={item.to}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors duration-150
                         ${isActive ? 'bg-gray-800 text-white font-medium' : 'text-gray-300 hover:text-white hover:bg-gray-800/50'}`}
                     >

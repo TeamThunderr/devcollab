@@ -16,12 +16,6 @@ export const aiConfig = {
   fallbackModel:
     process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.1-flash-lite",
 
-  /**
-   * When true, all AI routes return pre-defined mock responses instead of
-   * hitting the Gemini API. Set to false only for integration testing or demos.
-   */
-  mockMode: process.env.AI_MOCK_MODE === "true",
-
   // ── Rate limit awareness ───────────────────────────────────────────────────
   /** Number of automatic retries on 429 / 503 before giving up */
   maxRetries: 2,

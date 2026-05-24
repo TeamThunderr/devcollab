@@ -131,13 +131,7 @@ export async function restoreVersionHandler(
   }
 }
 
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import util from 'util';
-import { pipeline } from 'stream';
-
-const pump = util.promisify(pipeline);
+import { pool } from '../../db/client';
 
 export async function uploadImageHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
@@ -146,16 +140,44 @@ export async function uploadImageHandler(req: FastifyRequest, reply: FastifyRepl
       return reply.status(400).send({ error: 'No file uploaded' });
     }
 
-    const ext = path.extname(data.filename) || '.png';
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const uploadPath = path.join(__dirname, '../../../uploads', filename);
+    const buffer = await data.toBuffer();
+    const filename = data.filename;
+    const contentType = data.mimetype;
 
-    await pump(data.file, fs.createWriteStream(uploadPath));
+    const result = await pool.query(
+      'INSERT INTO uploaded_images (filename, content_type, data) VALUES ($1, $2, $3) RETURNING id',
+      [filename, contentType, buffer]
+    );
 
-    const imageUrl = `/uploads/${filename}`;
+    const imageId = result.rows[0].id;
+    const imageUrl = `/api/wiki/images/${imageId}`;
+    
     reply.send({ url: imageUrl });
   } catch (err: any) {
     req.log.error(err);
     reply.status(500).send({ error: 'Image upload failed' });
+  }
+}
+
+export async function getImageHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { id } = request.params;
+    const result = await pool.query('SELECT content_type, data FROM uploaded_images WHERE id = $1', [id]);
+    
+    if (result.rows.length === 0) {
+      return reply.status(404).send({ message: 'Image not found' });
+    }
+    
+    const { content_type, data } = result.rows[0];
+    
+    reply.header('Content-Type', content_type);
+    reply.header('Cache-Control', 'public, max-age=31536000');
+    return reply.send(data);
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ message: 'Internal server error' });
   }
 }

@@ -20,16 +20,7 @@ export default function LoginPage(): React.ReactElement {
     }
   }
 
-  async function handleQuickLogin() {
-    setEmail("test@devcollab.com");
-    setPassword("password123");
-    try {
-      await login("test@devcollab.com", "password123");
-      navigate("/");
-    } catch (err) {
-      // Error is handled by the store
-    }
-  }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
@@ -103,16 +94,7 @@ export default function LoginPage(): React.ReactElement {
             </Link>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
-            <button
-              type="button"
-              onClick={handleQuickLogin}
-              disabled={isLoading}
-              className="w-full py-2 px-4 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50"
-            >
-              ⚡ Quick Login (Test User)
-            </button>
-          </div>
+
         </div>
       </div>
     </div>

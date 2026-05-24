@@ -48,43 +48,31 @@ export const billingService = {
       throw new AppError(400, 'Workspace is already on PRO plan');
     }
 
-    let order;
-    try {
-      order = await razorpay.orders.create({
-        amount: PRO_PLAN_PRICE * 100,
-        currency: CURRENCY,
-        receipt: `receipt_${data.workspaceId}_${Date.now()}`,
-      });
-    } catch (err) {
-      console.warn('Razorpay order creation failed, falling back to mock order. Reason:', err);
-      order = {
-        id: `mock_order_${Date.now()}`,
-        amount: PRO_PLAN_PRICE * 100,
-        currency: CURRENCY,
-      };
-    }
+    const order = await razorpay.orders.create({
+      amount: PRO_PLAN_PRICE * 100,
+      currency: CURRENCY,
+      receipt: `receipt_${data.workspaceId}_${Date.now()}`,
+    });
 
     return {
       id: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID || 'mock_key',
+      keyId: process.env.RAZORPAY_KEY_ID,
     };
   },
 
   async verifyPayment(userId: string, data: VerifyPaymentInput) {
     await requireOwner(data.workspaceId, userId);
 
-    if (!data.razorpayOrderId.startsWith('mock_order_')) {
-      const secret = process.env.RAZORPAY_KEY_SECRET || 'test_secret';
-      const generatedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(data.razorpayOrderId + '|' + data.razorpayPaymentId)
-        .digest('hex');
+    const secret = process.env.RAZORPAY_KEY_SECRET || 'test_secret';
+    const generatedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(data.razorpayOrderId + '|' + data.razorpayPaymentId)
+      .digest('hex');
 
-      if (generatedSignature !== data.razorpaySignature) {
-        throw new AppError(400, 'Invalid payment signature. Verification failed.');
-      }
+    if (generatedSignature !== data.razorpaySignature) {
+      throw new AppError(400, 'Invalid payment signature. Verification failed.');
     }
 
     const subscription = await transaction(async (client) => {

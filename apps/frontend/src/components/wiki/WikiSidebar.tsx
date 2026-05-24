@@ -29,13 +29,51 @@ export default function WikiSidebar({ projectId, workspaceId }: { projectId: str
     <div className="w-64 h-full bg-[#1e1e1e] border-r border-[#2d2d2d] flex flex-col flex-shrink-0 select-none text-gray-300">
       <div className="px-4 py-3 border-b border-[#2d2d2d] flex items-center justify-between group">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pages</span>
-        <button 
-          onClick={() => setShowCreate(true)}
-          className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
-          title="New Page"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-        </button>
+        <div className="flex gap-1">
+          <button 
+            onClick={() => document.getElementById('wiki-local-file-upload')?.click()}
+            className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+            title="Import Local File"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+          </button>
+          <button 
+            onClick={() => setShowCreate(true)}
+            className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+            title="New Page"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          </button>
+        </div>
+        
+        <input 
+          type="file" 
+          id="wiki-local-file-upload" 
+          className="hidden" 
+          accept=".md,.txt"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file || !projectId || !workspaceId) return;
+            
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+              const content = ev.target?.result as string;
+              // Remove extension for title
+              const title = file.name.replace(/\.[^/.]+$/, "");
+              
+              try {
+                const store = useWikiStore.getState();
+                const newPage = await store.createPage(projectId, title, workspaceId);
+                await store.updatePage(newPage.id, { content });
+                store.setActivePageId(newPage.id);
+              } catch (err) {
+                console.error("Failed to upload wiki page", err);
+              }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+          }} 
+        />
       </div>
 
       <div className="p-2">

@@ -10,9 +10,9 @@ import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { Task, TaskStatus, TaskPriority } from '../../types';
-import { 
-  Search, Bell, ChevronDown, Sparkles, Users, Zap, Compass, 
-  Briefcase, Layers, Layout, Plus, Trash2, Crown, 
+import {
+  Search, Bell, ChevronDown, Sparkles, Users, Zap, Compass,
+  Briefcase, Layers, Layout, Plus, Trash2, Crown,
   Clock, BarChart3, Bot, Settings2, ShieldCheck, PlayCircle
 } from 'lucide-react';
 
@@ -60,34 +60,21 @@ const DEFAULT_COLUMNS = [
 ];
 
 export default function TasksPage(): React.ReactElement {
-  const { workspaceId, workspaceSlug, pid = 'project-test-456' } = useParams<{ workspaceId?: string; workspaceSlug?: string; pid?: string }>();
-  const activeWorkspaceId = workspaceId || workspaceSlug || 'default-workspace';
-  const navigate = useNavigate();
+  const { workspaceSlug, pid } = useParams<{ workspaceSlug: string; pid: string }>();
+  const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
+  const { members } = useWorkspaceStore();
+  const { user } = useAuthStore();
 
-  const { tasks, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
-  const { projects, fetchProjects, createProject, deleteProject } = useProjectStore();
-  const { members: workspaceMembers, fetchWorkspaceDetails } = useWorkspaceStore();
-  const { user: currentUser } = useAuthStore();
-  const { subscription, fetchSubscription, upgradeToPro } = useBillingStore();
+  const currentUserMember = members.find((m) => m.userId === user?.id);
+  const userRole = currentUserMember?.role || 'VIEWER';
+  const canEditTasks = userRole !== 'VIEWER';
 
-  // Project Mapping Layer to prevent fastify parameter validation crash (expects UUID)
-  const activeProjectId = useMemo(() => {
-    if (pid === 'project-test-456' && projects.length > 0) {
-      return projects[0].id;
-    }
-    return pid === 'project-test-456' || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(pid)
-      ? '00000000-0000-0000-0000-000000000456'
-      : pid;
-  }, [pid, projects]);
-
-  const [config, setConfig] = useState<ProjectWorkspaceConfig | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'sprints' | 'analytics' | 'activity' | 'ai'>('dashboard');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [quickTaskCol, setQuickTaskCol] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Project Switching & Modals States
   const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -118,7 +105,7 @@ export default function TasksPage(): React.ReactElement {
   const [showSprintForm, setShowSprintForm] = useState(false);
   const [sprintName, setSprintName] = useState('');
   const [sprintGoal, setSprintGoal] = useState('');
-  
+
   // AI suggestions
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiSuggestions, setAiSuggestions] = useState<{ title: string; description: string; priority: TaskPriority }[]>([]);
@@ -139,7 +126,7 @@ export default function TasksPage(): React.ReactElement {
       void fetchProjects(activeWorkspaceId);
       void fetchWorkspaceDetails(activeWorkspaceId);
       void fetchSubscription(activeWorkspaceId);
-      
+
       // Load starred / pinned project arrays from local storage
       const starred = localStorage.getItem(`devcollab_starred_projects_${activeWorkspaceId}`);
       if (starred) setStarredProjects(JSON.parse(starred));
@@ -296,8 +283,8 @@ export default function TasksPage(): React.ReactElement {
 
   const filteredTasks = useMemo(() => {
     if (!searchQuery.trim()) return localTasks;
-    return localTasks.filter(t => 
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    return localTasks.filter(t =>
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
     );
   }, [localTasks, searchQuery]);
@@ -348,9 +335,9 @@ export default function TasksPage(): React.ReactElement {
     };
 
     // Close form modal instantly and clear variables
-    setTaskTitle(''); 
-    setTaskDesc(''); 
-    setQuickTaskCol(null); 
+    setTaskTitle('');
+    setTaskDesc('');
+    setQuickTaskCol(null);
     setShowTaskForm(false);
 
     // Apply Optimistic Update
@@ -383,979 +370,144 @@ export default function TasksPage(): React.ReactElement {
     const activeTask = localTasks.find(t => t.id === active.id);
     if (!activeTask) return;
     const overId = String(over.id);
-    const nextStatus = (['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'].includes(overId) ? overId : 'TODO') as TaskStatus;
-    
-    if (activeTask.status !== nextStatus) {
-      // Apply Optimistic drag update
-      setLocalTasks(prev => prev.map(t => t.id === active.id ? { ...t, status: nextStatus } : t));
-      logActivity(`moved task "${activeTask.title}" to ${nextStatus}`);
+    const overTask = tasks.find((task) => task.id === overId);
+    const overStatus = String(over.data.current?.status);
+    const nextStatus: TaskStatus | null = isTaskStatus(overId)
+      ? overId
+      : overTask?.status ?? (isTaskStatus(overStatus) ? overStatus : null);
 
-      void updateTask(activeTask.id, { status: nextStatus }).catch(() => {
-        // Rollback state
-        setLocalTasks(tasks);
-        alert("Failed to synchronize task move. State reverted.");
-      });
+    if (nextStatus && activeTask.status !== nextStatus) {
+      void updateTask(activeId, { status: nextStatus });
     }
-  };
+  }
 
-  const handleRenameColumn = (colId: string, newTitle: string) => {
-    if (!canManageBoard) return;
-    updateProjectConfig(prev => ({ ...prev, columns: prev.columns.map(c => c.id === colId ? { ...c, title: newTitle } : c) }));
-    logActivity(`renamed column "${colId}" to "${newTitle}"`);
-  };
+  async function handleCreateTask() {
+    if (!title.trim() || !pid) return;
 
-  const handleMoveColumn = (colId: string, direction: 'left' | 'right') => {
-    if (!canManageBoard) return;
-    updateProjectConfig(prev => {
-      const idx = prev.columns.findIndex(c => c.id === colId);
-      const target = direction === 'left' ? idx - 1 : idx + 1;
-      if (target >= 0 && target < prev.columns.length) {
-        const next = [...prev.columns];
-        const temp = next[idx]; next[idx] = next[target]; next[target] = temp;
-        return { ...prev, columns: next };
-      }
-      return prev;
+    await createTask({
+      title: title.trim(),
+      description: description.trim() || undefined,
+      status,
+      priority,
+      dueDate: dueDate ? dueDate.toISOString() : undefined,
+      projectId: pid
     });
-  };
 
-  const handleDeleteColumn = (colId: string) => {
-    if (!canManageBoard) return;
-    updateProjectConfig(prev => ({ ...prev, columns: prev.columns.filter(c => c.id !== colId) }));
-    logActivity(`deleted column "${colId}"`);
-  };
-
-  const handleCreateSprint = () => {
-    if (!sprintName.trim() || !config || !canCreateSprint) return;
-    const newSprint = {
-      id: `spr-${Date.now()}`,
-      name: sprintName.trim(),
-      goal: sprintGoal.trim(),
-      status: 'upcoming' as const,
-      taskIds: [],
-    };
-    updateProjectConfig(prev => ({ ...prev, sprints: [...(prev.sprints || []), newSprint] }));
-    logActivity(`created sprint: "${sprintName.trim()}"`);
-    setSprintName(''); setSprintGoal(''); setShowSprintForm(false);
-  };
-
-  const handleActivateSprint = (sid: string) => {
-    updateProjectConfig(prev => ({
-      ...prev,
-      sprints: (prev.sprints || []).map(s => ({ ...s, status: s.id === sid ? 'active' : s.status === 'active' ? 'completed' : s.status }))
-    }));
-    logActivity(`activated sprint`);
-  };
-
-  const handleCompleteSprint = (sid: string) => {
-    updateProjectConfig(prev => ({
-      ...prev,
-      sprints: (prev.sprints || []).map(s => s.id === sid ? { ...s, status: 'completed' as const } : s)
-    }));
-    logActivity(`completed sprint`);
-  };
-
-  const handleGenerateAISuggestions = () => {
-    if (!aiPrompt.trim()) return;
-    setAiLoading(true);
-    setTimeout(() => {
-      setAiSuggestions([
-        { title: `Design modular context adapters for ${aiPrompt.trim()}`, description: `Establish dynamic custom stores and context providers.`, priority: 'P1' },
-        { title: `Initialize real-time state synchronization for ${aiPrompt.trim()}`, description: `Hook Socket.IO broadcasters into local state queues.`, priority: 'P0' },
-        { title: `Create responsive layout benchmarks for ${aiPrompt.trim()}`, description: `Verify viewport constraints on tablet and mobile resolutions.`, priority: 'P2' },
-      ]);
-      setAiLoading(false);
-    }, 800);
-  };
-
-  const handleAddAISuggestionToBoard = async (sug: typeof aiSuggestions[number]) => {
-    if (!canCreateTask || !activeProjectId) return;
-    const added = await createTask({
-      title: sug.title,
-      description: sug.description,
-      status: 'TODO',
-      priority: sug.priority,
-      projectId: activeProjectId,
-    });
-    setLocalTasks(prev => [added, ...prev]);
-    logActivity(`created task from AI: "${sug.title}"`);
-    alert(`Added task "${sug.title}" to board!`);
-  };
-
-  const handleMarkAllNotificationsRead = () => {
-    updateProjectConfig(prev => ({
-      ...prev,
-      notifications: (prev.notifications || []).map(n => ({ ...n, read: true }))
-    }));
-  };
-
-  const handleResetWorkspaceConfig = () => {
-    if (window.confirm('Wipe project configuration and re-run onboarding flow?')) {
-      localStorage.removeItem(`devcollab_project_workspace_${activeProjectId}`);
-      setConfig(null);
-      setWizardStep(1);
-    }
-  };
-
-  // Toggle Project Favorites
-  const toggleStarProject = (projectId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = starredProjects.includes(projectId)
-      ? starredProjects.filter(id => id !== projectId)
-      : [...starredProjects, projectId];
-    setStarredProjects(next);
-    localStorage.setItem(`devcollab_starred_projects_${activeWorkspaceId}`, JSON.stringify(next));
-  };
-
-  // Toggle Project Pinned
-  const togglePinProject = (projectId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = pinnedProjects.includes(projectId)
-      ? pinnedProjects.filter(id => id !== projectId)
-      : [...pinnedProjects, projectId];
-    setPinnedProjects(next);
-    localStorage.setItem(`devcollab_pinned_projects_${activeWorkspaceId}`, JSON.stringify(next));
-  };
-
-  // Premium onboarding launching sequence with full compiling progress
-  const handleLaunchProject = async () => {
-    const totalProjects = projects.length;
-    const isPro = subscription?.plan === 'PRO';
-
-    // Limit free tier to 5 projects
-    if (totalProjects >= 5 && !isPro) {
-      setShowUpgradeModal(true);
-      return;
-    }
-
-    setIsCompiling(true);
-    setCompilingProgress(5);
-    setCompilingStatusText('Bootstrapping modular workspace environment...');
-
-    const statuses = [
-      { p: 20, t: 'Connecting postgres schema tables...' },
-      { p: 45, t: `Compiling custom ${onboardingAnswers.workflow || 'Kanban'} workflow rules...` },
-      { p: 70, t: `Applying visual layout themes for ${onboardingAnswers.style || 'Minimal'} deck...` },
-      { p: 90, t: 'Syncing project workspace presence listeners...' },
-      { p: 100, t: 'Workspace active! Ready for delivery...' }
-    ];
-
-    let currentIdx = 0;
-    const compileInterval = setInterval(async () => {
-      if (currentIdx < statuses.length) {
-        setCompilingProgress(statuses[currentIdx].p);
-        setCompilingStatusText(statuses[currentIdx].t);
-        currentIdx++;
-      } else {
-        clearInterval(compileInterval);
-        
-        // Save to real database
-        const name = `My ${onboardingAnswers.buildType || 'SaaS'} ${onboardingAnswers.workflow || 'Kanban'}`;
-        const description = `A premium workspace structured around ${onboardingAnswers.workflow || 'Kanban'} workflow optimization. Style: ${onboardingAnswers.style || 'Minimal'}.`;
-
-        try {
-          const created = await createProject({
-            name,
-            description,
-            workspaceId: activeWorkspaceId,
-          });
-
-          const newConfig: ProjectWorkspaceConfig = {
-            name,
-            description,
-            projectType: onboardingAnswers.buildType || 'Software Engineering',
-            visibility: 'Public to Workspace',
-            members: [{ userId: currentUser?.id || 'default', role: 'Owner' }],
-            permissions: DEFAULT_PERMISSIONS,
-            columns: onboardingAnswers.workflow === 'Simple Tasks' ? [
-              { id: 'TODO', title: 'To Do' },
-              { id: 'DONE', title: 'Completed' }
-            ] : DEFAULT_COLUMNS,
-            sprints: [],
-            activities: [{ id: `act-${Date.now()}`, userName: currentUser?.name || 'Owner', details: 'created this project workspace', timestamp: new Date().toISOString() }],
-            notifications: [{ id: `notif-${Date.now()}`, message: `🚀 Welcome to the new premium project workspace "${name}"!`, read: false, timestamp: new Date().toISOString() }],
-          };
-
-          localStorage.setItem(`devcollab_project_workspace_${created.id}`, JSON.stringify(newConfig));
-          setConfig(newConfig);
-
-          // Complete syncing reset
-          setIsCompiling(false);
-          setShowCreateModal(false);
-          setOnboardingAnswers({ buildType: '', teamSize: '', priority: '', workflow: '', style: '' });
-          setWizardStep(1);
-          navigate(`/${activeWorkspaceId}/projects/${created.id}`);
-        } catch (err: any) {
-          setIsCompiling(false);
-          alert(`Error creating project: ${err.message}`);
-        }
-      }
-    }, 450);
-  };
-
-  const handleProUpgradeSubmit = async () => {
-    if (currentUser) {
-      await upgradeToPro(activeWorkspaceId, currentUser.email, currentUser.name ?? undefined);
-      setShowUpgradeModal(false);
-    }
-  };
-
-  // ─── PREMIUM INITIALIZING LOADER ──────────────────────────────────────────────
-  if (isInitializing) {
-    return (
-      <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-white premium-font z-50 transition-all duration-300">
-        <div className="w-full max-w-sm space-y-6 text-center animate-in fade-in zoom-in-95 duration-300">
-          <div className="flex justify-center">
-            <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 via-violet-650 to-cyan-400 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-indigo-950/50 animate-pulse">
-              <Sparkles className="h-7 w-7 text-white" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Initializing Project Workspace</h2>
-            <p className="text-xs text-slate-500 mt-1 font-medium">Syncing presence boards & visuals...</p>
-          </div>
-          <div className="space-y-2">
-            <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden border border-slate-800/80">
-              <div 
-                className="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 rounded-full transition-all duration-350 ease-out" 
-                style={{ width: `${initProgress}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between text-[10px] font-bold font-mono text-slate-600 px-1">
-              <span>Syncing Decks</span>
-              <span>{initProgress}%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    // Only clear the title and description, preserve status, priority, and due date
+    setTitle('');
+    setDescription('');
+    // Keep status, priority, and dueDate for next task creation
   }
 
-  // ─── WIZARD COMPILING / SYNC SCREEN ──────────────────────────────────────────
-  if (isCompiling) {
-    return (
-      <div className="absolute inset-0 bg-slate-950 flex items-center justify-center p-6 text-white premium-font z-50">
-        <div className="w-full max-w-md bg-slate-900/60 border border-slate-800/80 backdrop-blur-2xl p-8 rounded-3xl shadow-2xl text-center space-y-6 animate-in fade-in duration-300">
-          <div className="flex justify-center">
-            <div className="w-12 h-12 bg-indigo-600/10 rounded-full border border-indigo-500/30 flex items-center justify-center">
-              <Zap className="h-6 w-6 text-indigo-400 animate-bounce" />
-            </div>
-          </div>
-          <div className="space-y-2 text-center">
-            <h2 className="text-lg font-bold">Compiling Workspace</h2>
-            <p className="text-xs text-slate-400 h-4 transition-all duration-200">{compilingStatusText}</p>
-          </div>
-          <div className="space-y-2">
-            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${compilingProgress}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between text-[9px] font-bold text-slate-500 font-mono">
-              <span>Configuring Pipelines</span>
-              <span>{compilingProgress}%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Helper render for step visual components inside wizards
-  const renderWizardContent = () => {
-    switch (wizardStep) {
-      case 1:
-        return (
-          <div className="space-y-4 animate-slide-in-right text-left">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">What are you planning to build?</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { type: 'SaaS Platform', icon: '🚀', desc: 'Subscription platform' },
-                { type: 'AI Product', icon: '🧠', desc: 'Neural app models' },
-                { type: 'ERP System', icon: '📊', desc: 'Resource workflows' },
-                { type: 'Mobile App', icon: '📱', desc: 'Android & iOS cycles' },
-                { type: 'Portfolio', icon: '🎨', desc: 'Creative highlights' },
-                { type: 'Startup MVP', icon: '💎', desc: 'Agile MVP pipeline' },
-                { type: 'Team Workspace', icon: '👥', desc: 'Multi-member board' },
-                { type: 'Other', icon: '⚙️', desc: 'Custom workspace queue' },
-              ].map(opt => {
-                const selected = onboardingAnswers.buildType === opt.type;
-                return (
-                  <button
-                    key={opt.type}
-                    type="button"
-                    onClick={() => setOnboardingAnswers({ ...onboardingAnswers, buildType: opt.type })}
-                    className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-28 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 relative group overflow-hidden ${
-                      selected 
-                        ? 'bg-indigo-600/10 border-indigo-500 shadow-indigo-500/10 dark:shadow-indigo-500/20' 
-                        : 'bg-slate-950/40 border-slate-850 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="text-2xl group-hover:scale-110 transition-transform duration-300">{opt.icon}</span>
-                    <div className="mt-2">
-                      <p className="text-[11px] font-bold text-white leading-tight">{opt.type}</p>
-                      <p className="text-[9px] text-slate-500 mt-0.5 leading-none">{opt.desc}</p>
-                    </div>
-                    {selected && (
-                      <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-indigo-500 border border-indigo-400 flex items-center justify-center text-[9px] font-extrabold text-white animate-in zoom-in-50">✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      case 2:
-        return (
-          <div className="space-y-4 animate-slide-in-right text-left">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">How big is your team?</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { size: 'Solo', label: '👤 Just Me', desc: 'Single-member timelines and private workspaces.' },
-                { size: '2–5 Members', label: '👥 Small Team', desc: 'Direct agile flows, comments and shared boards.' },
-                { size: '5–15 Members', label: '🏢 Growing Core', desc: 'Sprint planning metrics, workload charts, and role allocations.' },
-                { size: 'Enterprise Team', label: '👑 Scale Suite', desc: 'Granular workspace permissions, security logs & capacity analysis.' },
-              ].map(opt => {
-                const selected = onboardingAnswers.teamSize === opt.size;
-                return (
-                  <button
-                    key={opt.size}
-                    type="button"
-                    onClick={() => setOnboardingAnswers({ ...onboardingAnswers, teamSize: opt.size })}
-                    className={`p-5 rounded-2xl border text-left space-y-2 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 relative ${
-                      selected 
-                        ? 'bg-indigo-600/10 border-indigo-500 shadow-indigo-500/10' 
-                        : 'bg-slate-950/40 border-slate-850 hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-white flex items-center gap-1.5">{opt.label}</p>
-                    <p className="text-[10px] text-slate-450 leading-relaxed">{opt.desc}</p>
-                    {selected && (
-                      <span className="absolute top-3 right-3 w-4.5 h-4.5 rounded-full bg-indigo-500 border border-indigo-400 flex items-center justify-center text-[9px] font-extrabold text-white animate-in zoom-in-50">✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      case 3:
-        return (
-          <div className="space-y-4 animate-slide-in-right text-left">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">What matters most?</h3>
-            <div className="grid grid-cols-5 gap-2.5">
-              {[
-                { key: 'Speed', label: 'Velocity', desc: 'Rapid delivery cycles', icon: <Zap className="h-5 w-5 text-amber-400" /> },
-                { key: 'Collaboration', label: 'Synergy', desc: 'Shared task reviews', icon: <Users className="h-5 w-5 text-indigo-400" /> },
-                { key: 'Client Delivery', label: 'Milestones', desc: 'Due date calendars', icon: <Briefcase className="h-5 w-5 text-emerald-450" /> },
-                { key: 'Product Tracking', label: 'Scopes', desc: 'Strategic roadmaps', icon: <Compass className="h-5 w-5 text-cyan-400" /> },
-                { key: 'Sprint Workflow', label: 'Sprints', desc: 'Sprint planners', icon: <Layers className="h-5 w-5 text-pink-400" /> },
-              ].map(opt => {
-                const selected = onboardingAnswers.priority === opt.key;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => setOnboardingAnswers({ ...onboardingAnswers, priority: opt.key })}
-                    className={`p-4 rounded-2xl border text-center flex flex-col items-center justify-center gap-3 transition-all duration-300 min-h-[145px] relative ${
-                      selected 
-                        ? 'bg-indigo-600/10 border-indigo-500 shadow-indigo-500/10 scale-[1.02]' 
-                        : 'bg-slate-950/40 border-slate-850 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="p-2 bg-slate-900 rounded-xl border border-slate-800">{opt.icon}</span>
-                    <div className="text-center space-y-0.5">
-                      <p className="text-[10px] font-bold text-white">{opt.label}</p>
-                      <p className="text-[8px] text-slate-500 leading-normal">{opt.desc}</p>
-                    </div>
-                    {selected && (
-                      <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-indigo-500 border border-indigo-400 flex items-center justify-center text-[9px] font-extrabold text-white animate-in zoom-in-50">✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      case 4:
-        return (
-          <div className="space-y-4 animate-slide-in-right text-left">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">What workflow fits your team?</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { key: 'Agile Sprint', label: '🏃 Agile Sprint', desc: 'Divide deliverables into iterative sprints with a dedicated Product Backlog queue.' },
-                { key: 'Kanban', label: '📋 Kanban Board', desc: 'Classic 4-lane pipeline flow: To Do, In Progress, In Review, and Completed.' },
-                { key: 'Product Roadmap', label: '🗺️ Product Roadmap', desc: 'Timeline-centric deliverable milestones and strategic release boards.' },
-                { key: 'Simple Tasks', label: '✅ Simple Tasks', desc: 'Minimalist 2-lane workflow (To Do and Completed) for rapid pipelines.' },
-              ].map(opt => {
-                const selected = onboardingAnswers.workflow === opt.key;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => setOnboardingAnswers({ ...onboardingAnswers, workflow: opt.key })}
-                    className={`p-4 rounded-2xl border text-left space-y-1.5 transition-all duration-300 relative ${
-                      selected 
-                        ? 'bg-indigo-600/10 border-indigo-500 shadow-indigo-500/10 scale-[1.01]' 
-                        : 'bg-slate-950/40 border-slate-850 hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-white">{opt.label}</p>
-                    <p className="text-[10px] text-slate-450 leading-relaxed">{opt.desc}</p>
-                    {selected && (
-                      <span className="absolute top-3 right-3 w-4.5 h-4.5 rounded-full bg-indigo-500 border border-indigo-400 flex items-center justify-center text-[9px] font-extrabold text-white animate-in zoom-in-50">✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      case 5:
-        return (
-          <div className="space-y-4 animate-slide-in-right text-left">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Choose your workspace style</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { style: 'Minimal', label: '⚪ Minimalist', desc: 'Ultra clean design. Thin border glass headers with minimal visual distraction.' },
-                { style: 'Professional', label: '💼 Professional', desc: 'Structured grid workspaces, clean layouts, and detailed logs.' },
-                { style: 'Creative', label: '🎨 Creative Glow', desc: 'Dynamic visual design featuring vibrant card shadow glows, transforms, and gradients.' },
-                { style: 'Enterprise', label: '🏢 Enterprise Bold', desc: 'Denser typography weights, prominent status indicators, and large text scales.' },
-              ].map(opt => {
-                const selected = onboardingAnswers.style === opt.style;
-                return (
-                  <button
-                    key={opt.style}
-                    type="button"
-                    onClick={() => setOnboardingAnswers({ ...onboardingAnswers, style: opt.style })}
-                    className={`p-4 rounded-2xl border text-left space-y-1.5 transition-all duration-300 relative ${
-                      selected 
-                        ? 'bg-indigo-600/10 border-indigo-500 shadow-indigo-500/10 scale-[1.01]' 
-                        : 'bg-slate-950/40 border-slate-850 hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-white">{opt.label}</p>
-                    <p className="text-[10px] text-slate-450 leading-relaxed">{opt.desc}</p>
-                    {selected && (
-                      <span className="absolute top-3 right-3 w-4.5 h-4.5 rounded-full bg-indigo-500 border border-indigo-400 flex items-center justify-center text-[9px] font-extrabold text-white animate-in zoom-in-50">✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  // ─── FULL PANEL ONBOARDING FLOW (No database projects exist) ────────────────
-  if (projects.length === 0) {
-    return (
-      <div className="absolute inset-0 bg-slate-950 flex items-center justify-center p-6 text-white premium-font z-40 overflow-y-auto">
-        <div className="w-full max-w-4xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-[580px] animate-in fade-in duration-405">
-          {/* Left panel */}
-          <aside className="w-full md:w-72 bg-slate-950/60 p-8 border-b md:border-b-0 md:border-r border-slate-850/80 flex flex-col justify-between text-left">
-            <div className="space-y-8">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-400">Workspace Deck</span>
-                <h1 className="text-xl font-extrabold text-white mt-1">Project Wizard</h1>
-              </div>
-              <ul className="space-y-4">
-                {[
-                  { step: 1, label: 'Platform Intent', desc: 'Core product intent' },
-                  { step: 2, label: 'Team Size', desc: 'Workload scale metrics' },
-                  { step: 3, label: 'Delivery Focus', desc: 'Priority deck target' },
-                  { step: 4, label: 'Workflow setup', desc: 'System board status lanes' },
-                  { step: 5, label: 'Visual style', desc: 'Workspace layout theme' },
-                ].map((s) => {
-                  const active = wizardStep === s.step;
-                  const completed = wizardStep > s.step;
-                  return (
-                    <li key={s.step} className="flex gap-3">
-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                        active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 ring-4 ring-indigo-950' : 
-                        completed ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/30' : 'bg-slate-900 text-slate-600 border border-slate-850'
-                      }`}>
-                        {completed ? '✓' : s.step}
-                      </span>
-                      <div>
-                        <p className={`text-xs font-bold leading-tight ${active ? 'text-white' : 'text-slate-550'}`}>{s.label}</p>
-                        <p className="text-[9px] text-slate-500 mt-0.5 leading-none">{s.desc}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-            <p className="text-[10px] text-slate-500 leading-normal border-t border-slate-850 pt-4">Configure your delivery streams with customized workflows in clicks.</p>
-          </aside>
-
-          {/* Wizard Main content */}
-          <main className="flex-1 p-8 flex flex-col justify-between min-h-[480px]">
-            <div className="flex-1 flex flex-col justify-center min-h-[340px]">
-              {renderWizardContent()}
-            </div>
-
-            {/* Wizard controls */}
-            <div className="flex justify-between items-center mt-8 border-t border-slate-800/80 pt-5">
-              <button 
-                type="button" 
-                onClick={() => setWizardStep(prev => prev - 1)} 
-                disabled={wizardStep === 1} 
-                className="rounded-xl border border-slate-705 px-4.5 py-2 text-xs font-semibold text-slate-350 hover:bg-slate-900 disabled:opacity-40 disabled:pointer-events-none transition"
-              >
-                ← Back
-              </button>
-              {wizardStep < 5 ? (
-                <button 
-                  type="button" 
-                  onClick={() => setWizardStep(prev => prev + 1)} 
-                  disabled={
-                    (wizardStep === 1 && !onboardingAnswers.buildType) ||
-                    (wizardStep === 2 && !onboardingAnswers.teamSize) ||
-                    (wizardStep === 3 && !onboardingAnswers.priority) ||
-                    (wizardStep === 4 && !onboardingAnswers.workflow)
-                  }
-                  className="rounded-xl bg-indigo-650 px-5.5 py-2.5 text-xs font-bold text-white hover:bg-indigo-550 disabled:opacity-40 disabled:pointer-events-none transition shadow-lg shadow-indigo-600/10"
-                >
-                  Continue →
-                </button>
-              ) : (
-                <button 
-                  type="button" 
-                  onClick={() => void handleLaunchProject()} 
-                  disabled={!onboardingAnswers.style}
-                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-650 px-6.5 py-2.5 text-xs font-extrabold text-white hover:opacity-95 shadow-lg shadow-indigo-500/15 ring-2 ring-indigo-950 transition"
-                >
-                  🚀 Compile Project Workspace
-                </button>
-              )}
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── PREMIUM SHELL WITH NAVIGATION ──────────────────────────────────────────
   return (
-    <div className="h-full w-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-805 dark:text-slate-100 premium-font overflow-hidden">
-      
-      {/* ─── NEW MINIMAL PREMIUM TOPBAR ────────────────────────────────────────── */}
-      <header className="px-6 py-3.5 border-b border-slate-205 dark:border-slate-900 bg-white/70 dark:bg-slate-950/70 backdrop-blur-md flex items-center justify-between gap-4 flex-shrink-0 z-20 shadow-sm transition-all duration-200">
-        
-        {/* WorkspaceSwitcher / Project selector dropdown */}
-        <div className="flex items-center gap-2 relative">
-          <button 
-            type="button" 
-            onClick={() => setShowProjectSwitcher(!showProjectSwitcher)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-205 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-900 text-xs font-bold text-slate-800 dark:text-white transition-all shadow-sm"
-          >
-            <Layout className="h-4 w-4 text-indigo-500" />
-            <span className="truncate max-w-[130px] font-semibold">{activeProjectObject?.name || 'Select Project'}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-450" />
-          </button>
-
-          {showProjectSwitcher && (
-            <div className="absolute left-0 top-full mt-2 w-64 rounded-2xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 shadow-2xl p-3.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
-              <div className="px-1.5 pb-2 mb-2 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center text-[10px] uppercase font-extrabold text-slate-400 tracking-wider">
-                <span>Projects</span>
-                <button type="button" onClick={() => { setShowCreateModal(true); setShowProjectSwitcher(false); }} className="text-indigo-550 dark:text-indigo-400 font-bold hover:underline">Add Project</button>
-              </div>
-              
-              <div className="space-y-1 max-h-48 overflow-y-auto pr-1 premium-scrollbar">
-                {projects.map((proj) => {
-                  const isStarred = starredProjects.includes(proj.id);
-                  const isPinned = pinnedProjects.includes(proj.id);
-                  const isSelected = proj.id === activeProjectId;
-
-                  return (
-                    <div 
-                      key={proj.id}
-                      onClick={() => { navigate(`/${activeWorkspaceId}/projects/${proj.id}`); setShowProjectSwitcher(false); }}
-                      className={`flex items-center justify-between p-2 rounded-xl text-xs font-semibold cursor-pointer transition ${
-                        isSelected 
-                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/10' 
-                          : 'text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-900'
-                      }`}
-                    >
-                      <span className="truncate flex-1 text-left">{proj.name}</span>
-                      <div className="flex items-center gap-1 ml-2">
-                        <button 
-                          type="button" 
-                          onClick={(e) => toggleStarProject(proj.id, e)} 
-                          className={`p-1 rounded text-xs transition ${
-                            isStarred ? 'text-amber-500 hover:text-amber-600' : 'text-slate-400 hover:text-slate-300'
-                          }`}
-                          title="Star Project"
-                        >
-                          ★
-                        </button>
-                        <button 
-                          type="button" 
-                          onClick={(e) => togglePinProject(proj.id, e)} 
-                          className={`p-1 rounded text-xs transition ${
-                            isPinned ? 'text-indigo-500' : 'text-slate-400 hover:text-slate-300'
-                          }`}
-                          title="Pin Project"
-                        >
-                          📌
-                        </button>
-                        {projects.length > 1 && (
-                          <button 
-                            type="button" 
-                            onClick={async (e) => { 
-                              e.stopPropagation(); 
-                              if (window.confirm('Delete this project?')) {
-                                await deleteProject(proj.id);
-                                localStorage.removeItem(`devcollab_project_workspace_${proj.id}`);
-                              } 
-                            }} 
-                            className="p-1 rounded text-xs text-slate-400 hover:text-red-500 transition"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+    <div className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-800 p-8 text-white shadow-xl sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <Link to={`/${workspaceSlug}/projects`} className="text-sm uppercase tracking-widest text-cyan-200 hover:text-white transition">
+              ← Back to Projects
+            </Link>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight">Project Tasks</h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-200">
+              Manage tasks for this project across the delivery pipeline.
+            </p>
+          </div>
+          {canEditTasks && (
+            <button
+              type="button"
+              onClick={() => setShowForm(current => !current)}
+              className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-cyan-100"
+            >
+              {showForm ? 'Close Form' : 'New Task'}
+            </button>
           )}
         </div>
 
-        {/* Minimal Search Input */}
-        <div className="relative flex-1 max-w-sm hidden sm:block">
-          <span className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500"><Search className="h-3.5 w-3.5" /></span>
-          <input 
-            type="text" 
-            placeholder="Search board tasks..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-205 dark:border-slate-850 rounded-full pl-9 pr-4 py-1.5 text-xs text-slate-850 dark:text-slate-200 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition-all shadow-inner"
-          />
-        </div>
-
-        {/* Stacked Avatars Group, notifications, reset, buttons */}
-        <div className="flex items-center gap-3">
-          {/* Overlapping User Avatars stacked group */}
-          <div className="flex -space-x-1.5 items-center">
-            {workspaceMembers.slice(0, 3).map((m, idx) => {
-              const initial = (m.user?.name || m.user?.email || '?').charAt(0).toUpperCase();
-              return (
-                <div 
-                  key={m.userId}
-                  className={`w-6 h-6 rounded-full border border-white dark:border-slate-950 flex items-center justify-center text-[9px] font-bold text-white shadow-sm cursor-help relative group/av`}
-                  style={{ backgroundColor: idx === 0 ? '#4f46e5' : idx === 1 ? '#0d9488' : '#0891b2', zIndex: 10 - idx }}
+        {showForm && canEditTasks ? (
+          <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-slate-900">Create Task</h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                Title
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="Task title..."
+                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-cyan-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                Status
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value as TaskStatus)}
+                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-cyan-500"
                 >
-                  {initial}
-                  <span className="absolute top-full right-1/2 translate-x-1/2 mt-1 hidden group-hover/av:block bg-slate-950 text-white text-[8px] px-2 py-0.5 rounded shadow-lg whitespace-nowrap z-30 font-sans">
-                    {m.user?.name || m.user?.email}
-                  </span>
-                </div>
-              );
-            })}
-            {workspaceMembers.length > 3 && (
-              <div className="w-6 h-6 rounded-full border border-white dark:border-slate-950 bg-slate-800 text-white flex items-center justify-center text-[9px] font-bold z-[5]">
-                +{workspaceMembers.length - 3}
-              </div>
-            )}
-          </div>
-
-          {/* Notifications Drawer */}
-          <div className="relative">
-            <button 
-              type="button" 
-              onClick={() => { setShowNotifications(!showNotifications); handleMarkAllNotificationsRead(); }} 
-              className="p-1.5 rounded-xl border border-slate-205 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-900 text-xs relative flex items-center justify-center transition-all shadow-sm"
-            >
-              <Bell className="h-4 w-4 text-slate-600 dark:text-slate-450" />
-              {(config?.notifications || []).some(n => !n.read) && (
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 shadow-2xl p-4 z-30 animate-in fade-in duration-100 text-left">
-                <div className="flex justify-between border-b dark:border-slate-850 pb-2 mb-2 text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                  <span>Recent Alerts</span>
-                  <button type="button" onClick={() => setShowNotifications(false)} className="text-slate-450 hover:text-slate-600">✕</button>
-                </div>
-                <div className="space-y-2 max-h-48 overflow-y-auto text-[10px] pr-1 premium-scrollbar">
-                  {config?.notifications?.length === 0 ? <p className="text-slate-450 italic text-center py-4">No recent alerts.</p> :
-                    config?.notifications?.map(n => (
-                      <div key={n.id} className="p-2 border border-slate-100 dark:border-slate-850 rounded-xl bg-slate-50/50 dark:bg-slate-900/30 leading-relaxed text-slate-700 dark:text-slate-350">
-                        {n.message}
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Reset Workspace button */}
-          <button 
-            type="button" 
-            onClick={handleResetWorkspaceConfig}
-            className="p-1.5 rounded-xl border border-slate-205 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-900 text-xs transition shadow-sm"
-            title="Reset Project Config (Wizard test)"
-          >
-            <Settings2 className="h-4 w-4 text-slate-500" />
-          </button>
-
-          {/* Action buttons */}
-          <button 
-            type="button" 
-            onClick={() => setShowCreateModal(true)} 
-            className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 px-3.5 py-1.5 text-xs font-bold transition shadow-sm hidden md:flex items-center gap-1"
-          >
-            <Plus className="h-3.5 w-3.5" /> Project
-          </button>
-
-          {canCreateTask && (
-            <button 
-              type="button" 
-              onClick={() => setShowTaskForm(true)} 
-              className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition shadow-md shadow-indigo-600/10 flex items-center gap-1"
-            >
-              <Plus className="h-3.5 w-3.5" /> Task
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* ─── MODERN MINIMALIST TAB SWITCHER ────────────────────────────────────────── */}
-      <nav className="px-6 py-1.5 border-b border-slate-205 dark:border-slate-900 bg-white dark:bg-slate-950/20 flex gap-1 flex-shrink-0 z-10 overflow-x-auto">
-        {[
-          { tab: 'dashboard', label: '🏠 Dashboard' },
-          { tab: 'board', label: '📋 Kanban Board' },
-          { tab: 'sprints', label: '🏃 Sprints' },
-          { tab: 'analytics', label: '📊 Analytics' },
-          { tab: 'activity', label: '🕒 Audit Feed' },
-          { tab: 'ai', label: '🤖 AI suggestion' },
-        ].map(t => {
-          const isActive = activeTab === t.tab;
-          return (
-            <button 
-              key={t.tab} 
-              type="button" 
-              onClick={() => setActiveTab(t.tab as any)} 
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                isActive 
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-sm scale-[1.01]' 
-                  : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900'
-              }`}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Scrollable Container Body */}
-      <main className={`flex-1 min-w-0 bg-slate-50/50 dark:bg-slate-950/20 ${activeTab === 'board' ? 'overflow-hidden flex flex-col p-6 h-full' : 'overflow-y-auto p-6'}`}>
-        
-        {/* Gorgeous Backdrop Floating creation task modal overlay */}
-        {showTaskForm && (
-          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <section className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl max-w-lg w-full animate-in zoom-in-95 duration-200 text-left">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                <h2 className="text-sm font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Create Project Task</h2>
-                <button type="button" onClick={() => setShowTaskForm(false)} className="text-slate-450 hover:text-slate-650 transition">✕</button>
-              </div>
-
-              <div className="grid gap-4 text-xs">
-                <label className="block font-bold text-slate-500">Task Title
-                  <input 
-                    type="text" 
-                    value={taskTitle} 
-                    onChange={e => setTaskTitle(e.target.value)} 
-                    className="w-full mt-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-800 rounded-xl px-4 py-2.5 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition" 
-                    placeholder="e.g. Build client adapter authentication fallback..." 
-                  />
-                </label>
-
-                <label className="block font-bold text-slate-500">Task Description
-                  <textarea 
-                    value={taskDesc} 
-                    onChange={e => setTaskDesc(e.target.value)} 
-                    className="w-full mt-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-800 rounded-xl px-4 py-2.5 outline-none resize-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-950 transition" 
-                    placeholder="Detailed task goals and deliverables criteria..." 
-                    rows={3} 
-                  />
-                </label>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="block font-bold text-slate-500">Priority Level
-                    <div className="flex gap-1.5 mt-1.5">
-                      {[
-                        { level: 'P0', label: 'Critical', color: 'border-rose-500/30 text-rose-600 bg-rose-500/5', activeColor: 'bg-rose-500 text-white border-rose-500' },
-                        { level: 'P1', label: 'High', color: 'border-amber-500/30 text-amber-600 bg-amber-500/5', activeColor: 'bg-amber-500 text-white border-amber-500' },
-                        { level: 'P2', label: 'Normal', color: 'border-emerald-500/30 text-emerald-600 bg-emerald-500/5', activeColor: 'bg-emerald-500 text-white border-emerald-500' },
-                      ].map(p => {
-                        const isSel = taskPrio === p.level;
-                        return (
-                          <button
-                            key={p.level}
-                            type="button"
-                            onClick={() => setTaskPrio(p.level as TaskPriority)}
-                            className={`flex-1 py-2 border rounded-xl font-bold text-center transition ${isSel ? p.activeColor : `${p.color} hover:opacity-80`}`}
-                          >
-                            {p.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <label className="block font-bold text-slate-500">Due Date
-                    <div className="mt-1.5">
-                      <DatePicker date={taskDue} setDate={setTaskDue} placeholder="Choose deadline" />
-                    </div>
-                  </label>
-                </div>
-
-                <div className="flex gap-2 justify-end pt-4 border-t border-slate-100 dark:border-slate-800 mt-2">
-                  <button type="button" onClick={() => setShowTaskForm(false)} className="rounded-xl border border-slate-200 dark:border-slate-800 px-4 py-2.5 font-bold hover:bg-slate-50 dark:hover:bg-slate-905 transition">Cancel</button>
-                  <button 
-                    type="button" 
-                    onClick={() => void handleCreateTaskSubmit()} 
-                    disabled={!taskTitle.trim()} 
-                    className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-5.5 py-2.5 font-extrabold disabled:opacity-40 transition shadow-lg shadow-indigo-600/10"
-                  >
-                    🚀 Create Instant Task
-                  </button>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {/* ─── TAB 0: DASHBOARD OVERVIEW ─────────────────────────────────────────── */}
-        {activeTab === 'dashboard' && config && (
-          <div className="space-y-6 max-w-5xl animate-in fade-in duration-300">
-            {/* Premium welcome header card */}
-            <div className="rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-7 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden border border-slate-850/80">
-              <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
-              <div className="text-left space-y-1 z-10">
-                <span className="text-[9px] font-extrabold uppercase tracking-[0.25em] text-indigo-400 flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Workspace summary</span>
-                <h2 className="text-2xl font-extrabold tracking-tight">Welcome back, {currentUser?.name || 'Builder'}!</h2>
-                <p className="text-xs text-slate-400">Let's ship some code today. You are viewing the <span className="font-bold text-indigo-300">"{config.name}"</span> dashboard.</p>
-              </div>
-              <div className="flex gap-3 z-10">
-                <div className="p-3 bg-slate-900/60 rounded-2xl border border-slate-800/40 text-center min-w-20">
-                  <span className="text-[9px] uppercase font-bold text-slate-500">Tasks</span>
-                  <p className="text-lg font-bold text-indigo-400">{localTasks.length}</p>
-                </div>
-                <div className="p-3 bg-slate-900/60 rounded-2xl border border-slate-800/40 text-center min-w-20">
-                  <span className="text-[9px] uppercase font-bold text-slate-500">Done</span>
-                  <p className="text-lg font-bold text-emerald-400">{localTasks.filter(t => t.status === 'DONE').length}</p>
-                </div>
-                <div className="p-3 bg-slate-900/60 rounded-2xl border border-slate-800/40 text-center min-w-20">
-                  <span className="text-[9px] uppercase font-bold text-slate-500">Sprints</span>
-                  <p className="text-lg font-bold text-cyan-400">{config.sprints?.length || 0}</p>
-                </div>
+                  <option value="TODO">To Do</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="IN_REVIEW">In Review</option>
+                  <option value="DONE">Done</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-slate-700 md:col-span-2">
+                Description
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Task details..."
+                  rows={3}
+                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-cyan-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                Priority
+                <select
+                  value={priority}
+                  onChange={e => setPriority(e.target.value as TaskPriority)}
+                  className="rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-cyan-500"
+                >
+                  <option value="P0">P0 (Critical)</option>
+                  <option value="P1">P1 (High)</option>
+                  <option value="P2">P2 (Normal)</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                Due Date
+                <DatePicker date={dueDate} setDate={setDueDate} placeholder="Select a due date" disablePastDates={true} />
+              </label>
+              <div className="flex items-end gap-3 md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => void handleCreateTask()}
+                  disabled={!title.trim()}
+                  className="rounded-full bg-cyan-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Create Task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
+          </section>
+        ) : null}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-              {/* Sprint Progress widget */}
-              <div className="border border-slate-205 dark:border-slate-900 bg-white/70 dark:bg-slate-950/70 backdrop-blur-md p-6 rounded-3xl shadow-sm space-y-4 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5"><PlayCircle className="h-4 w-4 text-indigo-500" /> Active Progress</h3>
-                  <p className="text-[10px] text-slate-450 mt-1">Completion rate of active sprint subtasks.</p>
-                </div>
-                <div className="py-2 flex items-center justify-center">
-                  <div className="relative w-24 h-24 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                      <path className="text-slate-100 dark:text-slate-900" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path className="text-indigo-550 transition-all duration-500" strokeDasharray={`${localTasks.length ? Math.round((localTasks.filter(t => t.status === 'DONE').length / localTasks.length) * 100) : 0}, 100`} strokeWidth="3" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    </svg>
-                    <span className="absolute text-sm font-extrabold text-slate-800 dark:text-white">
-                      {localTasks.length ? Math.round((localTasks.filter(t => t.status === 'DONE').length / localTasks.length) * 100) : 0}%
-                    </span>
-                  </div>
-                </div>
-                <div className="text-[10px] font-bold text-slate-500 text-center">
-                  {localTasks.filter(t => t.status === 'DONE').length} of {localTasks.length} tasks completed
-                </div>
-              </div>
-
-              {/* Upcoming Deadlines */}
-              <div className="border border-slate-205 dark:border-slate-900 bg-white/70 dark:bg-slate-950/70 backdrop-blur-md p-6 rounded-3xl shadow-sm space-y-3 md:col-span-2">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5"><Clock className="h-4 w-4 text-indigo-500" /> Upcoming Deadlines</h3>
-                <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1 premium-scrollbar">
-                  {localTasks.filter(t => t.dueDate && t.status !== 'DONE').length === 0 ? (
-                    <div className="text-center py-8 text-slate-450 italic text-[11px]">No urgent deadlines scheduled.</div>
-                  ) : (
-                    localTasks.filter(t => t.dueDate && t.status !== 'DONE').slice(0, 3).map(task => {
-                      const overdue = new Date(task.dueDate!) < new Date();
-                      return (
-                        <div key={task.id} className="flex justify-between items-center p-2.5 border border-slate-100 dark:border-slate-900/60 rounded-xl bg-slate-50/50 dark:bg-slate-900/25 text-xs hover:scale-[1.01] transition-transform">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[220px]">{task.title}</span>
-                          <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider border ${
-                            overdue 
-                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/30 border-rose-100 dark:border-rose-955' 
-                              : 'bg-amber-50 text-amber-600 dark:bg-amber-955/20 border-amber-100'
-                          }`}>
-                            {new Date(task.dueDate!).toLocaleDateString()} {overdue && '(Overdue)'}
-                          </span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Productivity Insights */}
-              <div className="border border-slate-205 dark:border-slate-900 bg-white/70 dark:bg-slate-950/70 backdrop-blur-md p-6 rounded-3xl shadow-sm space-y-4 md:col-span-2 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-indigo-650 dark:text-indigo-400 flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-indigo-500" /> Productivity Insights</h3>
-                  <p className="text-[10px] text-slate-455 mt-0.5">Priority and delivery load distribution metrics.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold">
-                      <span className="text-rose-500 uppercase tracking-wider">Critical (P0)</span>
-                      <span className="text-slate-500">{localTasks.filter(t => t.priority === 'P0').length} Tasks</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
-                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${localTasks.length ? (localTasks.filter(t => t.priority === 'P0').length / localTasks.length) * 100 : 0}%` }}></div>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold">
-                      <span className="text-amber-500 uppercase tracking-wider">High (P1)</span>
-                      <span className="text-slate-500">{localTasks.filter(t => t.priority === 'P1').length} Tasks</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${localTasks.length ? (localTasks.filter(t => t.priority === 'P1').length / localTasks.length) * 100 : 0}%` }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Actions Grid */}
-              <div className="border border-slate-205 dark:border-slate-900 bg-white/70 dark:bg-slate-950/70 backdrop-blur-md p-6 rounded-3xl shadow-sm space-y-3 flex flex-col justify-between">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                  <button type="button" onClick={() => setShowTaskForm(true)} className="p-3 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 font-extrabold rounded-2xl border border-indigo-100 dark:border-indigo-900/30 hover:scale-[1.02] transition-transform">Create Task</button>
-                  <button type="button" onClick={() => setActiveTab('sprints')} className="p-3 bg-pink-50 dark:bg-pink-950/20 text-pink-700 dark:text-pink-300 font-extrabold rounded-2xl border border-pink-100 dark:border-pink-900/30 hover:scale-[1.02] transition-transform">Plan Sprint</button>
-                  <button type="button" onClick={() => setActiveTab('ai')} className="p-3 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 font-extrabold rounded-2xl border border-purple-100 dark:border-purple-900/30 hover:scale-[1.02] transition-transform">Ask AI</button>
-                  <button type="button" onClick={() => setActiveTab('board')} className="p-3 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 font-extrabold rounded-2xl border border-emerald-100 dark:border-emerald-900/30 hover:scale-[1.02] transition-transform">Open Board</button>
-                </div>
-              </div>
-            </div>
+        {error ? (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
           </div>
-        )}
+        ) : null}
 
-        {/* TAB 1: BOARD VIEW */}
-        {activeTab === 'board' && config && (
+        {loading ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500 shadow-sm">
+            Loading tasks...
+          </div>
+        ) : (
           <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
             <div className="flex-1 flex gap-5 overflow-x-auto pb-2 select-none items-stretch min-h-0 premium-scrollbar">
               {config.columns?.map(col => (
@@ -1371,7 +523,7 @@ export default function TasksPage(): React.ReactElement {
                   onMoveColumn={handleMoveColumn}
                 />
               ))}
-              
+
               {/* Dynamic board column addition */}
               {canManageBoard && (
                 <div className="min-w-[280px] bg-white/40 dark:bg-slate-900/5 border border-dashed border-slate-205 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-start h-[130px] flex-shrink-0 animate-in fade-in duration-100">
@@ -1451,7 +603,7 @@ export default function TasksPage(): React.ReactElement {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Sprints Tasks */}
                   <div className="p-4 divide-y text-xs divide-slate-100 dark:divide-slate-900 text-left">
                     {localTasks.filter(t => s.taskIds?.includes(t.id)).length === 0 ? <p className="text-slate-400 italic text-center py-4">No tasks assigned to this sprint.</p> :
@@ -1575,7 +727,7 @@ export default function TasksPage(): React.ReactElement {
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">Audit Log Feed</h2>
               <p className="text-xs text-slate-500 mt-1">Audit log records representing project-level activities and modifications.</p>
             </div>
-            
+
             <div className="border-l-2 border-slate-200 dark:border-slate-800 pl-4 ml-2 space-y-4 pt-1">
               {config.activities?.length === 0 ? <p className="text-slate-450 italic">No events logged yet.</p> :
                 config.activities?.map(act => (
@@ -1603,7 +755,7 @@ export default function TasksPage(): React.ReactElement {
               <div className="border border-slate-205 dark:border-slate-900 bg-white/70 dark:bg-slate-950/70 backdrop-blur-md p-5 rounded-3xl shadow-sm space-y-4">
                 <h4 className="text-slate-400 font-bold uppercase text-[9px] tracking-wider flex items-center gap-1"><Bot className="h-4.5 w-4.5 text-indigo-500" /> AI Prompter</h4>
                 <textarea placeholder="e.g. Design socket connections room adapters fallback decks..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-205 rounded-2xl p-3 resize-none outline-none focus:border-indigo-500 transition text-slate-800 dark:text-slate-100" rows={4} />
-                
+
                 <button type="button" onClick={handleGenerateAISuggestions} disabled={aiLoading || !aiPrompt.trim()} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl py-2.5 font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
                   {aiLoading ? 'Thinking...' : '⚡ Compile suggestions'}
                 </button>
@@ -1677,7 +829,7 @@ export default function TasksPage(): React.ReactElement {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white shadow-2xl relative animate-in zoom-in-95 duration-200">
             <button type="button" onClick={() => { setShowCreateModal(false); setWizardStep(1); }} className="absolute top-4 right-4 text-slate-400 hover:text-white transition">✕</button>
-            
+
             <div className="mb-4 text-left border-b border-slate-800 pb-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Step {wizardStep} of 5</span>
               <h2 className="text-base font-bold text-white mt-0.5">Create Project Workspace</h2>
@@ -1694,18 +846,18 @@ export default function TasksPage(): React.ReactElement {
 
             {/* Stepper Navigation inside modal */}
             <div className="flex justify-between items-center mt-6 border-t border-slate-850 pt-4">
-              <button 
-                type="button" 
-                onClick={() => setWizardStep(prev => prev - 1)} 
-                disabled={wizardStep === 1} 
+              <button
+                type="button"
+                onClick={() => setWizardStep(prev => prev - 1)}
+                disabled={wizardStep === 1}
                 className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold hover:bg-slate-800 disabled:opacity-40 transition"
               >
                 Back
               </button>
               {wizardStep < 5 ? (
-                <button 
-                  type="button" 
-                  onClick={() => setWizardStep(prev => prev + 1)} 
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(prev => prev + 1)}
                   disabled={
                     (wizardStep === 1 && !onboardingAnswers.buildType) ||
                     (wizardStep === 2 && !onboardingAnswers.teamSize) ||
@@ -1717,9 +869,9 @@ export default function TasksPage(): React.ReactElement {
                   Continue →
                 </button>
               ) : (
-                <button 
-                  type="button" 
-                  onClick={() => void handleLaunchProject()} 
+                <button
+                  type="button"
+                  onClick={() => void handleLaunchProject()}
                   disabled={!onboardingAnswers.style}
                   className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-extrabold hover:bg-indigo-550 transition shadow-lg"
                 >

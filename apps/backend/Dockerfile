@@ -9,6 +9,7 @@ RUN npm install --workspace=apps/backend
 
 FROM base AS runner
 WORKDIR /app
+RUN apk add --no-cache python3 g++ openjdk17-jre
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 EXPOSE 3000

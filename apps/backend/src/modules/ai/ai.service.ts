@@ -8,7 +8,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { FastifyReply } from "fastify";
 import { aiConfig } from "../../config/ai.config";
-import { mockResponses } from "./ai.config";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,25 +66,7 @@ function writeChunk(reply: FastifyReply, payload: Record<string, string>): void 
 
 // ─── SSE streaming helpers ────────────────────────────────────────────────────
 
-/**
- * Simulates streaming by writing the mock text word-by-word at 30 ms intervals.
- * The UI receives identical SSE frames whether in mock or live mode.
- */
-export async function streamMockResponse(
-  reply: FastifyReply,
-  text: string
-): Promise<void> {
-  setSseHeaders(reply);
 
-  const words = text.split(" ");
-  for (const word of words) {
-    writeChunk(reply, { text: word + " " });
-    await delay(30);
-  }
-
-  reply.raw.write("data: [DONE]\n\n");
-  reply.raw.end();
-}
 
 /**
  * Streams a real Gemini response using generateContentStream.
@@ -165,10 +147,7 @@ export async function reviewCode(
   code: string,
   language: string
 ): Promise<void> {
-  if (aiConfig.mockMode) {
-    await streamMockResponse(reply, mockResponses.codeReview);
-    return;
-  }
+
 
   const systemPrompt =
     `You are a senior code reviewer. Review the following ${language} code. ` +
@@ -190,10 +169,7 @@ export async function summariseProject(
   reply: FastifyReply,
   tasks: ProjectTask[]
 ): Promise<void> {
-  if (aiConfig.mockMode) {
-    await streamMockResponse(reply, mockResponses.projectSummary);
-    return;
-  }
+
 
   const systemPrompt =
     "You are a project manager assistant for a software development team. " +
@@ -222,10 +198,7 @@ export async function generateStandup(
   reply: FastifyReply,
   activityItems: ActivityItem[]
 ): Promise<void> {
-  if (aiConfig.mockMode) {
-    await streamMockResponse(reply, mockResponses.standupReport);
-    return;
-  }
+
 
   const systemPrompt =
     "You are a scrum master assistant. Generate a concise daily standup report " +
@@ -254,9 +227,7 @@ export async function generateStandup(
 export async function breakdownTask(
   featureDescription: string
 ): Promise<BreakdownTask[]> {
-  if (aiConfig.mockMode) {
-    return JSON.parse(mockResponses.taskBreakdown) as BreakdownTask[];
-  }
+
 
   const systemPrompt =
     "You are a senior software engineer. Break down the given feature into " +
@@ -284,8 +255,8 @@ export async function breakdownTask(
     raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
 
     return JSON.parse(raw) as BreakdownTask[];
-  } catch {
-    // Parse failure or API error — fall back to mock data
-    return JSON.parse(mockResponses.taskBreakdown) as BreakdownTask[];
+  } catch (err) {
+    // Parse failure or API error
+    throw err;
   }
 }
