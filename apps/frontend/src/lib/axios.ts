@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/authStore'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -33,56 +33,8 @@ const processQueue = (error: any, token: string | null = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config
-
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      originalRequest.url !== '/api/auth/refresh' &&
-      originalRequest.url !== '/api/auth/login'
-    ) {
-      if (isRefreshing) {
-        return new Promise(function (resolve, reject) {
-          failedQueue.push({ resolve, reject })
-        })
-          .then((token) => {
-            originalRequest.headers['Authorization'] = 'Bearer ' + token
-            return api(originalRequest)
-          })
-          .catch((err) => {
-            return Promise.reject(err)
-          })
-      }
-
-      originalRequest._retry = true
-      isRefreshing = true
-
-      try {
-        const res = await axios.post(
-          `${API_BASE}/api/auth/refresh`,
-          {},
-          { withCredentials: true }
-        )
-        const newToken = res.data.accessToken
-
-        useAuthStore.getState().setAuthToken(newToken)
-        processQueue(null, newToken)
-
-        originalRequest.headers['Authorization'] = 'Bearer ' + newToken
-        return api(originalRequest)
-      } catch (err) {
-        processQueue(err, null)
-        useAuthStore.getState().clearAuth()
-        if (
-          window.location.pathname !== '/login' &&
-          window.location.pathname !== '/register'
-        ) {
-          window.location.href = '/login'
-        }
-        return Promise.reject(err)
-      } finally {
-        isRefreshing = false
-      }
+    if (error.response?.status === 401) {
+      useAuthStore.getState().clearAuth()
     }
 
     return Promise.reject(error)
