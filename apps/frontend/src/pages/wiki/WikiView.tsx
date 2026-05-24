@@ -5,7 +5,7 @@ import WikiEditor from '../../components/wiki/WikiEditor';
 import VersionHistoryPanel from '../../components/wiki/VersionHistoryPanel';
 
 export default function WikiView() {
-  const { workspaceId, pid } = useParams();
+  const { workspaceId, projectId: pid } = useParams();
   const [showHistory, setShowHistory] = useState(false);
 
   if (!pid || !workspaceId) return null;

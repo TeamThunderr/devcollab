@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 
 export default function ActivityBar() {
   const { layout, updateLayout } = useEditorStore();
-  const { pid: projectId } = useParams();
+  const { projectId } = useParams();
 
   const handleToggle = (view: 'explorer' | 'search' | 'source-control') => {
     // If clicking the active one, we could collapse the sidebar

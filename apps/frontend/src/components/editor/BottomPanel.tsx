@@ -6,7 +6,7 @@ import { useParams } from "react-router-dom";
 
 export default function BottomPanel() {
   const { layout, updateLayout } = useEditorStore();
-  const { pid: projectId } = useParams();
+  const { projectId } = useParams();
 
   if (!layout.bottomPanelActive) return null;
 

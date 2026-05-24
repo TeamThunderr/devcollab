@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import useEditorStore from "../../stores/editorStore";
 import { useNavigate, useParams } from "react-router-dom";
 
 export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const { updateSettings, settings, updateLayout, executeCode, activeFileId, files } = useEditorStore();
-  const { pid: projectId, workspaceId } = useParams();
+  const { updateSettings, updateLayout, executeCode, activeFileId, files } = useEditorStore();
+  const { projectId, workspaceId } = useParams();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,7 +30,7 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
       }
     }},
     { id: 'terminal-toggle', label: 'View: Toggle Terminal', action: () => updateLayout(projectId!, { bottomPanelActive: 'terminal' }) },
-    { id: 'go-dashboard', label: 'Go to Dashboard', action: () => navigate(`/${workspaceId}`) },
+    { id: 'go-dashboard', label: 'Go to Dashboard', action: () => navigate(`/w/${workspaceId}`) },
   ];
 
   const filtered = commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()));
