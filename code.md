@@ -21,6 +21,12 @@ The code editor module was built to provide a lightweight, single-user, IDE-like
 ### Task Integration
 - **Task Linking**: Added a dropdown utility directly in the editor header. This allows users to link the currently open file to a specific Agile Task/Ticket from the project's task board, bridging the gap between project management and code execution.
 
+### IDE Upgrades & Execution
+- **VS Code-Style Layout**: Overhauled the editor UI into a fully-fledged VS Code clone, including a left Activity Bar, collapsible primary Sidebar (Explorer, Search, Source Control), and a collapsible Bottom Panel (Terminal).
+- **Top Menu Bar**: Introduced a functional native-feeling top menu bar with File, Edit, View, Run, and Terminal dropdowns. 
+- **Local File & Folder Import**: Implemented direct upload from the local file system. Users can select "Open File..." or "Open Folder..." from the File menu to recursively read local directories and auto-create them inside the cloud project.
+- **Live Code Execution**: Added a dedicated "Run Code" play button. When clicked, the backend spins up child processes using language-specific compilers (Python, Node, GCC, JDK) directly inside the Docker container and streams `stdout` and `stderr` natively into the frontend Terminal panel.
+
 ---
 
 ## 2. Documentation Wiki Module
@@ -48,3 +54,6 @@ The Wiki module was designed to replicate a Notion-style, block-based rich text 
 - **Sticky Toolbar**: The formatting toolbar was rebuilt to be `sticky top-0` with a `z-10` index, ensuring tools are always accessible even when scrolling through massive documents.
 - **Organic History Button**: The "History" toggle button was integrated organically into the editor's sticky header next to the "Save Snapshot" button, fixing previous z-index occlusion bugs.
 - **Centered Typography**: Content is centralized into a `max-w-4xl` column with `prose-invert` tailwind typography for an optimized, distraction-free reading experience.
+
+### File Import
+- **Local Markdown Import**: Added a dedicated "Import Local File" action inside the Wiki sidebar. Users can select `.md` or `.txt` files from their operating system, and the content is instantly parsed and converted into a fully formatted Wiki page within the database.

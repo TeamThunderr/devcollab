@@ -1,139 +1,137 @@
-import { useState, useEffect } from "react";
-import FileTree from "../../components/editor/FileTree";
+import { useState, useEffect, useCallback } from "react";
+import ActivityBar from "../../components/editor/ActivityBar";
+import Sidebar from "../../components/editor/Sidebar";
 import EditorTabs from "../../components/editor/EditorTabs";
 import MonacoEditor from "../../components/editor/MonacoEditor";
-import AIReviewBar from "../../components/editor/AIReviewBar";
+import BottomPanel from "../../components/editor/BottomPanel";
+import CommandPalette from "../../components/editor/CommandPalette";
+import TopMenuBar from "../../components/editor/TopMenuBar";
 import useEditorStore from "../../stores/editorStore";
-import api from "../../lib/axios";
-
 import { useParams } from "react-router-dom";
 
 export default function EditorView() {
   const { pid: projectId } = useParams();
   
   if (!projectId) return null;
-  const { files, activeFileId, updateFile } = useEditorStore();
-  const [showAIBar, setShowAIBar] = useState(true);
-  const [theme, setTheme] = useState<"vs-dark" | "light">("vs-dark");
-  const [tasks, setTasks] = useState<{id: string, title: string}[]>([]);
+  const { files, activeFileId, updateFile, fetchEditorState, settings } = useEditorStore();
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
 
   useEffect(() => {
-    // Fetch tasks for task link dropdown
-    api.get(`/api/tasks/project/${projectId}`)
-      .then(res => setTasks(res.data || []))
-      .catch(console.error);
-  }, [projectId]);
+    fetchEditorState(projectId);
+  }, [projectId, fetchEditorState]);
 
   const activeFile = files.find(f => f.id === activeFileId);
 
   async function handleSave(content: string) {
     if (!activeFileId) return;
     try {
-      await updateFile(projectId, activeFileId, { content });
+      await updateFile(projectId!, activeFileId, { content });
     } catch (err) {
       console.error("Failed to auto-save file", err);
     }
   }
 
-  async function handleTaskLink(taskId: string) {
-    if (!activeFileId) return;
-    try {
-      await updateFile(projectId, activeFileId, { taskId: taskId || null });
-    } catch (err) {
-      console.error("Failed to link file to task", err);
+  useEffect(() => {
+    const handleTriggerSave = () => {
+      // We don't have the content here easily since Monaco holds it, 
+      // but Monaco uses Ctrl+S on its own. 
+      // To simulate it, we can dispatch a keyboard event for Ctrl+S
+      const evt = new KeyboardEvent('keydown', { ctrlKey: true, key: 's' });
+      document.dispatchEvent(evt);
+    };
+    window.addEventListener('trigger-save-active-file', handleTriggerSave);
+    return () => window.removeEventListener('trigger-save-active-file', handleTriggerSave);
+  }, []);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      setShowCommandPalette(true);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
+  const themeClass = settings.theme === 'vs-dark' ? 'bg-[#1e1e1e] text-[#cccccc]' : 'bg-[#fffffe] text-[#333333]';
 
   return (
-    <div className={`h-screen flex flex-col ${theme === 'vs-dark' ? 'bg-[#1e1e1e] text-gray-300' : 'bg-gray-50 text-black'}`}>
-      {/* Editor Header */}
-      <div className={`flex items-center justify-between px-4 py-2 border-b select-none ${theme === 'vs-dark' ? 'border-[#2d2d2d] bg-[#333333]' : 'border-gray-300 bg-gray-200'}`}>
-        <div className="flex items-center gap-4">
-          <h1 className="text-sm font-semibold text-white tracking-wide">Monaco Code Editor</h1>
-          <button 
-            onClick={() => setTheme(theme === "vs-dark" ? "light" : "vs-dark")}
-            className={`text-[11px] px-2 py-1 rounded-md transition-colors border ${theme === 'vs-dark' ? 'bg-[#252526] hover:bg-[#2d2d2d] border-[#3c3c3c] text-gray-300' : 'bg-white hover:bg-gray-100 border-gray-300 text-gray-700'}`}>
-            {theme === "vs-dark" ? "Light Mode" : "Dark Mode"}
-          </button>
-        </div>
-        
-        {/* Task Link UI */}
-        {activeFile && (
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 font-medium tracking-wide">Link File to Task:</span>
-            <select 
-              value={activeFile.taskId || ""} 
-              onChange={(e) => handleTaskLink(e.target.value)}
-              className={`text-xs px-2 py-1.5 rounded-md outline-none transition-colors border ${theme === 'vs-dark' ? 'bg-[#252526] text-gray-200 border-[#3c3c3c] focus:border-[#007acc]' : 'bg-white text-black border-gray-300 focus:border-blue-500'}`}
-            >
-              <option value="">-- No Task Linked --</option>
-              {tasks.map(t => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
+    <div className={`h-screen w-full flex flex-col ${themeClass} font-sans overflow-hidden`}>
+      <CommandPalette isOpen={showCommandPalette} onClose={() => setShowCommandPalette(false)} />
+      
+      {/* Top Menu Bar */}
+      <TopMenuBar />
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* File tree sidebar */}
-        <FileTree projectId={projectId} />
+        
+        {/* VS Code Left Activity Bar */}
+        <ActivityBar />
 
-        {/* Editor Area */}
+        {/* VS Code Primary Sidebar (Explorer, Search, Source Control) */}
+        <Sidebar projectId={projectId} />
+
+        {/* VS Code Editor Area */}
         <div className="flex flex-col flex-1 overflow-hidden min-w-0 bg-[#1e1e1e]">
           {/* Tab bar */}
           <EditorTabs />
 
           <div className="flex flex-col flex-1 overflow-hidden relative">
             {activeFile ? (
-              <>
-                <div className="flex-1 overflow-hidden absolute inset-0 bottom-0">
-                  <MonacoEditor
-                    key={activeFileId} // Remount editor strictly when active file changes
-                    fileId={activeFile.id}
-                    fileName={activeFile.name}
-                    language={activeFile.language || 'plaintext'}
-                    initialContent={activeFile.content || ''}
-                    onContentChange={() => {}}
-                    onSave={handleSave}
-                    theme={theme}
-                  />
-                </div>
-
-                {/* AI review bar docked to bottom */}
-                <div className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none flex flex-col justify-end h-full">
-                  <div className="pointer-events-auto">
-                    <AIReviewBar
-                      code={activeFile.content || ''}
-                      language={activeFile.language || 'plaintext'}
-                      isVisible={showAIBar}
-                      onToggle={() => setShowAIBar((p) => !p)}
-                    />
-                  </div>
-                </div>
-              </>
+              <div className="flex-1 overflow-hidden">
+                <MonacoEditor
+                  key={activeFileId} 
+                  fileId={activeFile.id}
+                  fileName={activeFile.name}
+                  language={activeFile.language || 'plaintext'}
+                  initialContent={activeFile.content || ''}
+                  onContentChange={() => {}}
+                  onSave={handleSave}
+                />
+              </div>
             ) : (
               /* Empty state / Welcome Screen */
               <div
-                className={`flex-1 flex flex-col items-center justify-center select-none ${theme === 'vs-dark' ? 'bg-[#1e1e1e]' : 'bg-gray-100'}`}
+                className={`flex-1 flex flex-col items-center justify-center select-none ${settings.theme === 'vs-dark' ? 'bg-[#1e1e1e]' : 'bg-gray-100'}`}
               >
-                <div className="flex items-center justify-center w-24 h-24 rounded-full bg-[#252526] shadow-inner mb-6 border border-[#2d2d2d]">
-                  <span className="text-5xl opacity-80" aria-hidden="true">{"{ }"}</span>
+                <div className="flex items-center justify-center w-24 h-24 mb-6">
+                  <svg className={`w-20 h-20 ${settings.theme === 'vs-dark' ? 'text-[#333333]' : 'text-gray-300'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
                 </div>
-                <h2 className={`text-xl font-medium mb-2 ${theme === 'vs-dark' ? 'text-gray-300' : 'text-gray-800'}`}>DevCollab Editor</h2>
-                <p className={`text-sm mb-8 ${theme === 'vs-dark' ? 'text-gray-500' : 'text-gray-500'}`}>Select a file to start editing</p>
+                <h2 className={`text-xl mb-2 font-light ${settings.theme === 'vs-dark' ? 'text-gray-400' : 'text-gray-600'}`}>DevCollab IDE</h2>
                 
-                <div className="flex gap-12 text-xs text-gray-500 font-mono">
+                <div className="flex gap-12 text-xs text-gray-500 font-mono mt-8">
                   <div className="flex flex-col gap-3">
-                    <div className="flex justify-between w-48"><span className="text-gray-400">Show Explorer</span> <span>Ctrl+Shift+E</span></div>
-                    <div className="flex justify-between w-48"><span className="text-gray-400">Go to File</span> <span>Ctrl+P</span></div>
-                    <div className="flex justify-between w-48"><span className="text-gray-400">Save File</span> <span>Ctrl+S</span></div>
+                    <div className="flex justify-between w-64"><span className="text-gray-400">Show All Commands</span> <span>Ctrl+Shift+P</span></div>
+                    <div className="flex justify-between w-64"><span className="text-gray-400">Go to File</span> <span>Ctrl+P</span></div>
+                    <div className="flex justify-between w-64"><span className="text-gray-400">Save File</span> <span>Ctrl+S</span></div>
                   </div>
                 </div>
               </div>
             )}
+            
+            {/* VS Code Bottom Panel */}
+            <BottomPanel />
           </div>
+        </div>
+      </div>
+      
+      {/* VS Code Status Bar */}
+      <div className={`h-6 flex items-center justify-between px-3 text-[11px] select-none ${settings.theme === 'vs-dark' ? 'bg-[#007acc] text-white' : 'bg-[#007acc] text-white'}`}>
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1 rounded"><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg> main</span>
+          <span className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1 rounded"><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> 0</span>
+          <span className="flex items-center gap-1 cursor-pointer hover:bg-white/20 px-1 rounded"><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> 0</span>
+        </div>
+        <div className="flex items-center gap-4">
+          {activeFile && (
+            <>
+              <span className="cursor-pointer hover:bg-white/20 px-1 rounded">UTF-8</span>
+              <span className="cursor-pointer hover:bg-white/20 px-1 rounded">{activeFile.language || 'plaintext'}</span>
+            </>
+          )}
+          <span className="cursor-pointer hover:bg-white/20 px-1 rounded">DevCollab IDE</span>
         </div>
       </div>
     </div>
