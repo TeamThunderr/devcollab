@@ -6,8 +6,8 @@
  *   Condition B — both workspaceId AND projectId exist   → Project nav
  */
 
-import React from "react";
-import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
+import React, { useMemo } from "react";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import useWorkspaceStore from "../../stores/workspaceStore";
 import { useProjectStore } from "../../stores/projectStore";
 import useAuthStore from "../../stores/authStore";
@@ -55,23 +55,45 @@ const ICONS = {
 // ─── Link component ───────────────────────────────────────────────────────────
 
 function SidebarNavLink({ item }: { item: NavItem }) {
+  const location = useLocation();
+
+  const isActive = useMemo(() => {
+    const [itemPath, itemQuery] = item.to.split('?');
+    if (location.pathname !== itemPath) return false;
+
+    const itemParams = new URLSearchParams(itemQuery || '');
+    const currentParams = new URLSearchParams(location.search);
+
+    const itemTab = itemParams.get('tab');
+    const currentTab = currentParams.get('tab');
+
+    // Snippets link is active only if currentTab is 'snippets'
+    if (itemTab === 'snippets') {
+      return currentTab === 'snippets';
+    }
+
+    // Board page container should be active if the tab is not 'snippets'
+    if (itemPath.endsWith('/board')) {
+      return currentTab !== 'snippets';
+    }
+
+    // Default exact match for other tabs/subpages (Wiki, Editor, etc.)
+    return !itemTab && !currentTab;
+  }, [location.pathname, location.search, item.to]);
+
   return (
-    <NavLink
+    <Link
       to={item.to}
-      end={item.exact}
-      className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 group
-         ${isActive
-           ? "bg-slate-700 text-white"
-           : "text-slate-400 hover:text-white hover:bg-slate-800"
-         }`
-      }
+      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 group border ${isActive
+          ? "bg-white/[0.05] border-white/[0.04] text-white"
+          : "border-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]"
+      }`}
     >
       <span className="flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
         {item.icon}
       </span>
       {item.label}
-    </NavLink>
+    </Link>
   );
 }
 
@@ -98,7 +120,6 @@ export default function MainSidebar(): React.ReactElement {
         label: "Board",
         to: `/w/${workspaceId}/p/${projectId}/board`,
         icon: <Icon d={ICONS.board} />,
-        exact: true,
       },
       {
         label: "Wiki",
@@ -107,7 +128,7 @@ export default function MainSidebar(): React.ReactElement {
       },
       {
         label: "Snippets",
-        to: `/w/${workspaceId}/p/${projectId}/snippets`,
+        to: `/w/${workspaceId}/p/${projectId}/board?tab=snippets`,
         icon: <Icon d={ICONS.snippets} />,
       },
       {
@@ -118,12 +139,12 @@ export default function MainSidebar(): React.ReactElement {
     ];
 
     return (
-      <aside className="flex flex-col w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 h-full">
+      <aside className="flex flex-col w-52 flex-shrink-0 bg-[#17191d] border-r border-white/[0.04] h-full">
         {/* Back to workspace */}
-        <div className="px-3 pt-4 pb-3 border-b border-slate-800">
+        <div className="px-3 pt-4 pb-3 border-b border-white/[0.04]">
           <button
             onClick={() => navigate(`/w/${workspaceId}/projects`)}
-            className="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors group w-full"
+            className="flex items-center gap-2 text-[10px] font-bold text-slate-400 hover:text-white transition-colors group w-full"
           >
             <Icon d={ICONS.back} className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
             Back to Workspace
@@ -131,18 +152,18 @@ export default function MainSidebar(): React.ReactElement {
         </div>
 
         {/* Project header */}
-        <div className="px-4 py-4 border-b border-slate-800">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold mb-2 shadow-sm">
+        <div className="px-4 py-4 border-b border-white/[0.04]">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-extrabold mb-2 shadow-sm">
             {(activeProject?.name ?? "P").substring(0, 2).toUpperCase()}
           </div>
-          <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Project</p>
-          <h2 className="text-sm font-bold text-white mt-0.5 truncate" title={activeProject?.name}>
+          <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">Project</p>
+          <h2 className="text-xs font-bold text-white mt-1.5 truncate" title={activeProject?.name}>
             {activeProject?.name ?? "Loading…"}
           </h2>
         </div>
 
         {/* Project nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
           {projectNav.map((item) => (
             <SidebarNavLink key={item.label} item={item} />
           ))}
@@ -169,6 +190,11 @@ export default function MainSidebar(): React.ReactElement {
           icon: <Icon d={ICONS.projects} />,
         },
         {
+          label: "Snippets",
+          to: `/w/${workspaceId}/snippets`,
+          icon: <Icon d={ICONS.snippets} />,
+        },
+        {
           label: "Members",
           to: `/w/${workspaceId}/members`,
           icon: <Icon d={ICONS.members} />,
@@ -182,14 +208,14 @@ export default function MainSidebar(): React.ReactElement {
     : [];
 
   return (
-    <aside className="flex flex-col w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 h-full">
+    <aside className="flex flex-col w-52 flex-shrink-0 bg-[#17191d] border-r border-white/[0.04] h-full">
       {/* Logo — always routes to /workspaces */}
-      <div className="px-4 py-4 border-b border-slate-800 flex items-center justify-between">
+      <div className="px-4 py-4 border-b border-white/[0.04] flex items-center justify-between">
         <Link to="/workspaces" className="flex items-center gap-2 group">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-            <span className="text-white text-xs font-black">DC</span>
+          <div className="w-6.5 h-6.5 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+            <span className="text-white text-[10px] font-black">DC</span>
           </div>
-          <span className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
+          <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">
             DevCollab
           </span>
         </Link>
@@ -200,7 +226,7 @@ export default function MainSidebar(): React.ReactElement {
       <div className="px-3 pt-3 pb-2">
         <Link
           to="/workspaces"
-          className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-200 transition-colors group w-fit"
+          className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-white transition-colors group w-fit"
         >
           <svg className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -211,18 +237,18 @@ export default function MainSidebar(): React.ReactElement {
 
       {/* Workspace header */}
       {activeWorkspace && (
-        <div className="px-4 py-2.5 border-b border-slate-800">
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5">
+        <div className="px-4 py-2 border-b border-white/[0.04]">
+          <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none mb-1">
             Workspace
           </p>
-          <h2 className="text-sm font-bold text-white truncate" title={activeWorkspace.name}>
+          <h2 className="text-xs font-bold text-white truncate" title={activeWorkspace.name}>
             {activeWorkspace.name}
           </h2>
         </div>
       )}
 
       {/* Workspace nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
         {workspaceNav.map((item) => (
           <SidebarNavLink key={item.label} item={item} />
         ))}
@@ -244,17 +270,17 @@ function UserFooter({
   onLogout: () => void;
 }) {
   return (
-    <div className="px-3 py-3 border-t border-slate-800 flex items-center justify-between gap-2">
+    <div className="px-3 py-3 border-t border-white/[0.04] flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+        <div className="w-6.5 h-6.5 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
           {(user?.name ?? user?.email ?? "U").substring(0, 1).toUpperCase()}
         </div>
-        <span className="text-xs text-slate-400 truncate">{user?.name ?? user?.email}</span>
+        <span className="text-[11px] font-semibold text-slate-300 truncate">{user?.name ?? user?.email}</span>
       </div>
       <button
         onClick={onLogout}
         title="Logout"
-        className="text-slate-500 hover:text-white transition-colors flex-shrink-0"
+        className="text-slate-400 hover:text-white transition-colors flex-shrink-0 animate-in fade-in"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

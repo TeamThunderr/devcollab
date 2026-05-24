@@ -65,12 +65,12 @@ export default function KanbanColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`min-w-[310px] w-[310px] flex-shrink-0 flex flex-col rounded-3xl border border-slate-205 dark:border-slate-850/80 bg-white/40 dark:bg-slate-900/10 p-4 shadow-sm backdrop-blur-md transition-all duration-300 h-full max-h-full relative overflow-hidden ${
-        isOver ? 'ring-2 ring-indigo-500/30 bg-slate-100/50 dark:bg-slate-900/30 shadow-md scale-[1.01]' : ''
+      className={`min-w-[310px] w-[310px] flex-shrink-0 flex flex-col rounded-2xl border border-white/[0.04] bg-[#17191d] p-4 shadow-sm transition-all duration-200 relative ${
+        isOver ? 'ring-1 ring-indigo-500/30 bg-[#1e2025] shadow-md scale-[1.01]' : ''
       }`}
     >
       {/* Column Header - Sticky */}
-      <div className="sticky top-0 bg-transparent backdrop-blur-sm z-10 pb-3 mb-4 border-b border-slate-100/60 dark:border-slate-900/60 flex items-center justify-between">
+      <div className="sticky top-0 bg-[#17191d] z-10 pb-3 mb-4 border-b border-white/[0.04] flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {/* Status Indicator Dot */}
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${badgeColor} shadow-sm`}></span>
@@ -83,18 +83,18 @@ export default function KanbanColumn({
               onBlur={handleSaveRename}
               onKeyDown={(e) => e.key === 'Enter' && handleSaveRename()}
               autoFocus
-              className="w-full text-xs font-bold text-slate-850 dark:text-slate-200 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full text-xs font-bold text-white bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           ) : (
             <h2
               onDoubleClick={() => onRenameColumn && setIsEditing(true)}
-              className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-250 truncate cursor-pointer hover:text-indigo-650 dark:hover:text-indigo-400 transition"
+              className="text-xs font-extrabold uppercase tracking-wider text-slate-300 truncate cursor-pointer hover:text-indigo-400 transition"
               title="Double click to rename"
             >
               {title}
             </h2>
           )}
-          <span className="flex-shrink-0 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-2 py-0.5 text-[10px] font-extrabold font-mono border border-slate-205 dark:border-slate-850">
+          <span className="flex-shrink-0 rounded bg-white/[0.03] text-slate-400 px-1.5 py-0.5 text-[9px] font-bold font-mono border border-white/[0.04]">
             {tasks.length}
           </span>
         </div>
@@ -105,7 +105,7 @@ export default function KanbanColumn({
             <button
               type="button"
               onClick={() => onAddTask(status)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.02] transition"
               title="Create task in this column"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -117,13 +117,13 @@ export default function KanbanColumn({
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.02] transition"
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-1.5 shadow-2xl z-30 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
+              <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-white/[0.04] bg-[#1e2025] py-1.5 shadow-2xl z-30 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
                 {onRenameColumn && (
                   <button
                     type="button"
@@ -131,7 +131,7 @@ export default function KanbanColumn({
                       setIsEditing(true);
                       setMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 font-semibold"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
                   >
                     <Edit2 className="h-3.5 w-3.5 text-slate-400" /> Rename Column
                   </button>
@@ -144,7 +144,7 @@ export default function KanbanColumn({
                         onMoveColumn(status, 'left');
                         setMenuOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 font-semibold"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
                     >
                       <MoveLeft className="h-3.5 w-3.5 text-slate-400" /> Move Left
                     </button>
@@ -154,7 +154,7 @@ export default function KanbanColumn({
                         onMoveColumn(status, 'right');
                         setMenuOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 font-semibold"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
                     >
                       <MoveRight className="h-3.5 w-3.5 text-slate-400" /> Move Right
                     </button>
@@ -169,7 +169,7 @@ export default function KanbanColumn({
                       }
                       setMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-600 dark:text-rose-450 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold border-t border-slate-100 dark:border-slate-900 mt-1 pt-1.5"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-450 hover:bg-rose-950/20 font-bold border-t border-white/[0.04] mt-1 pt-1.5"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-rose-500" /> Delete Column
                   </button>
@@ -180,17 +180,17 @@ export default function KanbanColumn({
         </div>
       </div>
 
-      {/* Task Cards List - Custom Scrollbar */}
+      {/* Task Cards List - Grows naturally with page-level scrolling */}
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 overflow-y-auto pr-1 -mr-1 space-y-3 min-h-[220px] premium-scrollbar">
+        <div className="space-y-2.5 mt-1">
           {tasks.map((task) => (
             <TaskCard key={task.id} task={task} onClick={onTaskClick} />
           ))}
           {tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-205 dark:border-slate-800/80 px-4 py-10 text-center text-xs text-slate-400 bg-white/30 dark:bg-slate-950/10 min-h-[140px] transition-all relative overflow-hidden group">
-              <span className="text-2xl mb-1.5 grayscale opacity-70 group-hover:grayscale-0 group-hover:scale-115 transition-all duration-300">📥</span>
-              <p className="font-extrabold text-[11px] text-slate-500 dark:text-slate-400">Empty Stage</p>
-              <p className="text-[9px] text-slate-400/80 mt-0.5 max-w-[150px] leading-relaxed">No deliverables allocated. Drag a card or click + to add.</p>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.04] px-4 py-8 text-center text-xs text-slate-500 bg-white/[0.005] min-h-[120px] transition-all relative overflow-hidden group">
+              <span className="text-xl mb-1 grayscale opacity-50 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-200">📥</span>
+              <p className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">Empty Column</p>
+              <p className="text-[9px] text-slate-600 mt-0.5 max-w-[140px] leading-relaxed">Drag a task or click + to assign.</p>
             </div>
           ) : null}
         </div>

@@ -28,6 +28,7 @@ import SettingsView from "./pages/settings/SettingsView";
 import TasksView from "./pages/project/TasksView";
 import EditorView from "./pages/editor/EditorView";
 import SnippetsView from "./pages/snippets/SnippetsView";
+import SnippetEditorPage from "./pages/snippets/SnippetEditorPage";
 import WikiView from "./pages/wiki/WikiView";
 
 // ─── Root redirect ────────────────────────────────────────────────────────────
@@ -74,6 +75,8 @@ function App(): React.ReactElement {
           <Route path="members" element={<MembersPage />} />
           <Route path="billing" element={<BillingPage />} />
           <Route path="settings" element={<SettingsView />} />
+          <Route path="snippets" element={<SnippetsView />} />
+          <Route path="snippets/:snippetId" element={<SnippetEditorPage />} />
 
           {/* ── Project-level routes: /w/:workspaceId/p/:projectId/* ── */}
           <Route path="p/:projectId" element={<ProjectLayout />}>
@@ -81,6 +84,7 @@ function App(): React.ReactElement {
             <Route path="board" element={<TasksView />} />
             <Route path="editor" element={<EditorView />} />
             <Route path="snippets" element={<SnippetsView />} />
+            <Route path="snippets/:snippetId" element={<SnippetEditorPage />} />
             <Route path="wiki" element={<WikiView />} />
           </Route>
         </Route>

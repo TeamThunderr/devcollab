@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import useEditorStore, { ProjectFile } from "../../stores/editorStore";
-import { ChevronRight, ChevronDown, FileCode, Folder, FolderOpen, MoreVertical, Plus, Edit2, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, FileCode, Folder, FolderOpen, Plus, Edit2, Trash2 } from "lucide-react";
 
 export interface FileTreeProps {
   projectId: string;
@@ -148,7 +148,7 @@ export default function FileTree({ projectId }: FileTreeProps) {
   }
 
   // Recursive render component
-  const renderNode = (node: TreeNode, depth: number = 0) => {
+  const renderNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
     if (node.name === 'root') {
       // Sort: folders first, then files alphabetically
       const sortedChildren = Object.values(node.children).sort((a, b) => {

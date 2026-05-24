@@ -88,104 +88,23 @@ export default function TaskCard({ task, onClick }: TaskCardProps): React.ReactE
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`group w-full rounded-xl border border-white/[0.04] bg-[#121318]/45 p-4 text-left shadow-sm hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)] hover:border-indigo-500/20 hover:-translate-y-0.5 transition-all duration-200 ease-out cursor-grab active:cursor-grabbing ${
+      className={`group w-full rounded-lg border border-white/[0.04] bg-[#1e2025] p-3 text-left shadow-sm hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] hover:border-indigo-500/20 hover:-translate-y-0.5 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing ${
         isDragging ? 'opacity-30 border-dashed border-indigo-500/40 scale-[0.98]' : ''
       }`}
       {...attributes}
       {...listeners}
     >
-      <div className="flex flex-col gap-3" onClick={() => onClick?.(task)}>
-        {/* Top Priority / Sprint group info */}
-        <div className="flex items-center justify-between gap-2">
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${prio.bg} ${prio.text}`}>
-            <span className={`w-1 h-1 rounded-full ${prio.dot}`}></span>
-            {prio.label}
-          </span>
-
-          {sprint && (
-            <span className="text-[8px] bg-black/20 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/[0.03] font-bold">
-              🏃 {sprint.name}
-            </span>
-          )}
-        </div>
-
-        {/* Task Title */}
-        <h3 className="text-xs font-bold text-white group-hover:text-indigo-400 transition-colors leading-snug break-words">
-          {task.title}
-        </h3>
-
-        {/* Description Snippet */}
-        {task.description && (
-          <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-2 font-medium">
-            {task.description}
-          </p>
-        )}
-
-        {/* Custom Tags */}
-        {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-0.5">
-            {tags.map((tag: string, index: number) => (
-              <span
-                key={tag}
-                className={`text-[8px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
-                  tagColors[index % tagColors.length]
-                }`}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Checklist Progress indicator inside card face */}
-        {totalItems > 0 && (
-          <div className="space-y-1.5 mt-0.5">
-            <div className="flex items-center justify-between text-[8px] text-slate-500 font-extrabold font-mono leading-none">
-              <span className="flex items-center gap-1"><CheckSquare className="h-2.5 w-2.5 text-indigo-500" /> {completedItems}/{totalItems} Done</span>
-              <span>{Math.round((completedItems / totalItems) * 100)}%</span>
-            </div>
-            <div className="w-full h-1 bg-black/40 rounded-full overflow-hidden border border-white/[0.02]">
-              <div 
-                className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-full transition-all duration-300"
-                style={{ width: `${(completedItems / totalItems) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-
-        {/* Separator */}
-        <div className="h-px bg-white/[0.03] my-0.5"></div>
-
-        {/* Footer info (Dates, comments count, assignee) */}
-        <div className="flex items-center justify-between gap-3 text-[10px] text-slate-500">
-          <div className="flex items-center gap-2 flex-wrap">
-            {task.dueDate ? (
-              <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8px] font-extrabold border ${getDueDateStyles()}`}>
-                <Calendar className="h-2.5 w-2.5" /> {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </span>
-            ) : (
-              <span className="text-[8px] text-slate-600 font-medium">No date</span>
-            )}
-
-            {/* Comment metrics */}
-            {commentCount > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-slate-600" title={`${commentCount} comments`}>
-                <MessageSquare className="h-2.5 w-2.5" /> {commentCount}
-              </span>
-            )}
-
-            {/* Attachment metrics */}
-            {attachmentCount > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-slate-600" title={`${attachmentCount} attachments`}>
-                <Paperclip className="h-2.5 w-2.5" /> {attachmentCount}
-              </span>
-            )}
-          </div>
-
+      <div className="flex flex-col gap-2" onClick={() => onClick?.(task)}>
+        {/* Title & Assignee Row */}
+        <div className="flex items-start justify-between gap-2.5">
+          <h3 className="text-xs font-semibold text-white group-hover:text-indigo-400 transition-colors leading-snug break-words">
+            {task.title}
+          </h3>
+          
           {/* Assignee avatar */}
-          <div className="relative group/avatar flex-shrink-0">
+          <div className="relative group/avatar flex-shrink-0 mt-0.5">
             <div
-              className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm ring-1 ring-[#08090a] ${avatarBg}`}
+              className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[7px] font-bold text-white shadow-sm ring-1 ring-[#121316] ${avatarBg}`}
               title={assignee ? assignee.name || assignee.email : (task.createdBy?.name || 'Unassigned')}
             >
               {initial}
@@ -195,6 +114,75 @@ export default function TaskCard({ task, onClick }: TaskCardProps): React.ReactE
             </div>
           </div>
         </div>
+
+        {/* Optional Description snippet - tight line clamp */}
+        {task.description && (
+          <p className="text-[10px] text-slate-500 leading-normal line-clamp-1 font-medium -mt-0.5">
+            {task.description}
+          </p>
+        )}
+
+        {/* Priority & Due Date & Metadata Row */}
+        <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 mt-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Priority Badge */}
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${prio.bg} ${prio.text}`}>
+              <span className={`w-1 h-1 rounded-full ${prio.dot}`}></span>
+              {task.priority}
+            </span>
+
+            {/* Due date Badge */}
+            {task.dueDate && (
+              <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8px] font-extrabold border ${getDueDateStyles()}`}>
+                <Calendar className="h-2.5 w-2.5" /> {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
+            )}
+
+            {/* Sprint Tag */}
+            {sprint && (
+              <span className="text-[8px] bg-black/20 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/[0.03] font-bold">
+                🏃 {sprint.name}
+              </span>
+            )}
+          </div>
+
+          {/* Comment & Attachment & Checklist Counts */}
+          <div className="flex items-center gap-1.5 flex-shrink-0 text-slate-650">
+            {totalItems > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold" title={`${completedItems}/${totalItems} items completed`}>
+                <CheckSquare className="h-2.5 w-2.5" /> {completedItems}/{totalItems}
+              </span>
+            )}
+            
+            {commentCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold" title={`${commentCount} comments`}>
+                <MessageSquare className="h-2.5 w-2.5" /> {commentCount}
+              </span>
+            )}
+
+            {attachmentCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold" title={`${attachmentCount} attachments`}>
+                <Paperclip className="h-2.5 w-2.5" /> {attachmentCount}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Custom Tags (if any) rendered micro-sized */}
+        {tags && tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {tags.map((tag: string, index: number) => (
+              <span
+                key={tag}
+                className={`text-[8px] font-extrabold uppercase tracking-wider px-1 px-0.5 rounded border ${
+                  tagColors[index % tagColors.length]
+                }`}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

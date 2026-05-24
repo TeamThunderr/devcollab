@@ -1,19 +1,22 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { DndContext, DragEndEvent, closestCorners } from '@dnd-kit/core';
 import { useTaskStore } from '../../stores/taskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
 import { useBillingStore } from '../../stores/billingStore';
+import { useSnippetStore } from '../../stores/snippetStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { Task, TaskStatus, TaskPriority } from '../../types';
 import {
   Search, Plus, Clock, Bot, Calendar,
-  TrendingUp, ArrowLeft, ChevronRight, CheckCircle2, Layers, Sparkles
+  TrendingUp, ChevronRight, CheckCircle2, Layers,
+  Code, Copy
 } from 'lucide-react';
+
 
 interface ProjectWorkspaceConfig {
   name: string;
@@ -31,6 +34,9 @@ interface ProjectWorkspaceConfig {
 
 export default function TasksPage(): React.ReactElement {
   const { workspaceId, projectId: pid } = useParams<{ workspaceId: string; projectId: string }>();
+  const location = useLocation();
+  const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const tabParam = queryParams.get('tab');
 
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
   const { projects, fetchProjects } = useProjectStore();
@@ -38,19 +44,30 @@ export default function TasksPage(): React.ReactElement {
   const { user } = useAuthStore();
   const { fetchSubscription } = useBillingStore();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'activity' | 'ai' | 'settings'>('dashboard');
-  const [settingsSubTab, setSettingsSubTab] = useState<'general' | 'members' | 'permissions' | 'billing'>('general');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'activity' | 'ai' | 'snippets'>('dashboard');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Project General Settings local inputs states
-  const [projName, setProjName] = useState('');
-  const [projDesc, setProjDesc] = useState('');
-  const [projType, setProjType] = useState('');
-  const [projGoal, setProjGoal] = useState('');
-  const [projStyle, setProjStyle] = useState('');
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  // Snippets store and state
+  const { snippets, fetchSnippetsByProject } = useSnippetStore();
+  const [snippetSearchQuery, setSnippetSearchQuery] = useState('');
+  const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tabParam && ['dashboard', 'board', 'activity', 'ai', 'snippets'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [tabParam]);
+
+  useEffect(() => {
+    if (pid && activeTab === 'snippets') {
+      void fetchSnippetsByProject(pid);
+    }
+  }, [pid, activeTab, fetchSnippetsByProject]);
+
+
+
 
   // Create Task Form States
   const [taskTitle, setTaskTitle] = useState('');
@@ -131,8 +148,6 @@ export default function TasksPage(): React.ReactElement {
   const canMoveTask = user && !config?.archived ? hasPermission(user.id, 'move_task') : false;
   const canAccessAI = user ? hasPermission(user.id, 'access_ai') : false;
   const canManageAuditFeed = user ? hasPermission(user.id, 'manage_audit_feed') : false;
-  const canEditSettings = user ? hasPermission(user.id, 'edit_project_settings') : false;
-  const canManageMembers = user ? hasPermission(user.id, 'manage_members') : false;
 
   // Load and cache workspace configurations
   const loadConfig = () => {
@@ -190,15 +205,6 @@ export default function TasksPage(): React.ReactElement {
     setLocalTasks(tasks);
   }, [tasks]);
 
-  useEffect(() => {
-    if (config) {
-      setProjName(config.name || '');
-      setProjDesc(config.description || '');
-      setProjType(config.projectType || 'Internal Product');
-      setProjGoal(config.primaryGoal || 'Workflow Organization');
-      setProjStyle(config.workspaceStyle || 'Minimal');
-    }
-  }, [config]);
 
   const updateProjectConfig = (updater: (prev: ProjectWorkspaceConfig) => ProjectWorkspaceConfig) => {
     if (!config || !pid) return;
@@ -222,126 +228,8 @@ export default function TasksPage(): React.ReactElement {
     }));
   };
 
-  const handleSaveGeneralSettings = () => {
-    if (!canEditSettings) {
-      alert("You do not have permission to edit project settings.");
-      return;
-    }
-    updateProjectConfig(prev => ({
-      ...prev,
-      name: projName,
-      description: projDesc,
-      projectType: projType,
-      primaryGoal: projGoal,
-      workspaceStyle: projStyle
-    }));
-    logActivity(`updated project general configurations`);
-    alert("Project settings updated successfully!");
-  };
 
-  const handleArchiveProject = () => {
-    if (!canEditSettings) {
-      alert("You do not have permission to archive this project.");
-      return;
-    }
-    if (!window.confirm("Are you sure you want to archive this project? All tasks will become read-only.")) return;
-    
-    updateProjectConfig(prev => ({
-      ...prev,
-      archived: true
-    }));
-    logActivity(`archived the project workspace`);
-    alert("Project workspace has been archived.");
-  };
 
-  const handleUpdateMemberRole = (userId: string, newRole: string) => {
-    if (!canManageMembers) {
-      alert("You do not have permission to manage members.");
-      return;
-    }
-    updateProjectConfig(prev => {
-      const nextRoles = { ...(prev.projectRoles || {}) };
-      nextRoles[userId] = newRole;
-      return {
-        ...prev,
-        projectRoles: nextRoles
-      };
-    });
-    logActivity(`updated role for workspace member to ${newRole}`);
-  };
-
-  const handleTransferOwnership = (userId: string) => {
-    if (getMemberRole(user?.id || '') !== 'Owner') {
-      alert("Only the current Project Owner can transfer ownership.");
-      return;
-    }
-    if (!window.confirm("Are you sure you want to transfer project ownership? This action is irreversible.")) return;
-    
-    updateProjectConfig(prev => ({
-      ...prev,
-      ownerId: userId,
-      projectRoles: {
-        ...(prev.projectRoles || {}),
-        [user!.id]: 'Admin' // Demote previous owner to Admin
-      }
-    }));
-    logActivity(`transferred project ownership`);
-    alert("Project ownership transferred successfully.");
-  };
-
-  const hasPermissionForRole = (role: string, permissionKey: string): boolean => {
-    if (config?.rolePermissions?.[role]?.[permissionKey] !== undefined) {
-      return !!config.rolePermissions[role][permissionKey];
-    }
-    
-    const defaultPermissions: Record<string, Record<string, boolean>> = {
-      Admin: {
-        create_task: true, edit_task: true, delete_task: true, move_task: true,
-        manage_members: true, edit_project_settings: true, access_ai: true,
-        manage_audit_feed: true, invite_users: true
-      },
-      'Project Manager': {
-        create_task: true, edit_task: true, delete_task: true, move_task: true,
-        manage_members: false, edit_project_settings: true, access_ai: true,
-        manage_audit_feed: true, invite_users: true
-      },
-      Developer: {
-        create_task: true, edit_task: true, delete_task: false, move_task: true,
-        manage_members: false, edit_project_settings: false, access_ai: true,
-        manage_audit_feed: false, invite_users: false
-      },
-      Viewer: {
-        create_task: false, edit_task: false, delete_task: false, move_task: false,
-        manage_members: false, edit_project_settings: false, access_ai: false,
-        manage_audit_feed: false, invite_users: false
-      }
-    };
-    
-    return !!defaultPermissions[role]?.[permissionKey];
-  };
-
-  const handleTogglePermission = (role: string, permissionKey: string) => {
-    if (!canEditSettings) {
-      alert("You do not have permission to edit project settings.");
-      return;
-    }
-    
-    updateProjectConfig(prev => {
-      const rolePermissions = { ...(prev.rolePermissions || {}) };
-      if (!rolePermissions[role]) {
-        rolePermissions[role] = {};
-      }
-      
-      const currentValue = hasPermissionForRole(role, permissionKey);
-      rolePermissions[role][permissionKey] = !currentValue;
-      
-      return {
-        ...prev,
-        rolePermissions
-      };
-    });
-    logActivity(`updated permission "${permissionKey}" for role "${role}"`);
-  };
 
   const handleCreateTask = async () => {
     if (!taskTitle.trim()) {
@@ -500,24 +388,21 @@ export default function TasksPage(): React.ReactElement {
   }, [localTasks, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-[#08090a] text-slate-200 font-sans antialiased premium-scrollbar selection:bg-indigo-500/30 selection:text-white">
+    <div className="min-h-screen bg-[#121316] text-slate-200 font-sans antialiased premium-scrollbar selection:bg-indigo-500/30 selection:text-white">
       {/* Visual Depth Injectors */}
       <style>{`
         .glass-panel {
-          background: rgba(18, 19, 24, 0.4);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          background: #17191d;
           border: 1px solid rgba(255, 255, 255, 0.04);
         }
         .board-lane {
-          background: rgba(13, 14, 18, 0.35);
-          backdrop-filter: blur(8px);
+          background: #17191d;
         }
         .board-lane-sticky {
           position: sticky;
           top: 0;
           z-index: 10;
-          background: #08090a;
+          background: #17191d;
         }
         .tab-pill-active {
           background: rgba(255, 255, 255, 0.05);
@@ -525,19 +410,14 @@ export default function TasksPage(): React.ReactElement {
           color: #ffffff;
         }
         .smooth-lift {
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: all 0.15s ease-out;
         }
-      `}</style>
-
-      {/* Top Navbar details */}
-      <div className="border-b border-white/[0.04] bg-[#0c0d10]/60 backdrop-blur-md sticky top-0 z-30 px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      `}</style>      {/* Top Navbar details */}
+      <div className="border-b border-white/[0.04] bg-[#17191d]/85 backdrop-blur-md sticky top-0 z-30 px-6 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link to={`/w/${workspaceId}/projects`} className="p-1.5 border border-white/[0.04] hover:border-white/10 bg-white/[0.01] rounded-lg text-slate-400 hover:text-white transition">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
           <div className="text-left">
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-bold text-white leading-none">{activeProject?.name || 'Project'}</h1>
+              <h1 className="text-base font-bold text-white leading-none">{activeProject?.name || 'Your project name'}</h1>
               <span className="text-[8px] uppercase font-mono tracking-widest px-1.5 py-0.5 border border-white/[0.04] rounded bg-white/[0.02] text-slate-500">
                 {config?.workspaceStyle || 'Minimal'}
               </span>
@@ -547,20 +427,20 @@ export default function TasksPage(): React.ReactElement {
         </div>
 
         {/* Minimal Tab Selection Navigation */}
-        <div className="flex items-center gap-1 bg-black/20 border border-white/[0.04] rounded-lg p-0.5 max-w-sm self-start sm:self-center">
+        <div className="flex items-center gap-1 bg-black/20 border border-white/[0.04] rounded-lg p-0.5 max-w-md self-start sm:self-center">
           {[
             { id: 'dashboard', label: 'Overview', icon: <TrendingUp className="h-3.5 w-3.5" /> },
             { id: 'board', label: 'Board', icon: <Layers className="h-3.5 w-3.5" /> },
             ...(canManageAuditFeed ? [{ id: 'activity', label: 'Audits', icon: <Clock className="h-3.5 w-3.5" /> }] : []),
             ...(canAccessAI ? [{ id: 'ai', label: 'AI Copilot', icon: <Bot className="h-3.5 w-3.5" /> }] : []),
-            { id: 'settings', label: 'Settings', icon: <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> }
+            { id: 'snippets', label: 'Snippets', icon: <Code className="h-3.5 w-3.5" /> }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold border border-transparent transition-all ${activeTab === tab.id
                   ? 'tab-pill-active font-black'
-                  : 'text-slate-500 hover:text-slate-300'
+                  : 'text-slate-400 hover:text-white'
                 }`}
             >
               {tab.icon}
@@ -588,7 +468,7 @@ export default function TasksPage(): React.ReactElement {
                 <div className="space-y-2 text-left">
                   <span className="text-[9px] font-extrabold uppercase tracking-widest text-indigo-400 leading-none">Workspace Progress</span>
                   <h2 className="text-xl font-bold text-white">Project Stream Health</h2>
-                  <p className="text-xs text-slate-450 leading-relaxed max-w-md font-medium">
+                  <p className="text-xs text-slate-400 leading-relaxed max-w-md font-medium">
                     {activeProject?.description || config?.description || 'Your delivery streams are configuring workspace lanes to coordinate project milestones.'}
                   </p>
                 </div>
@@ -626,7 +506,7 @@ export default function TasksPage(): React.ReactElement {
                     localTasks.slice(0, 4).map(task => (
                       <div key={task.id} className="flex justify-between items-center py-3 hover:bg-white/[0.01] px-2 rounded-xl transition cursor-pointer" onClick={() => setSelectedTask(task)}>
                         <div className="min-w-0 flex items-center gap-2.5">
-                          <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${task.status === 'DONE' ? 'text-emerald-500' : 'text-slate-655'}`} />
+                          <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${task.status === 'DONE' ? 'text-emerald-500' : 'text-slate-500'}`} />
                           <span className="text-xs font-bold text-slate-200 truncate">{task.title}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -711,10 +591,10 @@ export default function TasksPage(): React.ReactElement {
             {/* Header board actions */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-3 bg-white/[0.01] border border-white/[0.04] rounded-xl px-4 py-2 w-full max-w-xs focus-within:border-indigo-500/30 transition">
-                <Search className="h-4 w-4 text-slate-500" />
+                <Search className="h-4 w-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Filter board..."
+                  placeholder="Search tasks..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-transparent text-xs w-full outline-none placeholder-slate-500 text-slate-200"
@@ -725,7 +605,7 @@ export default function TasksPage(): React.ReactElement {
                 <button
                   type="button"
                   onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }}
-                  className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-550 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
+                  className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
                 >
                   <Plus className="h-3.5 w-3.5" /> Create Task
                 </button>
@@ -738,62 +618,18 @@ export default function TasksPage(): React.ReactElement {
               </div>
             ) : (
               <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                <div className="flex gap-6 overflow-x-auto pb-4 select-none items-stretch min-h-[480px] premium-scrollbar">
+                <div className="flex gap-6 overflow-x-auto pb-4 select-none items-start min-h-[480px] premium-scrollbar">
                   {config?.columns?.map(col => {
                     const colTasks = filteredKanbanTasks.filter(t => t.status === col.id);
                     return (
-                      <div key={col.id} className="board-lane border border-white/[0.03] rounded-2xl p-4 flex flex-col justify-start w-[310px] sm:w-[340px] flex-shrink-0 shadow-sm relative">
-                        <div className="board-lane-sticky py-2.5 mb-3 flex items-center justify-between border-b border-white/[0.04]">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${col.id === 'TODO' ? 'bg-slate-400' :
-                                col.id === 'IN_PROGRESS' ? 'bg-sky-400' :
-                                  col.id === 'IN_REVIEW' ? 'bg-amber-400' : 'bg-emerald-500'
-                              }`}></span>
-                            <h3 className="text-[10px] font-extrabold text-white uppercase tracking-wider">{col.title}</h3>
-                          </div>
-                          <span className="text-[9px] font-bold font-mono px-2 py-0.5 bg-black/30 border border-white/[0.04] rounded text-slate-500">
-                            {colTasks.length}
-                          </span>
-                        </div>
-
-                        {colTasks.length === 0 ? (
-                          /* Interactive Clean Empty State */
-                          <div className="flex-1 flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-white/[0.03] rounded-xl bg-white/[0.005]">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lane Empty</p>
-                            <p className="text-[10px] text-slate-600 mt-1 leading-normal max-w-[160px]">No deliverables listed here.</p>
-                            {col.id === 'TODO' && (
-                              <div className="mt-3.5 space-y-1.5">
-                                {canCreateTask && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }}
-                                    className="w-full px-3 py-1 bg-indigo-650/10 hover:bg-indigo-650/20 text-indigo-400 font-bold rounded-lg text-[9px] transition"
-                                  >
-                                    + Create Task
-                                  </button>
-                                )}
-                                {canAccessAI && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setActiveTab('ai'); setAiPrompt('starter deliverables for project sprint'); }}
-                                    className="flex items-center justify-center gap-1 text-[8px] text-slate-500 hover:text-slate-300 font-bold transition mx-auto"
-                                  >
-                                    <Sparkles className="h-2.5 w-2.5" /> AI Suggest
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <KanbanColumn
-                            title={col.title}
-                            status={col.id}
-                            tasks={colTasks}
-                            onTaskClick={setSelectedTask}
-                            onAddTask={canCreateTask ? (colId) => { setTaskStatus(colId as TaskStatus); setShowTaskForm(true); } : undefined}
-                          />
-                        )}
-                      </div>
+                      <KanbanColumn
+                        key={col.id}
+                        title={col.title}
+                        status={col.id}
+                        tasks={colTasks}
+                        onTaskClick={setSelectedTask}
+                        onAddTask={canCreateTask ? (colId) => { setTaskStatus(colId as TaskStatus); setShowTaskForm(true); } : undefined}
+                      />
                     );
                   })}
                 </div>
@@ -823,7 +659,7 @@ export default function TasksPage(): React.ReactElement {
                       <p className="text-xs text-slate-300 font-bold leading-normal">
                         <span className="text-indigo-400 font-black">{act.userName}</span> {act.details}
                       </p>
-                      <span className="text-[9px] text-slate-550 flex items-center gap-1">
+                      <span className="text-[9px] text-slate-500 flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {new Date(act.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
@@ -921,372 +757,123 @@ export default function TasksPage(): React.ReactElement {
           </div>
         )}
 
-        {/* ─── TAB 5: DYNAMIC PROJECT SETTINGS & PERMISSIONS DECK ─────────────── */}
-        {activeTab === 'settings' && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in duration-150 text-left">
-            
-            {/* Left Sub-navigation menu */}
-            <div className="lg:col-span-1 space-y-2">
-              <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 px-3 py-1.5">Project Config</h3>
-              <div className="flex flex-col gap-1 bg-black/20 border border-white/[0.03] rounded-2xl p-2.5">
-                {[
-                  { id: 'general', label: 'General info', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> },
-                  { id: 'members', label: 'Team members', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
-                  { id: 'permissions', label: 'Roles Matrix', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg> },
-                  { id: 'billing', label: 'Plan & Billing', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg> }
-                ].map(subTab => (
-                  <button
-                    key={subTab.id}
-                    onClick={() => setSettingsSubTab(subTab.id as any)}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all border ${
-                      settingsSubTab === subTab.id
-                        ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 font-extrabold'
-                        : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/[0.01]'
-                    }`}
-                  >
-                    {subTab.icon}
-                    <span>{subTab.label}</span>
-                  </button>
-                ))}
+        {/* ─── TAB 5: DEDICATED PROJECT SNIPPETS SYSTEM ───────────────────────── */}
+        {activeTab === 'snippets' && (
+          <div className="space-y-6 animate-in fade-in duration-150 text-left">
+            {/* Header / Search Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.04] pb-4">
+              <div className="space-y-1 text-left">
+                <h2 className="text-xl font-semibold text-white">Project Snippets</h2>
+                <p className="text-xs text-slate-400">Reusable code blocks, configurations, and utilities specific to this project.</p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2 w-full max-w-xs focus-within:border-indigo-500/30 transition">
+                  <Search className="h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search snippets..."
+                    value={snippetSearchQuery}
+                    onChange={(e) => setSnippetSearchQuery(e.target.value)}
+                    className="bg-transparent text-xs w-full outline-none placeholder-slate-500 text-slate-200"
+                  />
+                </div>
+                <Link
+                  to={`/w/${workspaceId}/p/${pid}/snippets/new`}
+                  className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New Snippet
+                </Link>
               </div>
             </div>
 
-            {/* Right Sub-tab Content Deck */}
-            <div className="lg:col-span-3">
-              
-              {/* 1. GENERAL SUB-TAB */}
-              {settingsSubTab === 'general' && (
-                <div className="glass-panel p-6 rounded-2xl shadow-sm space-y-6 animate-in fade-in duration-100">
-                  <div className="space-y-1 pb-4 border-b border-white/[0.04]">
-                    <h3 className="text-sm font-bold text-white">General Project Workspace Settings</h3>
-                    <p className="text-[10px] text-slate-500 leading-none">Modify core characteristics and styling configuration templates.</p>
-                  </div>
-
-                  {!canEditSettings && (
-                    <div className="rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-3 text-xs text-amber-400 font-medium">
-                      ⚠️ You are in View-Only mode. Saving changes requires the **Edit Project Settings** capability.
-                    </div>
-                  )}
-
-                  <div className="grid gap-5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="grid gap-1.5">
-                        <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Project Name</label>
-                        <input
-                          type="text"
-                          value={projName}
-                          disabled={!canEditSettings}
-                          onChange={(e) => setProjName(e.target.value)}
-                          className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 focus:border-indigo-500/55 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                        />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Project Delivery Type</label>
-                        <select
-                          value={projType}
-                          disabled={!canEditSettings}
-                          onChange={(e) => setProjType(e.target.value)}
-                          className="bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2.5 text-xs outline-none text-slate-400 focus:border-indigo-500/55 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          <option value="Internal Product">Internal Product</option>
-                          <option value="Client Stream">Client Stream</option>
-                          <option value="Research Initiative">Research Initiative</option>
-                          <option value="Enterprise Platform">Enterprise Platform</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-1.5">
-                      <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Description</label>
-                      <textarea
-                        value={projDesc}
-                        disabled={!canEditSettings}
-                        onChange={(e) => setProjDesc(e.target.value)}
-                        rows={3}
-                        className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2 text-xs outline-none text-slate-200 focus:border-indigo-500/55 transition resize-none disabled:opacity-60 disabled:cursor-not-allowed"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="grid gap-1.5">
-                        <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Primary Stream Goal</label>
-                        <input
-                          type="text"
-                          value={projGoal}
-                          disabled={!canEditSettings}
-                          onChange={(e) => setProjGoal(e.target.value)}
-                          className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 focus:border-indigo-500/55 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                        />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Workspace Visual Template</label>
-                        <select
-                          value={projStyle}
-                          disabled={!canEditSettings}
-                          onChange={(e) => setProjStyle(e.target.value)}
-                          className="bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2.5 text-xs outline-none text-slate-400 focus:border-indigo-500/55 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          <option value="Minimal">Minimal (Clean Vercel/Linear)</option>
-                          <option value="Professional">Professional (Corporate Slate)</option>
-                          <option value="Creative">Creative (Vibrant Electric)</option>
-                          <option value="Enterprise">Enterprise (High Density)</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {canEditSettings && (
-                    <div className="pt-4 border-t border-white/[0.04] flex justify-end">
-                      <button
-                        type="button"
-                        onClick={handleSaveGeneralSettings}
-                        className="rounded-xl bg-indigo-600 hover:bg-indigo-550 text-white px-5 py-2 text-xs font-bold transition shadow-sm"
-                      >
-                        Save Configurations
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Danger zone Archiving */}
-                  <div className="border border-rose-950/40 bg-rose-950/5 rounded-2xl p-5 space-y-4">
-                    <div className="text-left space-y-1">
-                      <h4 className="text-xs font-black text-rose-450 uppercase tracking-wider">Danger Zone</h4>
-                      <p className="text-[10px] text-slate-500 leading-none">Irreversible workspace administration actions.</p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-3 border border-rose-950/20 bg-rose-950/10 rounded-xl">
-                      <div className="text-left">
-                        <p className="text-xs font-bold text-slate-350">Archive Project Workspace</p>
-                        <p className="text-[10px] text-slate-500 mt-1 max-w-sm">Freeze delivery stream operations. This makes all tasks read-only and locks lanes.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleArchiveProject}
-                        disabled={!canEditSettings || config?.archived}
-                        className="px-4 py-2 border border-rose-900 bg-rose-950/30 hover:bg-rose-950/60 disabled:opacity-30 disabled:pointer-events-none rounded-xl text-rose-400 font-bold text-xs transition"
-                      >
-                        {config?.archived ? 'Archived' : 'Archive Stream'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. TEAM MEMBERS SUB-TAB */}
-              {settingsSubTab === 'members' && (
-                <div className="glass-panel p-6 rounded-2xl shadow-sm space-y-6 animate-in fade-in duration-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.04]">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-bold text-white">Stream Role Allocations</h3>
-                      <p className="text-[10px] text-slate-500 leading-none">Map workspace collaborators to specific project delivery roles.</p>
-                    </div>
-                    <div className="flex items-center gap-2 bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-1.5 w-full max-w-[200px]">
-                      <svg className="h-3.5 w-3.5 text-slate-550" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                      <input
-                        type="text"
-                        placeholder="Search team..."
-                        value={memberSearchQuery}
-                        onChange={(e) => setMemberSearchQuery(e.target.value)}
-                        className="bg-transparent text-[11px] w-full outline-none placeholder-slate-650 text-slate-200"
-                      />
-                    </div>
-                  </div>
-
-                  {!canManageMembers && (
-                    <div className="rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-3 text-xs text-amber-400 font-medium">
-                      ⚠️ Managing workspace roles requires the **Manage Members** capability.
-                    </div>
-                  )}
-
-                  <div className="divide-y divide-white/[0.03] bg-black/10 rounded-2xl border border-white/[0.03] overflow-hidden">
-                    {members
-                      .filter(m => {
-                        const name = m.user?.name || m.user?.email || '';
-                        return name.toLowerCase().includes(memberSearchQuery.toLowerCase());
-                      })
-                      .map(m => {
-                        const currentRole = getMemberRole(m.userId);
-                        const initials = (m.user?.name || m.user?.email || '?').charAt(0).toUpperCase();
-                        
-                        return (
-                          <div key={m.userId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 hover:bg-white/[0.005] transition">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-indigo-905/40 border border-indigo-500/20 flex items-center justify-center font-bold text-xs text-indigo-300 relative">
-                                {initials}
-                                {/* Presence Dot indicator */}
-                                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#08090a]"></span>
-                              </div>
-                              <div className="text-left">
-                                <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                                  {m.user?.name || 'Workspace Member'}
-                                  {currentRole === 'Owner' && (
-                                    <span className="text-[7px] uppercase font-mono tracking-widest px-1 bg-indigo-500/20 text-indigo-400 rounded font-black border border-indigo-500/30">
-                                      Owner
-                                    </span>
-                                  )}
-                                </h4>
-                                <p className="text-[10px] text-slate-500 mt-0.5">{m.user?.email}</p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2.5 self-end sm:self-center">
-                              {currentRole !== 'Owner' && canManageMembers ? (
-                                <>
-                                  <select
-                                    value={currentRole}
-                                    onChange={(e) => handleUpdateMemberRole(m.userId, e.target.value)}
-                                    className="bg-slate-950 border border-white/[0.04] rounded-lg px-2.5 py-1.5 text-[10px] font-bold outline-none text-slate-400 focus:border-indigo-500/50 transition cursor-pointer"
-                                  >
-                                    <option value="Admin">Admin</option>
-                                    <option value="Project Manager">Project Manager</option>
-                                    <option value="Developer">Developer</option>
-                                    <option value="Viewer">Viewer</option>
-                                  </select>
-                                  
-                                  {/* Ownership transfer button */}
-                                  {getMemberRole(user?.id || '') === 'Owner' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleTransferOwnership(m.userId)}
-                                      className="px-2.5 py-1.5 text-[9px] font-bold border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-indigo-400 rounded-lg transition"
-                                      title="Transfer Owner Ownership"
-                                    >
-                                      Transfer Owner
-                                    </button>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-[10px] uppercase font-mono px-2 py-1 border border-white/[0.04] bg-slate-950 text-slate-500 rounded font-bold">
-                                  {currentRole}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-
-              {/* 3. PERMISSIONS DECK MATRIX */}
-              {settingsSubTab === 'permissions' && (
-                <div className="glass-panel p-6 rounded-2xl shadow-sm space-y-6 animate-in fade-in duration-100">
-                  <div className="space-y-1 pb-4 border-b border-white/[0.04]">
-                    <h3 className="text-sm font-bold text-white">Dynamic Role Capability Override Matrix</h3>
-                    <p className="text-[10px] text-slate-500 leading-none">Customize default role features and lock access rules instantly.</p>
-                  </div>
-
-                  {!canEditSettings && (
-                    <div className="rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-3 text-xs text-amber-400 font-medium">
-                      ⚠️ Customizing role capabilities requires the **Edit Project Settings** capability.
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    {['Admin', 'Project Manager', 'Developer', 'Viewer'].map(role => (
-                      <div key={role} className="border border-white/[0.03] bg-black/10 rounded-2xl p-4 space-y-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${
-                            role === 'Admin' ? 'bg-indigo-500' :
-                            role === 'Project Manager' ? 'bg-sky-400' :
-                            role === 'Developer' ? 'bg-amber-500' : 'bg-slate-400'
-                          }`}></span>
-                          <h4 className="text-xs font-black text-white uppercase tracking-wider">{role} capabilities</h4>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
-                          {[
-                            { key: 'create_task', label: 'Create Workspace Tasks', desc: 'Allows drafting and inserting new lane cards.' },
-                            { key: 'edit_task', label: 'Modify Task Details', desc: 'Enables updating fields, checklist logs, and titles.' },
-                            { key: 'delete_task', label: 'Eradicate Tasks', desc: 'Authorizes full removal and deletion of board cards.' },
-                            { key: 'move_task', label: 'Re-align Lane States', desc: 'Grants drag-and-drop board placement authorization.' },
-                            { key: 'manage_members', label: 'Manage Stream Collaborators', desc: 'Allows role changes and member additions.' },
-                            { key: 'edit_project_settings', label: 'Edit Project Settings', desc: 'Unlocks General panel, matrices, and danger archiving.' },
-                            { key: 'access_ai', label: 'Engage AI Copilot', desc: 'Allows generating subtasks and status synthesis.' },
-                            { key: 'manage_audit_feed', label: 'Audit Timeline Feeds', desc: 'Grants viewing of detailed stream updates.' }
-                          ].map(perm => {
-                            const isChecked = hasPermissionForRole(role, perm.key);
-                            return (
-                              <div key={perm.key} className="flex items-center justify-between p-3 border border-white/[0.02] bg-white/[0.005] rounded-xl hover:border-slate-850/60 transition">
-                                <div className="text-left pr-4">
-                                  <p className="font-bold text-slate-200 text-xs">{perm.label}</p>
-                                  <p className="text-[9px] text-slate-500 leading-normal mt-0.5 max-w-[190px]">{perm.desc}</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={!canEditSettings}
-                                  onClick={() => handleTogglePermission(role, perm.key)}
-                                  className={`w-9 h-5 flex-shrink-0 rounded-full p-0.5 transition-all duration-200 border outline-none ${
-                                    isChecked
-                                      ? 'bg-indigo-600 border-indigo-500/20 justify-end'
-                                      : 'bg-slate-900 border-white/[0.04] justify-start'
-                                  } flex items-center disabled:opacity-40 disabled:cursor-not-allowed`}
-                                >
-                                  <span className="w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-all duration-200"></span>
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 4. PLAN & BILLING CARD */}
-              {settingsSubTab === 'billing' && (
-                <div className="glass-panel p-6 rounded-2xl shadow-sm space-y-6 animate-in fade-in duration-100">
-                  <div className="space-y-1 pb-4 border-b border-white/[0.04]">
-                    <h3 className="text-sm font-bold text-white">SaaS Stream Subscriptions</h3>
-                    <p className="text-[10px] text-slate-500 leading-none">Benchmark quotas, manage billing configurations, and unlock addons.</p>
-                  </div>
-
-                  {/* Gradient PRO upgrade card */}
-                  <div className="relative overflow-hidden rounded-2xl border border-indigo-500/25 bg-gradient-to-br from-indigo-950/20 via-[#0e0f12] to-cyan-950/15 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
-                    {/* Glowing highlight */}
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-tr from-indigo-500/10 to-cyan-500/5 blur-3xl rounded-full pointer-events-none"></div>
-
-                    <div className="space-y-2 text-left relative z-10">
-                      <span className="text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20">
-                        Enterprise Delivery Plan
-                      </span>
-                      <h4 className="text-lg font-bold text-white flex items-center gap-1.5 mt-1.5">
-                        Active Workspace Stream <Sparkles className="h-4.5 w-4.5 text-indigo-400 animate-pulse" />
-                      </h4>
-                      <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-                        This workspace stream is configured with fully unlocked Pro features: Unlimited subtask generation, Dynamic permission override matrices, and Timeline Log storage.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => alert("Simulated Billing Portal: Loading stripe panel context...")}
-                      className="px-4.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-550 hover:from-indigo-550 hover:to-indigo-500 text-white font-bold text-xs transition relative z-10 shadow-md shadow-indigo-950/50"
+            {loading ? (
+              <div className="py-24 text-center">
+                <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              </div>
+            ) : snippets.length === 0 ? (
+              <div className="glass-panel flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.04] px-4 py-16 text-center text-xs text-slate-500 bg-white/[0.005] min-h-[220px]">
+                <Code className="h-8 w-8 text-slate-700 mb-2" />
+                <p className="font-bold text-slate-400 uppercase tracking-wider">No Snippets Found</p>
+                <p className="text-slate-600 mt-1 max-w-xs leading-relaxed font-medium">Save reusable utility scripts, APIs, or config snippets for your development stream.</p>
+                <Link
+                  to={`/w/${workspaceId}/p/${pid}/snippets/new`}
+                  className="mt-4 px-4.5 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-bold rounded-xl text-xs transition"
+                >
+                  + Add Your First Snippet
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {snippets
+                  .filter(snip => 
+                    snip.title.toLowerCase().includes(snippetSearchQuery.toLowerCase()) ||
+                    (snip.description && snip.description.toLowerCase().includes(snippetSearchQuery.toLowerCase())) ||
+                    snip.language.toLowerCase().includes(snippetSearchQuery.toLowerCase())
+                  )
+                  .map(snip => (
+                    <Link
+                      key={snip.id}
+                      to={`/w/${workspaceId}/p/${pid}/snippets/${snip.id}`}
+                      className="glass-panel rounded-2xl p-4 flex flex-col justify-between gap-4 border border-white/[0.04] bg-[#17191d] shadow-sm relative overflow-hidden smooth-lift hover:bg-[#1e2025] hover:border-white/[0.08]"
                     >
-                      Manage Billing
-                    </button>
-                  </div>
-
-                  {/* Quota breakdown meters */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {[
-                      { label: 'Stream Members', val: '5 / 50 seats', percent: 10, color: 'bg-indigo-500' },
-                      { label: 'Cloud Storage', val: '1.2 GB / 100 GB', percent: 1.2, color: 'bg-sky-400' },
-                      { label: 'AI Suggestion Tokens', val: '42,500 / 500,000', percent: 8.5, color: 'bg-emerald-500' }
-                    ].map((quota, idx) => (
-                      <div key={idx} className="border border-white/[0.03] bg-black/10 rounded-2xl p-4.5 space-y-2 text-left">
-                        <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{quota.label}</p>
-                        <p className="text-xs font-bold text-slate-200">{quota.val}</p>
-                        <div className="w-full h-1 bg-white/[0.02] rounded-full overflow-hidden">
-                          <div className={`h-full ${quota.color} rounded-full`} style={{ width: `${quota.percent}%` }}></div>
+                      <div className="space-y-2">
+                        {/* Title & Actions Row */}
+                        <div className="flex items-center justify-between gap-3 text-left">
+                          <h3 className="text-sm font-semibold text-white truncate pr-12">{snip.title}</h3>
+                          <span className="text-[9px] uppercase font-mono tracking-widest px-1.5 py-0.5 border border-white/[0.04] rounded bg-white/[0.02] text-slate-400 flex-shrink-0">
+                            {snip.language}
+                          </span>
+                        </div>
+                        
+                        {snip.description && (
+                          <p className="text-[11px] text-slate-400 leading-relaxed font-medium line-clamp-2 text-left">
+                            {snip.description}
+                          </p>
+                        )}
+                        
+                        {/* Monospace Code Preview */}
+                        <div className="relative group/code mt-2">
+                          <pre className="bg-slate-950 font-mono text-[10px] text-slate-350 rounded-xl p-3 border border-white/[0.03] overflow-x-auto max-h-[140px] premium-scrollbar">
+                            <code>{snip.code}</code>
+                          </pre>
+                          
+                          {/* Copy Button Hover Overlay */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void navigator.clipboard.writeText(snip.code);
+                              setCopiedSnippetId(snip.id);
+                              setTimeout(() => setCopiedSnippetId(null), 1500);
+                            }}
+                            className="absolute top-2 right-2 p-1.5 rounded-lg border border-white/[0.04] bg-slate-950/80 hover:bg-slate-950 text-slate-400 hover:text-white transition shadow-lg"
+                            title="Copy code snippet"
+                          >
+                            {copiedSnippetId === snip.id ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-            </div>
+
+                      {/* Footer Metadata & Actions */}
+                      <div className="flex items-center justify-between pt-2 border-t border-white/[0.03] mt-1 text-[10px] text-slate-500">
+                        <span>
+                          {new Date(snip.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        
+                        <span className="text-[9px] text-indigo-400 hover:text-indigo-300 font-extrabold flex items-center gap-0.5">
+                          Edit <Plus className="h-3 w-3 rotate-45" />
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1294,7 +881,7 @@ export default function TasksPage(): React.ReactElement {
       {/* ─── CREATE TASK OVERLAY MODAL ────────────────────────────────── */}
       {showTaskForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050607]/80 px-4 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-[#0e0f12] border border-white/[0.04] rounded-2xl p-5 text-white shadow-2xl space-y-4 text-left animate-in zoom-in-95 duration-150">
+          <div className="w-full max-w-md bg-[#17191d] border border-white/[0.04] rounded-2xl p-5 text-white shadow-2xl space-y-4 text-left animate-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center border-b border-white/[0.04] pb-3">
               <h2 className="text-sm font-bold text-white">Create Workspace Task</h2>
               <button type="button" onClick={() => setShowTaskForm(false)} className="text-slate-500 hover:text-white transition">✕</button>
@@ -1305,13 +892,13 @@ export default function TasksPage(): React.ReactElement {
                 <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Title</label>
                 <input
                   type="text"
-                  placeholder="Task title..."
+                  placeholder="Your task title..."
                   value={taskTitle}
                   onChange={(e) => {
                     setTaskTitle(e.target.value);
                     if (titleError) setTitleError(null);
                   }}
-                  className={`bg-slate-950 border rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 placeholder-slate-650 transition ${
+                  className={`bg-slate-950 border rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 placeholder-slate-600 transition ${
                     titleError ? 'border-rose-500/80 focus:border-rose-500' : 'border-white/[0.04] focus:border-indigo-500/50'
                   }`}
                 />
@@ -1337,11 +924,11 @@ export default function TasksPage(): React.ReactElement {
               <div className="grid gap-1">
                 <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Description</label>
                 <textarea
-                  placeholder="Task specifications..."
+                  placeholder="Short task description..."
                   value={taskDesc}
                   onChange={(e) => setTaskDesc(e.target.value)}
                   rows={3}
-                  className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2 text-xs outline-none focus:border-indigo-500/50 text-slate-200 placeholder-slate-650 transition resize-none"
+                  className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2 text-xs outline-none focus:border-indigo-500/50 text-slate-200 placeholder-slate-600 transition resize-none"
                 />
               </div>
 
@@ -1374,7 +961,7 @@ export default function TasksPage(): React.ReactElement {
                   setTitleError(null);
                 }}
                 disabled={isCreatingTask}
-                className="rounded-xl border border-slate-800 px-4 py-2 text-xs font-bold hover:bg-slate-900 transition text-slate-400"
+                className="rounded-xl border border-white/[0.04] px-4 py-2 text-xs font-bold hover:bg-white/[0.01] transition text-slate-400"
               >
                 Cancel
               </button>
@@ -1397,6 +984,8 @@ export default function TasksPage(): React.ReactElement {
           </div>
         </div>
       )}
+
+
 
       {/* Task detail drawer modal */}
       {selectedTask && (
@@ -1423,3 +1012,4 @@ export default function TasksPage(): React.ReactElement {
     </div>
   );
 }
+

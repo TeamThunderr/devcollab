@@ -5,9 +5,10 @@ import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
 import { useBillingStore } from '../../stores/billingStore';
 import {
-  Search, Plus, Sparkles, Star, Users, Trash2, Crown,
-  Zap, Compass, Briefcase, Layers, ChevronRight, X
+  Search, Plus, Star, Users, Trash2, Crown,
+  Zap, Compass, X
 } from 'lucide-react';
+
 
 export default function ProjectsPage(): React.ReactElement {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -22,11 +23,7 @@ export default function ProjectsPage(): React.ReactElement {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Creation Mode: 'quick' or 'advanced'
-  const [creationMode, setCreationMode] = useState<'quick' | 'advanced'>('quick');
-
-  // Advanced Wizard Steps (pruned to 3 steps)
-  const [wizardStep, setWizardStep] = useState(1);
+  // Unified Creation State
   const [wizardData, setWizardData] = useState({
     projectType: 'Internal Product',
     primaryGoal: 'Workflow Organization',
@@ -34,6 +31,7 @@ export default function ProjectsPage(): React.ReactElement {
     name: '',
     summary: ''
   });
+
 
   const [isCompiling, setIsCompiling] = useState(false);
   const [compilingProgress, setCompilingProgress] = useState(0);
@@ -84,8 +82,6 @@ export default function ProjectsPage(): React.ReactElement {
     if (projects.length >= 5 && !isPro) {
       setShowUpgradeModal(true);
     } else {
-      setCreationMode('quick');
-      setWizardStep(1);
       setWizardData({
         projectType: 'Internal Product',
         primaryGoal: 'Workflow Organization',
@@ -106,12 +102,13 @@ export default function ProjectsPage(): React.ReactElement {
 
   // Launch project creation with clean optimistic compiling screen
   const handleLaunchProject = async () => {
-    const projectName = creationMode === 'quick' ? wizardData.name.trim() : wizardData.name.trim();
+    const projectName = wizardData.name.trim();
     if (!projectName || !workspaceId) return;
 
     setIsCompiling(true);
     setCompilingProgress(15);
     setCompilingStatusText('Initializing workspace directory...');
+
 
     const statuses = [
       { p: 45, t: 'Building Kanban pipeline schema...' },
@@ -189,17 +186,14 @@ export default function ProjectsPage(): React.ReactElement {
     } catch (err: any) {
       alert(`Error deleting project: ${err.message}`);
     }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#08090a] text-slate-200 font-sans antialiased selection:bg-indigo-500/30 selection:text-white">
+  };  return (
+    <div className="min-h-screen bg-[#121316] text-slate-200 font-sans antialiased premium-scrollbar selection:bg-indigo-500/30 selection:text-white">
       {/* Visual Depth Injectors */}
       <style>{`
         .glass-card {
-          background: rgba(18, 19, 24, 0.45);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          background: #17191d;
           border: 1px solid rgba(255, 255, 255, 0.04);
+          box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
         }
         .smooth-lift {
           transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -234,17 +228,17 @@ export default function ProjectsPage(): React.ReactElement {
                 </span>
               )}
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white font-sans sm:text-4xl">
+            <h1 className="text-2xl font-semibold tracking-tight text-white font-sans sm:text-3xl">
               <span className="text-gradient">{activeWorkspace?.name || 'Workspace'} Projects</span>
             </h1>
-            <p className="text-xs text-slate-450 max-w-xl font-medium leading-relaxed">
+            <p className="text-xs text-slate-400 max-w-xl font-medium leading-relaxed">
               Track project milestones, tasks status, and stream alignments inside a unified workspace.
             </p>
           </div>
           <button
             type="button"
             onClick={handleOpenCreateModal}
-            className="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-550 active:scale-[0.98] text-white px-4.5 py-2.5 text-xs font-bold transition-all shadow-md shadow-indigo-650/10 self-start md:self-center font-sans tracking-wide"
+            className="flex items-center gap-2 rounded-xl bg-indigo-650 hover:bg-indigo-600 active:scale-[0.98] text-white px-4.5 py-2.5 text-xs font-bold transition-all shadow-md shadow-indigo-650/10 self-start md:self-center font-sans tracking-wide"
           >
             <Plus className="h-4 w-4" /> Create Project
           </button>
@@ -285,7 +279,7 @@ export default function ProjectsPage(): React.ReactElement {
           <Search className="h-4 w-4 text-slate-500 flex-shrink-0" />
           <input
             type="text"
-            placeholder="Search projects..."
+            placeholder="Search projects"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="bg-transparent text-xs w-full outline-none placeholder-slate-500 text-slate-200"
@@ -313,7 +307,7 @@ export default function ProjectsPage(): React.ReactElement {
               <button
                 type="button"
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-550 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
               >
                 <Plus className="h-3.5 w-3.5" /> Start Project
               </button>
@@ -331,7 +325,7 @@ export default function ProjectsPage(): React.ReactElement {
                 >
                   <div className="space-y-2 text-left">
                     <div className="flex items-start justify-between gap-4">
-                      <h3 className="text-base font-bold text-white group-hover:text-indigo-400 transition-colors leading-snug truncate max-w-[80%]">
+                      <h3 className="text-sm font-medium text-white group-hover:text-indigo-400 transition-colors leading-snug truncate max-w-[80%]">
                         {project.name}
                       </h3>
                       <button
@@ -346,7 +340,7 @@ export default function ProjectsPage(): React.ReactElement {
                       </button>
                     </div>
 
-                    <p className="text-xs text-slate-450 leading-relaxed line-clamp-2 min-h-[2.2rem]">
+                    <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 min-h-[2.2rem]">
                       {project.description || 'No description provided for this project.'}
                     </p>
                   </div>
@@ -369,7 +363,7 @@ export default function ProjectsPage(): React.ReactElement {
                     <div className="flex items-center justify-between text-[10px] text-slate-500">
                       <div className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        <span className="font-semibold text-slate-450">Active Stream</span>
+                        <span className="font-semibold text-slate-400">Active Stream</span>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -380,7 +374,7 @@ export default function ProjectsPage(): React.ReactElement {
                             e.stopPropagation();
                             void handleDeleteProject(project.id, project.name);
                           }}
-                          className="p-1 text-slate-600 hover:text-rose-400 transition duration-150 opacity-0 group-hover:opacity-100"
+                          className="p-1 text-slate-600 hover:text-rose-450 transition duration-150 opacity-0 group-hover:opacity-100"
                           title="Delete Project Workspace"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -401,7 +395,7 @@ export default function ProjectsPage(): React.ReactElement {
       {/* ─── UPGRADE TO PRO MODAL ────────────────────────────────────────────────── */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050607]/80 px-4 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl bg-[#0e0f12] border border-white/[0.04] shadow-2xl p-6 text-white text-center space-y-5 animate-in zoom-in-95 duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-[#17191d] border border-white/[0.04] shadow-2xl p-6 text-white text-center space-y-5 animate-in zoom-in-95 duration-150">
             <div className="flex justify-center">
               <span className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-650 flex items-center justify-center text-xl shadow-lg shadow-indigo-650/10">
                 <Crown className="h-5 w-5 text-amber-300 animate-pulse" />
@@ -428,7 +422,7 @@ export default function ProjectsPage(): React.ReactElement {
               <button
                 type="button"
                 onClick={handleProUpgrade}
-                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 py-2 text-xs font-bold shadow-lg shadow-indigo-600/10 hover:opacity-95 transition text-slate-950 font-extrabold"
+                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-650 py-2 text-xs font-bold shadow-lg shadow-indigo-650/10 hover:opacity-95 transition text-slate-950 font-extrabold"
               >
                 Upgrade Plan
               </button>
@@ -442,7 +436,7 @@ export default function ProjectsPage(): React.ReactElement {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#050607]/80 px-4 backdrop-blur-md animate-in fade-in duration-200">
           {isCompiling ? (
             /* PROGRESS LOADING SCREEN */
-            <div className="w-full max-w-sm bg-[#0e0f12] border border-white/[0.04] p-6 rounded-2xl shadow-2xl text-center space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="w-full max-w-sm bg-[#17191d] border border-white/[0.04] p-6 rounded-2xl shadow-2xl text-center space-y-5 animate-in zoom-in-95 duration-150">
               <div className="flex justify-center animate-pulse">
                 <div className="w-10 h-10 bg-indigo-600/10 rounded-full border border-indigo-500/20 flex items-center justify-center">
                   <Zap className="h-5 w-5 text-indigo-400" />
@@ -450,7 +444,7 @@ export default function ProjectsPage(): React.ReactElement {
               </div>
               <div className="space-y-1">
                 <h2 className="text-base font-bold text-white">Compiling Workspace</h2>
-                <p className="text-xs text-slate-500 h-4 truncate">{compilingStatusText}</p>
+                <p className="text-xs text-slate-400 h-4 truncate">{compilingStatusText}</p>
               </div>
               <div className="space-y-1.5">
                 <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden border border-white/[0.02]">
@@ -466,8 +460,8 @@ export default function ProjectsPage(): React.ReactElement {
               </div>
             </div>
           ) : (
-            /* NORMAL FORM WIZARD */
-            <div className="w-full max-w-xl bg-[#0e0f12] border border-white/[0.04] rounded-2xl p-6 text-white shadow-2xl relative animate-in zoom-in-95 duration-150 flex flex-col justify-between min-h-[380px]">
+            /* NORMAL FORM WIZARD (Pruned to compact minimal style) */
+            <div className="w-full max-w-md bg-[#17191d] border border-white/[0.04] rounded-2xl p-6 text-white shadow-2xl relative animate-in zoom-in-95 duration-150 flex flex-col justify-between">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
@@ -477,212 +471,65 @@ export default function ProjectsPage(): React.ReactElement {
               </button>
 
               <div className="space-y-4">
-                {/* Stepper Header / Tabs */}
-                <div className="text-left border-b border-white/[0.04] pb-3.5 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setCreationMode('quick')}
-                      className={`text-xs font-bold px-3 py-1 rounded-md transition ${creationMode === 'quick' ? 'bg-white/5 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                      Quick Create
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCreationMode('advanced')}
-                      className={`text-xs font-bold px-3 py-1 rounded-md transition ${creationMode === 'advanced' ? 'bg-white/5 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                      Advanced Setup
-                    </button>
-                  </div>
-                  {creationMode === 'advanced' && (
-                    <span className="text-[9px] font-extrabold uppercase font-mono tracking-widest text-indigo-400">Step {wizardStep} of 3</span>
-                  )}
+                <div className="text-left pb-1 border-b border-white/[0.04]">
+                  <h2 className="text-base font-semibold text-white">Create Project</h2>
+                  <p className="text-xs text-slate-400 mt-1">Start a clean delivery stream to manage milestones.</p>
                 </div>
 
-                {/* MODES: QUICK OR ADVANCED */}
-                <div className="py-2 text-left">
-                  {creationMode === 'quick' ? (
-                    <div className="space-y-4 animate-in fade-in duration-100">
-                      <div className="space-y-0.5">
-                        <h3 className="text-sm font-bold text-white">Create a new project workspace</h3>
-                        <p className="text-xs text-slate-500">Fast, streamlined setup. You will be able to edit pipeline styles inside the workspace dashboard.</p>
-                      </div>
-                      <div className="space-y-3 pt-2">
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Project Name</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Apollo Dashboard"
-                            value={wizardData.name}
-                            onChange={(e) => setWizardData({ ...wizardData, name: e.target.value })}
-                            className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Short Summary</label>
-                          <textarea
-                            placeholder="Briefly describe the objective of this workspace..."
-                            value={wizardData.summary}
-                            onChange={(e) => setWizardData({ ...wizardData, summary: e.target.value })}
-                            rows={3}
-                            className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition resize-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="animate-in fade-in duration-100">
-                      {wizardStep === 1 && (
-                        <div className="space-y-3 text-left">
-                          <div className="space-y-0.5">
-                            <h3 className="text-sm font-bold text-white">What type of project are you managing?</h3>
-                            <p className="text-xs text-slate-500">Pick a baseline stream target to configure workspace templates.</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 pt-2">
-                            {[
-                              { key: 'Client Project', icon: <Briefcase className="h-4 w-4" />, desc: 'Deliverables for clients' },
-                              { key: 'Internal Product', icon: <Layers className="h-4 w-4" />, desc: 'Core product features' },
-                              { key: 'Startup MVP', icon: <Sparkles className="h-4 w-4" />, desc: 'Rapid velocity setup' },
-                              { key: 'Other', icon: <Compass className="h-4 w-4" />, desc: 'Custom workspace deck' }
-                            ].map(opt => {
-                              const selected = wizardData.projectType === opt.key;
-                              return (
-                                <button
-                                  key={opt.key}
-                                  type="button"
-                                  onClick={() => setWizardData({ ...wizardData, projectType: opt.key })}
-                                  className={`p-3 rounded-xl border text-left flex flex-col justify-between h-20 hover:-translate-y-0.5 transition-all duration-155 relative overflow-hidden ${selected
-                                      ? 'bg-indigo-650/10 border-indigo-500'
-                                      : 'bg-slate-950/40 border-white/[0.04] hover:border-slate-800'
-                                    }`}
-                                >
-                                  <span className={`${selected ? 'text-indigo-400' : 'text-slate-500'}`}>{opt.icon}</span>
-                                  <div>
-                                    <p className="text-xs font-bold text-white leading-tight">{opt.key}</p>
-                                    <p className="text-[9px] text-slate-500 leading-none mt-0.5">{opt.desc}</p>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                <div className="space-y-3.5 text-left">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Project Name</label>
+                    <input
+                      type="text"
+                      placeholder="Your project name"
+                      value={wizardData.name}
+                      onChange={(e) => setWizardData({ ...wizardData, name: e.target.value })}
+                      className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition"
+                    />
+                  </div>
 
-                      {wizardStep === 2 && (
-                        <div className="space-y-3 text-left">
-                          <div className="space-y-0.5">
-                            <h3 className="text-sm font-bold text-white">Choose your workspace style</h3>
-                            <p className="text-xs text-slate-500">Pick a visual styling template to theme the internal board deck.</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 pt-2">
-                            {[
-                              { key: 'Minimal', desc: 'Clean slate theme, strict borders, high breathing room.' },
-                              { key: 'Professional', desc: 'Deep corporate slate, optimized high contrast layout.' },
-                              { key: 'Creative', desc: 'Subtle gradients, glowing borders, active hovers.' },
-                              { key: 'Enterprise', desc: 'Dense grids, dense columns, comprehensive widgets.' }
-                            ].map(opt => {
-                              const selected = wizardData.workspaceStyle === opt.key;
-                              return (
-                                <button
-                                  key={opt.key}
-                                  type="button"
-                                  onClick={() => setWizardData({ ...wizardData, workspaceStyle: opt.key })}
-                                  className={`p-3 rounded-xl border text-left space-y-1 hover:-translate-y-0.5 transition-all duration-155 relative ${selected
-                                      ? 'bg-indigo-650/10 border-indigo-500'
-                                      : 'bg-slate-950/40 border-white/[0.04] hover:border-slate-800'
-                                    }`}
-                                >
-                                  <p className="text-xs font-bold text-white leading-tight">{opt.key}</p>
-                                  <p className="text-[9px] text-slate-500 leading-normal">{opt.desc}</p>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Short Summary</label>
+                    <textarea
+                      placeholder="Short project summary"
+                      value={wizardData.summary}
+                      onChange={(e) => setWizardData({ ...wizardData, summary: e.target.value })}
+                      rows={3}
+                      className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition resize-none"
+                    />
+                  </div>
 
-                      {wizardStep === 3 && (
-                        <div className="space-y-4 text-left">
-                          <div className="space-y-0.5">
-                            <h3 className="text-sm font-bold text-white">Give your project a name</h3>
-                            <p className="text-xs text-slate-500">Simple, memorable names align team milestones best.</p>
-                          </div>
-                          <div className="space-y-3 pt-2">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Project Name</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Apollo Dashboard"
-                                value={wizardData.name}
-                                onChange={(e) => setWizardData({ ...wizardData, name: e.target.value })}
-                                className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Short Summary</label>
-                              <textarea
-                                placeholder="Briefly describe the objective of this workspace..."
-                                value={wizardData.summary}
-                                onChange={(e) => setWizardData({ ...wizardData, summary: e.target.value })}
-                                rows={3}
-                                className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition resize-none"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Workspace Style</label>
+                    <select
+                      value={wizardData.workspaceStyle}
+                      onChange={(e) => setWizardData({ ...wizardData, workspaceStyle: e.target.value })}
+                      className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition"
+                    >
+                      <option value="Minimal">Minimal</option>
+                      <option value="Professional">Professional</option>
+                      <option value="Creative">Creative</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Wizard Navigation / Form Submission */}
-              <div className="flex justify-between items-center mt-6 border-t border-white/[0.04] pt-4">
-                {creationMode === 'quick' ? (
-                  <>
-                    <span className="text-[10px] text-indigo-400 font-semibold cursor-pointer hover:underline" onClick={() => setCreationMode('advanced')}>
-                      Use Advanced Setup →
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleLaunchProject()}
-                      disabled={!wizardData.name.trim()}
-                      className="rounded-xl bg-indigo-650 hover:bg-indigo-600 disabled:opacity-40 disabled:pointer-events-none transition px-5 py-2 text-xs font-bold text-white flex items-center shadow-md shadow-indigo-650/5"
-                    >
-                      🚀 Create Project
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setWizardStep(prev => prev - 1)}
-                      disabled={wizardStep === 1}
-                      className="rounded-xl border border-slate-800 px-4 py-2 text-xs font-bold hover:bg-slate-900 disabled:opacity-40 disabled:pointer-events-none transition text-slate-400"
-                    >
-                      Back
-                    </button>
-                    {wizardStep < 3 ? (
-                      <button
-                        type="button"
-                        onClick={() => setWizardStep(prev => prev + 1)}
-                        className="rounded-xl bg-indigo-650 hover:bg-indigo-600 transition px-4 py-2 text-xs font-bold text-white flex items-center gap-1"
-                      >
-                        Continue <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void handleLaunchProject()}
-                        disabled={!wizardData.name.trim()}
-                        className="rounded-xl bg-indigo-600 hover:bg-indigo-550 active:scale-[0.98] disabled:opacity-45 disabled:pointer-events-none transition px-5 py-2 text-xs font-extrabold shadow-lg shadow-indigo-600/10 text-white flex items-center gap-1.5"
-                      >
-                        🚀 Compile Workspace
-                      </button>
-                    )}
-                  </>
-                )}
+              <div className="flex justify-end gap-2 mt-6 border-t border-white/[0.04] pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="rounded-xl border border-slate-800 px-4 py-2.5 text-xs font-bold hover:bg-slate-900 transition text-slate-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleLaunchProject()}
+                  disabled={!wizardData.name.trim()}
+                  className="rounded-xl bg-indigo-650 hover:bg-indigo-600 disabled:opacity-40 disabled:pointer-events-none transition px-5 py-2.5 text-xs font-bold text-white flex items-center shadow-md shadow-indigo-650/5"
+                >
+                  Create Project
+                </button>
               </div>
             </div>
           )}
