@@ -26,6 +26,8 @@ The code editor module was built to provide a lightweight, single-user, IDE-like
 - **Top Menu Bar**: Introduced a functional native-feeling top menu bar with File, Edit, View, Run, and Terminal dropdowns. 
 - **Local File & Folder Import**: Implemented direct upload from the local file system. Users can select "Open File..." or "Open Folder..." from the File menu to recursively read local directories and auto-create them inside the cloud project.
 - **Live Code Execution**: Added a dedicated "Run Code" play button. When clicked, the backend spins up child processes using language-specific compilers (Python, Node, GCC, JDK) directly inside the Docker container and streams `stdout` and `stderr` natively into the frontend Terminal panel.
+- **VS Code Extension Waitlist Modal**: Added an "Install DevCollab for VS Code" button in the Top Menu Bar. Clicking it opens a modal that interfaces directly with a new PostgreSQL `waitlist` table to securely enroll the user and instantly display their exact real-time queue position.
+- **Layout & Viewport Optimization**: Resolved a layout overflow bug by ensuring the EditorView uses `h-full` rather than `h-screen`, guaranteeing the IDE scales perfectly within the dashboard context without generating unwanted vertical scrollbars.
 
 ---
 

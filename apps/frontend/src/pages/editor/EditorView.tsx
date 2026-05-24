@@ -58,7 +58,7 @@ export default function EditorView() {
   const themeClass = settings.theme === 'vs-dark' ? 'bg-[#1e1e1e] text-[#cccccc]' : 'bg-[#fffffe] text-[#333333]';
 
   return (
-    <div className={`h-screen w-full flex flex-col ${themeClass} font-sans overflow-hidden`}>
+    <div className={`h-full w-full flex flex-col ${themeClass} font-sans overflow-hidden`}>
       <CommandPalette isOpen={showCommandPalette} onClose={() => setShowCommandPalette(false)} />
       
       {/* Top Menu Bar */}

@@ -28,8 +28,9 @@ import activityRoutes from './modules/activity/activity.routes';
 import notificationRoutes from './modules/notification/notification.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import billingRoutes from './modules/billing/billing.routes';
+import waitlistRoutes from './modules/waitlist/waitlist.routes';
 
-const fastify = Fastify({ logger: true });
+export const fastify = Fastify({ logger: true });
 
 async function bootstrap() {
   await fastify.register(cors, {
@@ -42,9 +43,10 @@ async function bootstrap() {
   });
 
   await fastify.register(multipart, {
-    limits: { fileSize: 10 * 1024 * 1024 },
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
   });
-
 
   fastify.register(authRoutes, { prefix: '/api/auth' });
   fastify.register(workspaceRoutes, { prefix: '/api/workspaces' });
@@ -58,6 +60,7 @@ async function bootstrap() {
   fastify.register(notificationRoutes, { prefix: '/api/notifications' });
   fastify.register(paymentRoutes, { prefix: '/api/payments' });
   fastify.register(billingRoutes, { prefix: '/api/billing' });
+  fastify.register(waitlistRoutes, { prefix: '/api/waitlist' });
 
   fastify.get('/api/health', async (_request, reply) => {
     return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
