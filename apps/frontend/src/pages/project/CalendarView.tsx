@@ -7,7 +7,7 @@ import { Task } from '../../types';
 import { cn } from '../../lib/utils';
 
 export default function CalendarView(): React.ReactElement {
-  const { workspaceId, pid } = useParams<{ workspaceId: string; pid: string }>();
+  const { workspaceId, projectId: pid } = useParams<{ workspaceId: string; projectId: string }>();
   const { tasks, loading, error, fetchTasksByProject } = useTaskStore();
   
   const [currentDate, setCurrentDate] = useState(new Date());

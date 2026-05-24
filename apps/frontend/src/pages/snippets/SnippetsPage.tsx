@@ -4,7 +4,7 @@ import { useSnippetStore } from '../../stores/snippetStore';
 import SnippetCard from '../../components/kanban/SnippetCard';
 
 export default function SnippetsPage(): React.ReactElement {
-  const { workspaceId, pid } = useParams<{ workspaceId: string; pid: string }>();
+  const { workspaceId, projectId: pid } = useParams<{ workspaceId: string; projectId: string }>();
   const {
     snippets,
     loading,

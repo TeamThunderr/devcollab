@@ -153,13 +153,19 @@ export default function ProjectsPage(): React.ReactElement {
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
-                    to={`/${workspaceId}/projects/${project.id}`}
+                    to={`/w/${workspaceId}/p/${project.id}/board`}
                     className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                   >
-                    Open Tasks
+                    Open Board
                   </Link>
                   <Link
-                    to={`/${workspaceId}/snippets/${project.id}`}
+                    to={`/w/${workspaceId}/p/${project.id}/editor`}
+                    className="rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100"
+                  >
+                    Open Editor
+                  </Link>
+                  <Link
+                    to={`/w/${workspaceId}/p/${project.id}/snippets`}
                     className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-100"
                   >
                     Open Snippets

@@ -59,7 +59,7 @@ export default function WorkspaceList(): React.ReactElement {
           {workspaces.map((workspace) => (
             <Link
               key={workspace.id}
-              to={`/${workspace.id}`}
+              to={`/w/${workspace.id}`}
               className="group block bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 hover:shadow-xl hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-200"
             >
               <div className="flex items-start justify-between mb-4">

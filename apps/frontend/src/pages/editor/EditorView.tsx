@@ -10,7 +10,7 @@ import useEditorStore from "../../stores/editorStore";
 import { useParams } from "react-router-dom";
 
 export default function EditorView() {
-  const { pid: projectId } = useParams();
+  const { projectId } = useParams();
   
   if (!projectId) return null;
   const { files, activeFileId, updateFile, fetchEditorState, settings } = useEditorStore();
