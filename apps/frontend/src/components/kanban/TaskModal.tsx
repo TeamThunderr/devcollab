@@ -28,6 +28,79 @@ export default function TaskModal({
   const { members } = useWorkspaceStore();
   const { user: currentUser } = useAuthStore();
 
+  const getMemberRole = (userId: string): string => {
+    try {
+      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
+      if (stored) {
+        const config = JSON.parse(stored);
+        if (config.ownerId === userId) return 'Owner';
+        if (config.projectRoles && config.projectRoles[userId]) {
+          return config.projectRoles[userId];
+        }
+      }
+    } catch {}
+    
+    // Default based on workspace role
+    const wsMember = members.find(m => m.userId === userId);
+    if (wsMember) {
+      if (wsMember.role === 'OWNER') return 'Owner';
+      if (wsMember.role === 'ADMIN') return 'Admin';
+      if (wsMember.role === 'VIEWER') return 'Viewer';
+    }
+    return 'Developer';
+  };
+
+  const hasPermission = (userId: string, permissionKey: string): boolean => {
+    const role = getMemberRole(userId);
+    if (role === 'Owner') return true;
+
+    try {
+      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
+      if (stored) {
+        const config = JSON.parse(stored);
+        if (config.rolePermissions && config.rolePermissions[role]) {
+          if (config.rolePermissions[role][permissionKey] !== undefined) {
+            return !!config.rolePermissions[role][permissionKey];
+          }
+        }
+      }
+    } catch {}
+
+    const defaultPermissions: Record<string, Record<string, boolean>> = {
+      Admin: {
+        create_task: true, edit_task: true, delete_task: true, move_task: true,
+        manage_members: true, edit_project_settings: true, access_ai: true
+      },
+      'Project Manager': {
+        create_task: true, edit_task: true, delete_task: true, move_task: true,
+        manage_members: false, edit_project_settings: true, access_ai: true
+      },
+      Developer: {
+        create_task: true, edit_task: true, delete_task: false, move_task: true,
+        manage_members: false, edit_project_settings: false, access_ai: true
+      },
+      Viewer: {
+        create_task: false, edit_task: false, delete_task: false, move_task: false,
+        manage_members: false, edit_project_settings: false, access_ai: false
+      }
+    };
+
+    return !!defaultPermissions[role]?.[permissionKey];
+  };
+
+  const isArchived = (() => {
+    try {
+      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
+      if (stored) {
+        return !!JSON.parse(stored).archived;
+      }
+    } catch {}
+    return false;
+  })();
+
+  const canEdit = currentUser && !isArchived ? hasPermission(currentUser.id, 'edit_task') : false;
+  const canDelete = currentUser && !isArchived ? hasPermission(currentUser.id, 'delete_task') : false;
+
   const [draft, setDraft] = useState(task);
   const [commentText, setCommentText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -415,7 +488,8 @@ export default function TaskModal({
                   type="text"
                   value={draft.title}
                   onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                  className="w-full mt-1.5 text-base font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500"
+                  disabled={!canEdit}
+                  className="w-full mt-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </label>
 
@@ -429,9 +503,10 @@ export default function TaskModal({
                       description: event.target.value || undefined,
                     }))
                   }
+                  disabled={!canEdit}
                   rows={4}
                   placeholder="Describe this task details..."
-                  className="w-full mt-1.5 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500 resize-none leading-relaxed"
+                  className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500 resize-none leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </label>
             </div>
@@ -463,43 +538,48 @@ export default function TaskModal({
                       <input 
                         type="checkbox" 
                         checked={item.completed} 
+                        disabled={!canEdit}
                         onChange={() => handleToggleChecklistItem(item.id)} 
-                        className="rounded text-indigo-600 bg-white dark:bg-slate-900 border-slate-350 dark:border-slate-700 h-4.5 w-4.5 cursor-pointer focus:ring-indigo-500" 
+                        className="rounded text-indigo-600 bg-white dark:bg-slate-900 border-slate-350 dark:border-slate-700 h-4.5 w-4.5 cursor-pointer focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" 
                       />
-                      <span className={`text-slate-700 dark:text-slate-200 font-semibold transition ${item.completed ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>
+                      <span className={`text-xs text-slate-700 dark:text-slate-200 font-semibold transition ${item.completed ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>
                         {item.text}
                       </span>
                     </label>
-                    <button 
-                      type="button" 
-                      onClick={() => handleDeleteChecklistItem(item.id)} 
-                      className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition text-xs"
-                      title="Remove checklist item"
-                    >
-                      ✕
-                    </button>
+                    {canEdit && (
+                      <button 
+                        type="button" 
+                        onClick={() => handleDeleteChecklistItem(item.id)} 
+                        className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition text-xs"
+                        title="Remove checklist item"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newChecklistItem}
-                  onChange={(e) => setNewChecklistItem(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddChecklistItem()}
-                  placeholder="Add a checklist task..."
-                  className="flex-1 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 transition"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddChecklistItem}
-                  disabled={!newChecklistItem.trim()}
-                  className="px-4 py-2 text-xs font-semibold bg-slate-900 dark:bg-slate-100 dark:text-slate-900 text-white rounded-xl hover:bg-slate-800 dark:hover:bg-slate-200 disabled:opacity-40 transition"
-                >
-                  Add
-                </button>
-              </div>
+              {canEdit && (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newChecklistItem}
+                    onChange={(e) => setNewChecklistItem(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddChecklistItem()}
+                    placeholder="Add a checklist task..."
+                    className="flex-1 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddChecklistItem}
+                    disabled={!newChecklistItem.trim()}
+                    className="px-4 py-2 text-xs font-semibold bg-slate-900 dark:bg-slate-100 dark:text-slate-900 text-white rounded-xl hover:bg-slate-800 dark:hover:bg-slate-200 disabled:opacity-40 transition"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Attachments Section */}
@@ -508,13 +588,15 @@ export default function TaskModal({
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                   📎 Attachments ({attachments.length})
                 </span>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:underline flex items-center gap-1"
-                >
-                  ➕ Add File
-                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:underline flex items-center gap-1"
+                  >
+                    ➕ Add File
+                  </button>
+                )}
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -544,7 +626,7 @@ export default function TaskModal({
               ) : (
                 <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
                   {attachments.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between p-2.5 border border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-900/40">
+                     <div key={file.id} className="flex items-center justify-between p-2.5 border border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-900/40">
                       <div className="min-w-0 flex items-center gap-2">
                         <span className="text-xl">📄</span>
                         <div className="min-w-0">
@@ -565,14 +647,16 @@ export default function TaskModal({
                         >
                           ⬇️
                         </a>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAttachment(file.id)}
-                          className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
-                          title="Delete"
-                        >
-                          🗑️
-                        </button>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAttachment(file.id)}
+                            className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -593,7 +677,7 @@ export default function TaskModal({
                   onChange={handleCommentChange}
                   placeholder="Add context, review notes... type '@' to mention project members"
                   rows={3}
-                  className="w-full text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500 resize-none leading-relaxed"
+                  className="w-full text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500 resize-none leading-relaxed"
                 />
 
                 {mentionQuery !== null && filteredMembers.length > 0 && (
@@ -657,194 +741,206 @@ export default function TaskModal({
                           <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                             {parts.map((part, i) => {
                               if (part.startsWith('@')) {
-                                return (
-                                  <span key={i} className="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-semibold px-1 rounded inline-block">
-                                    {part}
-                                  </span>
-                                );
-                              }
-                              return part;
-                            })}
-                          </p>
-                        </div>
-                      </article>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* Right sidebar area (Metadata Controls) */}
-          <div className="p-6 space-y-5 bg-slate-50/50 dark:bg-slate-900/20">
-            
-            <div className="space-y-4">
-              
-              {/* Status Selector */}
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Status
-                <select
-                  value={draft.status}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      status: event.target.value as TaskStatus,
-                    }))
-                  }
-                  className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500"
-                >
-                  <option value="TODO">To Do</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="IN_REVIEW">In Review</option>
-                  <option value="DONE">Done</option>
-                </select>
-              </label>
-
-              {/* Priority Selector */}
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Priority
-                <select
-                  value={draft.priority}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      priority: event.target.value as TaskPriority,
-                    }))
-                  }
-                  className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500"
-                >
-                  <option value="P0">P0 (Critical)</option>
-                  <option value="P1">P1 (High)</option>
-                  <option value="P2">P2 (Normal)</option>
-                </select>
-              </label>
-
-              {/* Assignee Selector */}
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Assignee
-                <select
-                  value={assigneeId}
-                  onChange={(e) => {
-                    setAssigneeId(e.target.value);
-                    saveLocalMetadata({ assigneeId: e.target.value });
-                  }}
-                  className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500"
-                >
-                  <option value="">Unassigned</option>
-                  {members.map((m) => (
-                    <option key={m.userId} value={m.userId}>
-                      👤 {m.user?.name || m.user?.email || 'Unnamed'} ({m.role})
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {/* Sprint Selector */}
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Sprint
-                <select
-                  value={sprintId}
-                  onChange={(e) => {
-                    setSprintId(e.target.value);
-                    saveLocalMetadata({ sprintId: e.target.value });
-                  }}
-                  className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500"
-                >
-                  <option value="">No Sprint (Backlog)</option>
-                  {activeSprintList.map((s: any) => (
-                    <option key={s.id} value={s.id}>
-                      🏃 {s.name} ({s.status.toUpperCase()})
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {/* Due Date Selector */}
-              <div className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Due date
-                <div className="mt-1.5">
-                  <DatePicker
-                    date={draft.dueDate ? new Date(draft.dueDate) : undefined}
-                    setDate={(date) =>
-                      setDraft((current) => ({
-                        ...current,
-                        dueDate: date ? date.toISOString() : undefined,
-                      }))
-                    }
-                    placeholder="Select a due date"
-                  />
+                                  return (
+                                    <span key={i} className="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-semibold px-1 rounded inline-block">
+                                      {part}
+                                    </span>
+                                  );
+                                }
+                                return part;
+                              })}
+                            </p>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
                 </div>
-              </div>
-
-              {/* Custom Tags Section */}
-              <div className="block text-xs font-semibold text-slate-500 uppercase tracking-wider space-y-2">
-                <span>Tags / Labels</span>
-                
-                {tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-2 rounded-xl">
-                    {tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-[10px] font-bold border border-indigo-100 dark:border-indigo-950/20"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTag(tag)}
-                          className="hover:text-indigo-900 text-[10px]"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-slate-400 italic">No tags added yet</p>
-                )}
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                    placeholder="tag..."
-                    className="flex-1 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddTag}
-                    className="px-2.5 py-1.5 text-xs font-semibold bg-slate-900 dark:bg-slate-200 dark:text-slate-900 text-white rounded-lg hover:bg-slate-800 transition"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
+              </section>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5">
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={isSaving}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-3 text-xs font-bold transition shadow-md"
-              >
-                {isSaving ? 'Saving...' : '💾 Save Changes'}
-              </button>
+            {/* Right sidebar area (Metadata Controls) */}
+            <div className="p-6 space-y-5 bg-slate-50/50 dark:bg-slate-900/20">
               
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={isDeleting}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 dark:border-rose-950 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100/50 transition px-4 py-3 text-xs font-bold"
-              >
-                {isDeleting ? 'Deleting...' : '🗑️ Delete Task'}
-              </button>
+              <div className="space-y-4">
+                
+                {/* Status Selector */}
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Status
+                  <select
+                    value={draft.status}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        status: event.target.value as TaskStatus,
+                      }))
+                    }
+                    className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="TODO">To Do</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="IN_REVIEW">In Review</option>
+                    <option value="DONE">Done</option>
+                  </select>
+                </label>
+
+                {/* Priority Selector */}
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Priority
+                  <select
+                    value={draft.priority}
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        priority: event.target.value as TaskPriority,
+                      }))
+                    }
+                    className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="P0">P0 (Critical)</option>
+                    <option value="P1">P1 (High)</option>
+                    <option value="P2">P2 (Normal)</option>
+                  </select>
+                </label>
+
+                {/* Assignee Selector */}
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Assignee
+                  <select
+                    value={assigneeId}
+                    disabled={!canEdit}
+                    onChange={(e) => {
+                      setAssigneeId(e.target.value);
+                      saveLocalMetadata({ assigneeId: e.target.value });
+                    }}
+                    className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        👤 {m.user?.name || m.user?.email || 'Unnamed'} ({m.role})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {/* Sprint Selector */}
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Sprint
+                  <select
+                    value={sprintId}
+                    disabled={!canEdit}
+                    onChange={(e) => {
+                      setSprintId(e.target.value);
+                      saveLocalMetadata({ sprintId: e.target.value });
+                    }}
+                    className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="">No Sprint (Backlog)</option>
+                    {activeSprintList.map((s: any) => (
+                      <option key={s.id} value={s.id}>
+                        🏃 {s.name} ({s.status.toUpperCase()})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {/* Due Date Selector */}
+                <div className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Due date
+                  <div className="mt-1.5">
+                    <DatePicker
+                      date={draft.dueDate ? new Date(draft.dueDate) : undefined}
+                      setDate={(date) =>
+                        setDraft((current) => ({
+                          ...current,
+                          dueDate: date ? date.toISOString() : undefined,
+                        }))
+                      }
+                      placeholder="Select a due date"
+                      disabled={!canEdit}
+                    />
+                  </div>
+                </div>
+
+                {/* Custom Tags Section */}
+                <div className="block text-xs font-semibold text-slate-500 uppercase tracking-wider space-y-2">
+                  <span>Tags / Labels</span>
+                  
+                  {tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-2 rounded-xl">
+                      {tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-[10px] font-bold border border-indigo-100 dark:border-indigo-950/20"
+                        >
+                          {tag}
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTag(tag)}
+                              className="hover:text-indigo-900 text-[10px]"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic">No tags added yet</p>
+                  )}
+
+                  {canEdit && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                        placeholder="tag..."
+                        className="flex-1 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTag}
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-slate-900 dark:bg-slate-200 dark:text-slate-900 text-white rounded-lg hover:bg-slate-800 transition"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5">
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSave()}
+                    disabled={isSaving}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-3 text-xs font-bold transition shadow-md"
+                  >
+                    {isSaving ? 'Saving...' : '💾 Save Changes'}
+                  </button>
+                )}
+                
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete()}
+                    disabled={isDeleting}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 dark:border-rose-950 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100/50 transition px-4 py-3 text-xs font-bold"
+                  >
+                    {isDeleting ? 'Deleting...' : '🗑️ Delete Task'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }
-

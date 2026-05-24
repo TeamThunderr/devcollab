@@ -170,7 +170,7 @@ export default function ProjectsPage(): React.ReactElement {
 
           setIsCompiling(false);
           setShowCreateModal(false);
-          navigate(`/${workspaceId}/projects/${created.id}`);
+          navigate(`/w/${workspaceId}/p/${created.id}`);
         } catch (err: any) {
           setIsCompiling(false);
           alert(`Failed to create project: ${err.message}`);
@@ -259,7 +259,7 @@ export default function ProjectsPage(): React.ReactElement {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {starredList.map(project => (
                 <Link
-                  to={`/${workspaceId}/projects/${project.id}`}
+                  to={`/w/${workspaceId}/p/${project.id}`}
                   key={`starred-${project.id}`}
                   className="glass-card smooth-lift rounded-2xl p-5 flex items-center justify-between transition-all"
                 >
@@ -325,7 +325,7 @@ export default function ProjectsPage(): React.ReactElement {
               const starred = starredProjects.includes(project.id);
               return (
                 <Link
-                  to={`/${workspaceId}/projects/${project.id}`}
+                  to={`/w/${workspaceId}/p/${project.id}`}
                   key={project.id}
                   className="glass-card smooth-lift rounded-2xl p-6 flex flex-col justify-between min-h-[190px] group transition-all duration-200"
                 >

@@ -32,7 +32,7 @@ export default function UpgradeModal({ isOpen, onClose, workspaceId, featureName
             <button
               onClick={() => {
                 onClose();
-                navigate(`/${workspaceId}/settings/billing`);
+                navigate(`/w/${workspaceId}/billing`);
               }}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
             >

@@ -80,7 +80,7 @@ export default function SnippetsPage(): React.ReactElement {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-800 p-8 text-white shadow-xl sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link to={`/${workspaceId}/projects`} className="text-sm uppercase tracking-widest text-cyan-200 hover:text-white transition">
+            <Link to={`/w/${workspaceId}/projects`} className="text-sm uppercase tracking-widest text-cyan-200 hover:text-white transition">
               ← Back to Projects
             </Link>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight">Code Snippets</h1>

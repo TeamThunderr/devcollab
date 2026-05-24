@@ -24,12 +24,12 @@ export default function WorkspaceLayout(): React.ReactElement {
   const { fetchSubscription } = useBillingStore();
 
   useEffect(() => {
-    if (workspaceId) {
+    if (isInitialized && isAuthenticated && workspaceId) {
       fetchWorkspaceDetails(workspaceId).catch(console.error);
       fetchProjects(workspaceId).catch(console.error);
       fetchSubscription(workspaceId).catch(console.error);
     }
-  }, [workspaceId, fetchWorkspaceDetails, fetchProjects, fetchSubscription]);
+  }, [workspaceId, isInitialized, isAuthenticated, fetchWorkspaceDetails, fetchProjects, fetchSubscription]);
 
   if (!isInitialized) {
     return (
