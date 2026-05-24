@@ -1,10 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import useEditorStore from "../../stores/editorStore";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 export default function TopMenuBar() {
   const { 
-    updateSettings, 
     updateLayout, 
     settings, 
     executeCode, 
@@ -14,8 +13,7 @@ export default function TopMenuBar() {
     layout 
   } = useEditorStore();
   
-  const { pid: projectId, workspaceId } = useParams();
-  const navigate = useNavigate();
+  const { projectId } = useParams();
   
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);

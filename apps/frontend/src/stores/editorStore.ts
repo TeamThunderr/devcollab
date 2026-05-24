@@ -38,7 +38,7 @@ interface EditorState {
     sidebarWidth: number;
     bottomPanelHeight: number;
     activityBarActive: 'explorer' | 'search' | 'source-control';
-    bottomPanelActive: 'terminal' | 'output' | 'problems' | null;
+    bottomPanelActive: 'terminal' | 'output' | 'problems' | 'debug' | null;
   };
   terminalHistory: string[];
   terminalOutput: TerminalOutput[];

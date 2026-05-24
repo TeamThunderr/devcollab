@@ -13,7 +13,7 @@ function fileIcon(language: string): string {
 
 export default function EditorTabs() {
   const { files, openTabs, activeFileId, openTab, closeTab } = useEditorStore();
-  const { pid: projectId } = useParams();
+  const { projectId } = useParams();
   
   const openFiles = openTabs.map(id => files.find(f => f.id === id)).filter(Boolean) as typeof files;
 

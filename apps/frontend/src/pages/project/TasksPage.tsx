@@ -21,7 +21,7 @@ function isTaskStatus(value: string): value is TaskStatus {
 }
 
 export default function TasksPage(): React.ReactElement {
-  const { workspaceId, pid } = useParams<{ workspaceId: string; pid: string }>();
+  const { workspaceId, projectId: pid } = useParams<{ workspaceId: string; projectId: string }>();
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
   const { members } = useWorkspaceStore();
   const { user } = useAuthStore();

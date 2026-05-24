@@ -35,7 +35,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     ref
   ) => {
     const { settings } = useEditorStore();
-    const { pid: projectId } = useParams();
+    const { projectId } = useParams();
     const [content, setContent] = useState(initialContent);
     const [isDirty, setIsDirty] = useState(false);
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -1,0 +1,265 @@
+/**
+ * src/components/sidebar/MainSidebar.tsx
+ *
+ * Dynamic sidebar. Uses URL params to decide which navigation level to render:
+ *   Condition A — workspaceId exists, projectId does NOT → Workspace nav
+ *   Condition B — both workspaceId AND projectId exist   → Project nav
+ */
+
+import React from "react";
+import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
+import useWorkspaceStore from "../../stores/workspaceStore";
+import { useProjectStore } from "../../stores/projectStore";
+import useAuthStore from "../../stores/authStore";
+import { useBillingStore } from "../../stores/billingStore";
+import SubscriptionBadge from "../billing/SubscriptionBadge";
+
+// ─── Nav item types ───────────────────────────────────────────────────────────
+
+interface NavItem {
+  label: string;
+  to: string;
+  icon: React.ReactElement;
+  exact?: boolean;
+}
+
+// ─── Icon helpers ─────────────────────────────────────────────────────────────
+
+const Icon = ({ d, ...rest }: { d: string; className?: string }) => (
+  <svg
+    className={rest.className ?? "w-4 h-4"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    aria-hidden="true"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d={d} />
+  </svg>
+);
+
+const ICONS = {
+  dashboard: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
+  projects:  "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z",
+  members:   "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
+  billing:   "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
+  board:     "M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2",
+  wiki:      "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
+  snippets:  "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
+  editor:    "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
+  ai:        "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+  activity:  "M13 10V3L4 14h7v7l9-11h-7z",
+  back:      "M10 19l-7-7m0 0l7-7m-7 7h18",
+};
+
+// ─── Link component ───────────────────────────────────────────────────────────
+
+function SidebarNavLink({ item }: { item: NavItem }) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.exact}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 group
+         ${isActive
+           ? "bg-slate-700 text-white"
+           : "text-slate-400 hover:text-white hover:bg-slate-800"
+         }`
+      }
+    >
+      <span className="flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+        {item.icon}
+      </span>
+      {item.label}
+    </NavLink>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function MainSidebar(): React.ReactElement {
+  const { workspaceId, projectId } = useParams<{
+    workspaceId?: string;
+    projectId?: string;
+  }>();
+
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+  const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
+  const projects = useProjectStore((s) => s.projects);
+  const { subscription } = useBillingStore();
+
+  const activeProject = projects.find((p) => p.id === projectId);
+
+  // ── Condition B: Project-level navigation ────────────────────────────────
+  if (workspaceId && projectId) {
+    const projectNav: NavItem[] = [
+      {
+        label: "Board",
+        to: `/w/${workspaceId}/p/${projectId}/board`,
+        icon: <Icon d={ICONS.board} />,
+        exact: true,
+      },
+      {
+        label: "Wiki",
+        to: `/w/${workspaceId}/p/${projectId}/wiki`,
+        icon: <Icon d={ICONS.wiki} />,
+      },
+      {
+        label: "Snippets",
+        to: `/w/${workspaceId}/p/${projectId}/snippets`,
+        icon: <Icon d={ICONS.snippets} />,
+      },
+      {
+        label: "Editor",
+        to: `/w/${workspaceId}/p/${projectId}/editor`,
+        icon: <Icon d={ICONS.editor} />,
+      },
+    ];
+
+    return (
+      <aside className="flex flex-col w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 h-full">
+        {/* Back to workspace */}
+        <div className="px-3 pt-4 pb-3 border-b border-slate-800">
+          <button
+            onClick={() => navigate(`/w/${workspaceId}/projects`)}
+            className="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors group w-full"
+          >
+            <Icon d={ICONS.back} className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            Back to Workspace
+          </button>
+        </div>
+
+        {/* Project header */}
+        <div className="px-4 py-4 border-b border-slate-800">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold mb-2 shadow-sm">
+            {(activeProject?.name ?? "P").substring(0, 2).toUpperCase()}
+          </div>
+          <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Project</p>
+          <h2 className="text-sm font-bold text-white mt-0.5 truncate" title={activeProject?.name}>
+            {activeProject?.name ?? "Loading…"}
+          </h2>
+        </div>
+
+        {/* Project nav */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+          {projectNav.map((item) => (
+            <SidebarNavLink key={item.label} item={item} />
+          ))}
+        </nav>
+
+        {/* User footer */}
+        <UserFooter user={user} onLogout={async () => { await logout(); navigate("/login"); }} />
+      </aside>
+    );
+  }
+
+  // ── Condition A: Workspace-level navigation ──────────────────────────────
+  const workspaceNav: NavItem[] = workspaceId
+    ? [
+        {
+          label: "Overview",
+          to: `/w/${workspaceId}`,
+          icon: <Icon d={ICONS.dashboard} />,
+          exact: true,
+        },
+        {
+          label: "Projects",
+          to: `/w/${workspaceId}/projects`,
+          icon: <Icon d={ICONS.projects} />,
+        },
+        {
+          label: "Members",
+          to: `/w/${workspaceId}/members`,
+          icon: <Icon d={ICONS.members} />,
+        },
+        {
+          label: "Billing",
+          to: `/w/${workspaceId}/billing`,
+          icon: <Icon d={ICONS.billing} />,
+        },
+      ]
+    : [];
+
+  return (
+    <aside className="flex flex-col w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 h-full">
+      {/* Logo — always routes to /workspaces */}
+      <div className="px-4 py-4 border-b border-slate-800 flex items-center justify-between">
+        <Link to="/workspaces" className="flex items-center gap-2 group">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+            <span className="text-white text-xs font-black">DC</span>
+          </div>
+          <span className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
+            DevCollab
+          </span>
+        </Link>
+        {subscription?.plan === "PRO" && <SubscriptionBadge plan="PRO" />}
+      </div>
+
+      {/* ← All Workspaces back link */}
+      <div className="px-3 pt-3 pb-2">
+        <Link
+          to="/workspaces"
+          className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-200 transition-colors group w-fit"
+        >
+          <svg className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          All Workspaces
+        </Link>
+      </div>
+
+      {/* Workspace header */}
+      {activeWorkspace && (
+        <div className="px-4 py-2.5 border-b border-slate-800">
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-0.5">
+            Workspace
+          </p>
+          <h2 className="text-sm font-bold text-white truncate" title={activeWorkspace.name}>
+            {activeWorkspace.name}
+          </h2>
+        </div>
+      )}
+
+      {/* Workspace nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+        {workspaceNav.map((item) => (
+          <SidebarNavLink key={item.label} item={item} />
+        ))}
+      </nav>
+
+      {/* User footer */}
+      <UserFooter user={user} onLogout={async () => { await logout(); navigate("/login"); }} />
+    </aside>
+  );
+}
+
+// ─── Shared footer ────────────────────────────────────────────────────────────
+
+function UserFooter({
+  user,
+  onLogout,
+}: {
+  user: { name?: string | null; email: string } | null;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="px-3 py-3 border-t border-slate-800 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          {(user?.name ?? user?.email ?? "U").substring(0, 1).toUpperCase()}
+        </div>
+        <span className="text-xs text-slate-400 truncate">{user?.name ?? user?.email}</span>
+      </div>
+      <button
+        onClick={onLogout}
+        title="Logout"
+        className="text-slate-500 hover:text-white transition-colors flex-shrink-0"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+      </button>
+    </div>
+  );
+}
