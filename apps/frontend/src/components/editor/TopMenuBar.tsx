@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import useEditorStore from "../../stores/editorStore";
 import { useParams, useNavigate } from "react-router-dom";
+import api from "../../lib/axios";
 
 export default function TopMenuBar() {
   const { 
@@ -18,9 +19,26 @@ export default function TopMenuBar() {
   const navigate = useNavigate();
   
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [showVSCodeModal, setShowVSCodeModal] = useState(false);
+  const [hasJoinedWaitlist, setHasJoinedWaitlist] = useState(false);
+  const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
+  const [isJoiningWaitlist, setIsJoiningWaitlist] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const activeFile = files.find(f => f.id === activeFileId);
+
+  const handleJoinWaitlist = async () => {
+    setIsJoiningWaitlist(true);
+    try {
+      const response = await api.post('/api/waitlist/join');
+      setWaitlistPosition(response.data.position);
+      setHasJoinedWaitlist(true);
+    } catch (e) {
+      console.error("Failed to join waitlist:", e);
+    } finally {
+      setIsJoiningWaitlist(false);
+    }
+  }
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -282,7 +300,13 @@ export default function TopMenuBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pr-2">
+         <button 
+           onClick={() => setShowVSCodeModal(true)}
+           className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium transition-colors border border-blue-500 shadow-sm whitespace-nowrap"
+         >
+           Install DevCollab for VS Code
+         </button>
          {/* Layout toggle icons */}
          <button className="hover:bg-white/10 p-1 rounded" title="Toggle Panel" onClick={() => {
            updateLayout(projectId!, { bottomPanelActive: layout.bottomPanelActive ? null : 'terminal' })
@@ -290,6 +314,62 @@ export default function TopMenuBar() {
            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="15" x2="21" y2="15"></line></svg>
          </button>
       </div>
+
+      {showVSCodeModal && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-[#1e1e1e] border border-[#333] rounded-xl p-8 max-w-md w-full shadow-2xl relative">
+            <button 
+              onClick={() => {
+                setShowVSCodeModal(false);
+                setTimeout(() => setHasJoinedWaitlist(false), 300);
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-blue-600/20 text-blue-500 rounded-full flex items-center justify-center mb-6">
+                {hasJoinedWaitlist ? (
+                  <svg className="w-8 h-8 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                ) : (
+                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 0l-12.5 4.5v15l12.5 4.5 6.5-5v-14l-6.5-5zM2 6.5l3.5-1.5v14l-3.5-1.5v-11z"/></svg>
+                )}
+              </div>
+              <h2 className="text-xl font-bold text-white mb-3">
+                {hasJoinedWaitlist ? "You're on the list!" : "DevCollab VS Code Extension"}
+              </h2>
+              <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+                {hasJoinedWaitlist ? (
+                  <>
+                    Awesome! You've successfully joined the waitlist. <br/><br/>
+                    There are currently <span className="text-white font-bold bg-white/10 px-2 py-0.5 rounded">{waitlistPosition?.toLocaleString() ?? "1,428"}</span> people ahead of you in the queue. We'll notify you when your turn arrives!
+                  </>
+                ) : (
+                  "DevCollab VS Code Extension is currently in closed beta. Join the waitlist to sync your local editor directly with your workspace!"
+                )}
+              </p>
+              {hasJoinedWaitlist ? (
+                <button 
+                  onClick={() => {
+                    setShowVSCodeModal(false);
+                  }}
+                  className="w-full py-2.5 bg-[#333] hover:bg-[#444] text-white rounded-lg font-medium transition-colors"
+                >
+                  Close
+                </button>
+              ) : (
+                <button 
+                  onClick={handleJoinWaitlist}
+                  disabled={isJoiningWaitlist}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/20"
+                >
+                  {isJoiningWaitlist ? "Joining..." : "Join Waitlist"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
