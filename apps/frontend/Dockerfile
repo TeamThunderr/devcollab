@@ -2,6 +2,7 @@ FROM node:22-alpine AS base
 WORKDIR /app
 
 FROM base AS deps
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
