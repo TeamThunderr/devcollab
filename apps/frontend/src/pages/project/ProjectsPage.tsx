@@ -4,8 +4,8 @@ import { useProjectStore } from '../../stores/projectStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
 import { useBillingStore } from '../../stores/billingStore';
-import { 
-  Search, Plus, Sparkles, Star, Users, Trash2, Crown, 
+import {
+  Search, Plus, Sparkles, Star, Users, Trash2, Crown,
   Zap, Compass, Briefcase, Layers, ChevronRight, X
 } from 'lucide-react';
 
@@ -67,7 +67,7 @@ export default function ProjectsPage(): React.ReactElement {
   // Filter projects by search
   const filteredProjects = useMemo(() => {
     if (!searchQuery.trim()) return projects;
-    return projects.filter(p => 
+    return projects.filter(p =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
     );
@@ -149,19 +149,19 @@ export default function ProjectsPage(): React.ReactElement {
             ],
             sprints: [],
             activities: [
-              { 
-                id: `act-${Date.now()}`, 
-                userName: user?.name || 'Owner', 
-                details: `created project "${projectName}"`, 
-                timestamp: new Date().toISOString() 
+              {
+                id: `act-${Date.now()}`,
+                userName: user?.name || 'Owner',
+                details: `created project "${projectName}"`,
+                timestamp: new Date().toISOString()
               }
             ],
             notifications: [
-              { 
-                id: `notif-${Date.now()}`, 
-                message: `🚀 Welcome to the new project workspace "${projectName}"!`, 
-                read: false, 
-                timestamp: new Date().toISOString() 
+              {
+                id: `notif-${Date.now()}`,
+                message: `🚀 Welcome to the new project workspace "${projectName}"!`,
+                read: false,
+                timestamp: new Date().toISOString()
               }
             ]
           };
@@ -337,11 +337,10 @@ export default function ProjectsPage(): React.ReactElement {
                       <button
                         type="button"
                         onClick={(e) => toggleStar(project.id, e)}
-                        className={`p-1.5 rounded-lg border transition-all ${
-                          starred 
-                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+                        className={`p-1.5 rounded-lg border transition-all ${starred
+                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                             : 'border-white/[0.04] hover:border-slate-800 text-slate-500 hover:text-slate-300'
-                        }`}
+                          }`}
                       >
                         <Star className={`h-3.5 w-3.5 ${starred ? 'fill-current' : ''}`} />
                       </button>
@@ -360,8 +359,8 @@ export default function ProjectsPage(): React.ReactElement {
                         <span>{project._count?.tasks ?? 0} Tasks</span>
                       </div>
                       <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden border border-white/[0.02]">
-                        <div 
-                          className="h-full bg-indigo-500 rounded-full transition-all duration-300" 
+                        <div
+                          className="h-full bg-indigo-500 rounded-full transition-all duration-300"
                           style={{ width: project._count?.tasks ? '65%' : '0%' }}
                         ></div>
                       </div>
@@ -455,7 +454,7 @@ export default function ProjectsPage(): React.ReactElement {
               </div>
               <div className="space-y-1.5">
                 <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden border border-white/[0.02]">
-                  <div 
+                  <div
                     className="h-full bg-indigo-500 rounded-full transition-all duration-300"
                     style={{ width: `${compilingProgress}%` }}
                   ></div>
@@ -469,8 +468,8 @@ export default function ProjectsPage(): React.ReactElement {
           ) : (
             /* NORMAL FORM WIZARD */
             <div className="w-full max-w-xl bg-[#0e0f12] border border-white/[0.04] rounded-2xl p-6 text-white shadow-2xl relative animate-in zoom-in-95 duration-150 flex flex-col justify-between min-h-[380px]">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setShowCreateModal(false)}
                 className="absolute top-4 right-4 text-slate-500 hover:text-white transition"
               >
@@ -553,11 +552,10 @@ export default function ProjectsPage(): React.ReactElement {
                                   key={opt.key}
                                   type="button"
                                   onClick={() => setWizardData({ ...wizardData, projectType: opt.key })}
-                                  className={`p-3 rounded-xl border text-left flex flex-col justify-between h-20 hover:-translate-y-0.5 transition-all duration-155 relative overflow-hidden ${
-                                    selected 
-                                      ? 'bg-indigo-650/10 border-indigo-500' 
+                                  className={`p-3 rounded-xl border text-left flex flex-col justify-between h-20 hover:-translate-y-0.5 transition-all duration-155 relative overflow-hidden ${selected
+                                      ? 'bg-indigo-650/10 border-indigo-500'
                                       : 'bg-slate-950/40 border-white/[0.04] hover:border-slate-800'
-                                  }`}
+                                    }`}
                                 >
                                   <span className={`${selected ? 'text-indigo-400' : 'text-slate-500'}`}>{opt.icon}</span>
                                   <div>
@@ -590,11 +588,10 @@ export default function ProjectsPage(): React.ReactElement {
                                   key={opt.key}
                                   type="button"
                                   onClick={() => setWizardData({ ...wizardData, workspaceStyle: opt.key })}
-                                  className={`p-3 rounded-xl border text-left space-y-1 hover:-translate-y-0.5 transition-all duration-155 relative ${
-                                    selected 
-                                      ? 'bg-indigo-650/10 border-indigo-500' 
+                                  className={`p-3 rounded-xl border text-left space-y-1 hover:-translate-y-0.5 transition-all duration-155 relative ${selected
+                                      ? 'bg-indigo-650/10 border-indigo-500'
                                       : 'bg-slate-950/40 border-white/[0.04] hover:border-slate-800'
-                                  }`}
+                                    }`}
                                 >
                                   <p className="text-xs font-bold text-white leading-tight">{opt.key}</p>
                                   <p className="text-[9px] text-slate-500 leading-normal">{opt.desc}</p>

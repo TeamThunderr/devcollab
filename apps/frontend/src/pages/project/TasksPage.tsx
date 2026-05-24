@@ -10,8 +10,8 @@ import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { Task, TaskStatus, TaskPriority } from '../../types';
-import { 
-  Search, Plus, Clock, Bot, Calendar, 
+import {
+  Search, Plus, Clock, Bot, Calendar,
   TrendingUp, ArrowLeft, ChevronRight, CheckCircle2, Layers, Sparkles
 } from 'lucide-react';
 
@@ -38,7 +38,7 @@ export default function TasksPage(): React.ReactElement {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Create Task Form States
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
@@ -124,11 +124,11 @@ export default function TasksPage(): React.ReactElement {
     updateProjectConfig(prev => ({
       ...prev,
       activities: [
-        { 
-          id: `act-${Date.now()}`, 
-          userName: user?.name || 'Workspace Member', 
-          details, 
-          timestamp: new Date().toISOString() 
+        {
+          id: `act-${Date.now()}`,
+          userName: user?.name || 'Workspace Member',
+          details,
+          timestamp: new Date().toISOString()
         },
         ...(prev.activities || [])
       ]
@@ -150,7 +150,7 @@ export default function TasksPage(): React.ReactElement {
 
       setLocalTasks(prev => [added, ...prev]);
       logActivity(`created task: "${taskTitle.trim()}"`);
-      
+
       // Reset form
       setTaskTitle('');
       setTaskDesc('');
@@ -244,7 +244,7 @@ export default function TasksPage(): React.ReactElement {
 
   const filteredKanbanTasks = useMemo(() => {
     if (!searchQuery.trim()) return localTasks;
-    return localTasks.filter(t => 
+    return localTasks.filter(t =>
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
     );
@@ -308,11 +308,10 @@ export default function TasksPage(): React.ReactElement {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold border border-transparent transition-all ${
-                activeTab === tab.id 
-                  ? 'tab-pill-active font-black' 
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold border border-transparent transition-all ${activeTab === tab.id
+                  ? 'tab-pill-active font-black'
                   : 'text-slate-500 hover:text-slate-300'
-              }`}
+                }`}
             >
               {tab.icon}
               <span>{tab.label}</span>
@@ -381,13 +380,12 @@ export default function TasksPage(): React.ReactElement {
                           <span className="text-xs font-bold text-slate-200 truncate">{task.title}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 border rounded ${
-                            task.priority === 'P0' 
-                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' 
+                          <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 border rounded ${task.priority === 'P0'
+                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
                               : task.priority === 'P1'
                                 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                                 : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                          }`}>
+                            }`}>
                             {task.priority}
                           </span>
                           <span className="text-[8px] uppercase font-mono px-1.5 py-0.5 border border-white/[0.04] bg-slate-950 rounded text-slate-500">
@@ -495,11 +493,10 @@ export default function TasksPage(): React.ReactElement {
                       <div key={col.id} className="board-lane border border-white/[0.03] rounded-2xl p-4 flex flex-col justify-start w-[310px] sm:w-[340px] flex-shrink-0 shadow-sm relative">
                         <div className="board-lane-sticky py-2.5 mb-3 flex items-center justify-between border-b border-white/[0.04]">
                           <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${
-                              col.id === 'TODO' ? 'bg-slate-400' :
-                              col.id === 'IN_PROGRESS' ? 'bg-sky-400' :
-                              col.id === 'IN_REVIEW' ? 'bg-amber-400' : 'bg-emerald-500'
-                            }`}></span>
+                            <span className={`w-2 h-2 rounded-full ${col.id === 'TODO' ? 'bg-slate-400' :
+                                col.id === 'IN_PROGRESS' ? 'bg-sky-400' :
+                                  col.id === 'IN_REVIEW' ? 'bg-amber-400' : 'bg-emerald-500'
+                              }`}></span>
                             <h3 className="text-[10px] font-extrabold text-white uppercase tracking-wider">{col.title}</h3>
                           </div>
                           <span className="text-[9px] font-bold font-mono px-2 py-0.5 bg-black/30 border border-white/[0.04] rounded text-slate-500">
@@ -590,7 +587,7 @@ export default function TasksPage(): React.ReactElement {
                 <Bot className="h-4 w-4 text-indigo-400" /> AI Copilot
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed font-medium">Use structured pipelines to instantly draft milestone subtasks or synthesize delivery reports.</p>
-              
+
               <div className="space-y-3.5 pt-1.5 border-t border-white/[0.04]">
                 <button type="button" onClick={handleAISummarizeProgress} disabled={aiLoading} className="w-full text-left p-3 border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] rounded-xl transition text-[11px] font-bold text-slate-300 flex items-center justify-between">
                   <span>📊 Synthesize Stream Status</span>
@@ -620,7 +617,7 @@ export default function TasksPage(): React.ReactElement {
             {/* Output screen */}
             <div className="glass-panel p-5 rounded-2xl shadow-sm lg:col-span-2 space-y-4 min-h-[280px] flex flex-col">
               <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Copilot Output</h3>
-              
+
               {aiLoading ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-500 py-12 gap-2 animate-pulse">
                   <Bot className="h-8 w-8 text-indigo-500 animate-bounce" />
@@ -636,13 +633,12 @@ export default function TasksPage(): React.ReactElement {
                     <div key={i} className="p-3 border border-white/[0.04] rounded-xl bg-white/[0.005] flex justify-between items-center text-xs gap-4 hover:border-slate-800 transition animate-in fade-in duration-100">
                       <div className="min-w-0 text-left">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border ${
-                            sug.priority === 'P0' 
-                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' 
-                              : sug.priority === 'P1' 
-                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+                          <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border ${sug.priority === 'P0'
+                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                              : sug.priority === 'P1'
+                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                                 : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                          }`}>
+                            }`}>
                             {sug.priority}
                           </span>
                           <h4 className="font-bold text-white truncate">{sug.title}</h4>
