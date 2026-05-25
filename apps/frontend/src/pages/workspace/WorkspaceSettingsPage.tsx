@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Navigate } from "react-router-dom";
 import useAuthStore from "../../stores/authStore";
 import useWorkspaceStore from "../../stores/workspaceStore";
 import { WorkspaceRole } from "../../types";
 import InviteMemberModal from "../../components/workspace/InviteMemberModal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import { canAccessSettings, canManageMembers as checkCanManageMembers } from "../../lib/permissions";
 
 const ROLE_BADGES: Record<WorkspaceRole, string> = {
   OWNER: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800",
@@ -13,7 +14,7 @@ const ROLE_BADGES: Record<WorkspaceRole, string> = {
   VIEWER: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700",
 };
 
-export default function WorkspaceDashboard(): React.ReactElement {
+export default function WorkspaceSettingsPage(): React.ReactElement {
   const { workspaceId } = useParams();
   const { user } = useAuthStore();
   const { activeWorkspace, members, isLoading, fetchWorkspaceDetails, updateMemberRole, removeMember } = useWorkspaceStore();
@@ -30,7 +31,8 @@ export default function WorkspaceDashboard(): React.ReactElement {
   // Determine current user's permissions
   const currentUserMember = members.find((m) => m.userId === user?.id);
   const userRole = currentUserMember?.role || 'VIEWER';
-  const canManageMembers = userRole === 'OWNER' || userRole === 'ADMIN';
+  const canManageMembers = checkCanManageMembers(userRole);
+  const isAllowed = canAccessSettings(userRole);
 
   const handleUpdateRole = async (memberId: string, newRole: WorkspaceRole) => {
     if (!workspaceId) return;
@@ -71,6 +73,11 @@ export default function WorkspaceDashboard(): React.ReactElement {
         Workspace not found or you don't have access.
       </div>
     );
+  }
+
+  // Prevent members/viewers from accessing settings
+  if (!isAllowed && !isLoading && members.length > 0) {
+    return <Navigate to={`/w/${workspaceId}`} replace />;
   }
 
   return (

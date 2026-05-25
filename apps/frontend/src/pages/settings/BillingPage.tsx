@@ -1,15 +1,16 @@
 import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Navigate } from 'react-router-dom';
 import { useBillingStore } from '../../stores/billingStore';
 import useAuthStore from '../../stores/authStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import PricingCard from '../../components/billing/PricingCard';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import { canManageBilling } from '../../lib/permissions';
 
 export default function BillingPage(): React.ReactElement {
   const { workspaceId } = useParams();
   const { user } = useAuthStore();
-  const { activeWorkspace, fetchWorkspaceDetails } = useWorkspaceStore();
+  const { activeWorkspace, members, fetchWorkspaceDetails } = useWorkspaceStore();
   
   const { 
     subscription, 
@@ -35,6 +36,14 @@ export default function BillingPage(): React.ReactElement {
         <LoadingSpinner size="lg" />
       </div>
     );
+  }
+
+  const currentUserMember = members.find((m) => m.userId === user?.id);
+  const userRole = currentUserMember?.role || 'VIEWER';
+  const isAllowed = canManageBilling(userRole);
+
+  if (!isAllowed && members.length > 0) {
+    return <Navigate to={`/w/${workspaceId}`} replace />;
   }
 
   const currentPlan = subscription?.plan || 'FREE';

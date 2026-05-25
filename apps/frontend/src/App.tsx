@@ -11,9 +11,11 @@ import ProjectLayout from "./layouts/ProjectLayout";
 // ─── Auth pages ───────────────────────────────────────────────────────────────
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 // ─── Global pages ─────────────────────────────────────────────────────────────
 import WorkspaceList from "./pages/workspace/WorkspaceList";
+import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
 
 // ─── Workspace pages ──────────────────────────────────────────────────────────
 import WorkspaceOverview from "./pages/workspace/WorkspaceOverview";
@@ -61,9 +63,13 @@ function App(): React.ReactElement {
           <Route path="/register" element={<RegisterPage />} />
         </Route>
 
+        {/* Public Invite Accept Route */}
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
+
         {/* ── Global protected shell: /workspaces ── */}
         <Route element={<GlobalLayout />}>
           <Route path="/workspaces" element={<WorkspaceList />} />
+          <Route path="/onboarding/create-workspace" element={<CreateWorkspaceOnboardingPage />} />
         </Route>
 
         {/* ── Workspace-level routes: /w/:workspaceId/* ── */}

@@ -48,11 +48,16 @@ export const billingService = {
       throw new AppError(400, 'Workspace is already on PRO plan');
     }
 
-    const order = await razorpay.orders.create({
-      amount: PRO_PLAN_PRICE * 100,
-      currency: CURRENCY,
-      receipt: `receipt_${data.workspaceId}_${Date.now()}`,
-    });
+    let order;
+    try {
+      order = await razorpay.orders.create({
+        amount: PRO_PLAN_PRICE * 100,
+        currency: CURRENCY,
+        receipt: `rcpt_${data.workspaceId.substring(0, 8)}_${Date.now()}`,
+      });
+    } catch (err: any) {
+      throw new AppError(400, `Payment gateway error: ${err.error?.description || err.message || 'Failed to create order'}`);
+    }
 
     return {
       id: order.id,

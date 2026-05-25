@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import useAuthStore from "../../stores/authStore";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 
 export default function RegisterPage(): React.ReactElement {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromState = location.state?.from;
+  const from = typeof fromState === 'string' ? fromState : (fromState?.pathname || "/");
   const { register, isLoading, error } = useAuthStore();
 
   const [name, setName] = useState("");
@@ -15,7 +18,7 @@ export default function RegisterPage(): React.ReactElement {
     e.preventDefault();
     try {
       await register(email, password, name || undefined);
-      navigate("/");
+      navigate(from, { replace: true });
     } catch (err) {
       // Error handled by store
     }

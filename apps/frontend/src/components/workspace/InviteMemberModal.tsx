@@ -18,12 +18,14 @@ const ROLES: { value: WorkspaceRole; label: string; description: string }[] = [
 export default function InviteMemberModal({ isOpen, onClose, workspaceId }: InviteMemberModalProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<WorkspaceRole>('MEMBER');
+  const [isSuccess, setIsSuccess] = useState(false);
   const { inviteMember, isLoading, error, clearError } = useWorkspaceStore();
 
   useEffect(() => {
     if (isOpen) {
       setEmail('');
       setRole('MEMBER');
+      setIsSuccess(false);
       clearError();
     }
   }, [isOpen, clearError]);
@@ -34,7 +36,10 @@ export default function InviteMemberModal({ isOpen, onClose, workspaceId }: Invi
 
     try {
       await inviteMember(workspaceId, email, role);
-      onClose();
+      setIsSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (err) {
       // Error handled by store
     }
@@ -59,7 +64,22 @@ export default function InviteMemberModal({ isOpen, onClose, workspaceId }: Invi
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {isSuccess ? (
+            <div className="flex flex-col items-center py-8">
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 mb-4">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">
+                Invite Sent!
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-2">
+                We've sent an invitation email to {email}.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email Address
@@ -135,6 +155,7 @@ export default function InviteMemberModal({ isOpen, onClose, workspaceId }: Invi
               </button>
             </div>
           </form>
+          )}
         </div>
       </div>
     </div>

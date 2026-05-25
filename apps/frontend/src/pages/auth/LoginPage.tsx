@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import useAuthStore from "../../stores/authStore";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 
 export default function LoginPage(): React.ReactElement {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromState = location.state?.from;
+  const from = typeof fromState === 'string' ? fromState : (fromState?.pathname || "/");
   const { login, isLoading, error } = useAuthStore();
 
   const [email, setEmail] = useState("");
@@ -14,7 +17,7 @@ export default function LoginPage(): React.ReactElement {
     e.preventDefault();
     try {
       await login(email, password);
-      navigate("/");
+      navigate(from, { replace: true });
     } catch (err) {
       // Error is handled by the store
     }
