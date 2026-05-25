@@ -56,6 +56,12 @@ function mapTask(task: any) {
       email: task.creator_email,
       name: task.creator_name,
     } : undefined,
+    assigneeId: task.assignee_id ?? undefined,
+    assignee: task.assignee_id ? {
+      id: task.assignee_id,
+      email: task.assignee_email,
+      name: task.assignee_name,
+    } : undefined,
     comments: comments.map(mapComment),
   };
 }
@@ -85,9 +91,9 @@ export class TaskService {
   async createTask(data: CreateTaskInput, userId: string) {
     await requireProjectAccess(userId, data.projectId);
     const result = await query(
-      `INSERT INTO tasks (title, description, status, priority, due_date, project_id, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, title, description, status, priority, due_date, project_id, created_by, created_at, updated_at`,
+      `INSERT INTO tasks (title, description, status, priority, due_date, project_id, created_by, assignee_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, title, description, status, priority, due_date, project_id, created_by, assignee_id, created_at, updated_at`,
       [
         data.title,
         data.description ?? null,
@@ -96,6 +102,7 @@ export class TaskService {
         data.dueDate ? new Date(data.dueDate) : null,
         data.projectId,
         userId,
+        data.assigneeId ?? null,
       ]
     );
     return mapTask({ ...result.rows[0], comments: [] });
@@ -117,9 +124,11 @@ export class TaskService {
     }
 
     const result = await query(
-      `SELECT t.*, u.email AS creator_email, u.name AS creator_name
+      `SELECT t.*, u.email AS creator_email, u.name AS creator_name,
+              a.email AS assignee_email, a.name AS assignee_name
        FROM tasks t
        JOIN users u ON u.id = t.created_by
+       LEFT JOIN users a ON a.id = t.assignee_id
        WHERE ${where.join(' AND ')}
        ORDER BY t.created_at DESC`,
       params
@@ -130,9 +139,11 @@ export class TaskService {
 
   async getTaskById(taskId: string, userId: string) {
     const result = await query(
-      `SELECT t.*, u.email AS creator_email, u.name AS creator_name
+      `SELECT t.*, u.email AS creator_email, u.name AS creator_name,
+              a.email AS assignee_email, a.name AS assignee_name
        FROM tasks t
        JOIN users u ON u.id = t.created_by
+       LEFT JOIN users a ON a.id = t.assignee_id
        WHERE t.id = $1`,
       [taskId]
     );
@@ -160,9 +171,10 @@ export class TaskService {
            status = COALESCE($4::task_status, status),
            priority = COALESCE($5::task_priority, priority),
            due_date = CASE WHEN $6::boolean THEN $7 ELSE due_date END,
+           assignee_id = CASE WHEN $8::boolean THEN $9 ELSE assignee_id END,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, title, description, status, priority, due_date, project_id, created_by, created_at, updated_at`,
+       RETURNING id, title, description, status, priority, due_date, project_id, created_by, assignee_id, created_at, updated_at`,
       [
         taskId,
         data.title ?? null,
@@ -171,6 +183,8 @@ export class TaskService {
         data.priority ? priorityToDb(data.priority) : null,
         data.dueDate !== undefined,
         data.dueDate ? new Date(data.dueDate) : null,
+        data.assigneeId !== undefined,
+        data.assigneeId ?? null,
       ]
     );
     const task = result.rows[0];

@@ -10,6 +10,7 @@ export const createTaskSchema = z.object({
   status: taskStatusEnum.default('TODO'),
   priority: taskPriorityEnum.default('P1'),
   dueDate: z.string().datetime().optional(),
+  assigneeId: z.string().uuid().nullable().optional(),
 });
 
 export const updateTaskSchema = z.object({
@@ -18,6 +19,7 @@ export const updateTaskSchema = z.object({
   status: taskStatusEnum.optional(),
   priority: taskPriorityEnum.optional(),
   dueDate: z.string().datetime().nullable().optional(),
+  assigneeId: z.string().uuid().nullable().optional(),
 });
 
 export const createCommentSchema = z.object({

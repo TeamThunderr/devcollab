@@ -3,6 +3,8 @@ import { Comment, Task, TaskPriority, TaskStatus, User } from '../../types';
 import { DatePicker } from '../ui/DatePicker';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { notificationService } from '../../services/api/notification.service';
 
 interface TaskModalProps {
   task: Task;
@@ -13,6 +15,7 @@ interface TaskModalProps {
     dueDate?: string | null;
     description?: string;
     title?: string;
+    assigneeId?: string | null;
   }) => Promise<Task>;
   onDelete: (taskId: string) => Promise<void>;
   onAddComment: (taskId: string, content: string) => Promise<Comment>;
@@ -25,8 +28,16 @@ export default function TaskModal({
   onDelete,
   onAddComment,
 }: TaskModalProps): React.ReactElement {
-  const { members } = useWorkspaceStore();
+  const { members: workspaceMembers } = useWorkspaceStore();
+  const { projectMembers, fetchProjectMembers } = useProjectStore();
   const { user: currentUser } = useAuthStore();
+  const members = projectMembers[task.projectId] || [];
+
+  useEffect(() => {
+    if (task.projectId && (!projectMembers[task.projectId] || projectMembers[task.projectId].length === 0)) {
+      fetchProjectMembers(task.projectId);
+    }
+  }, [task.projectId, fetchProjectMembers, projectMembers]);
 
   const getMemberRole = (userId: string): string => {
     try {
@@ -41,11 +52,11 @@ export default function TaskModal({
     } catch {}
     
     // Default based on workspace role
-    const wsMember = members.find(m => m.userId === userId);
+    const wsMember = workspaceMembers.find(m => m.userId === userId);
     if (wsMember) {
-      if (wsMember.role === 'OWNER') return 'Owner';
-      if (wsMember.role === 'ADMIN') return 'Admin';
-      if (wsMember.role === 'VIEWER') return 'Viewer';
+      if (wsMember.role === 'OWNER' || wsMember.role === 'owner') return 'Owner';
+      if (wsMember.role === 'ADMIN' || wsMember.role === 'admin') return 'Admin';
+      if (wsMember.role === 'VIEWER' || wsMember.role === 'viewer') return 'Viewer';
     }
     return 'Developer';
   };
@@ -108,7 +119,7 @@ export default function TaskModal({
   const [isPosting, setIsPosting] = useState(false);
 
   // Local Storage metadata states
-  const [assigneeId, setAssigneeId] = useState<string>('');
+  const [assigneeId, setAssigneeId] = useState<string>(task.assigneeId || '');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [sprintId, setSprintId] = useState<string>('');
@@ -131,8 +142,6 @@ export default function TaskModal({
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
         const config = JSON.parse(stored);
-        const savedAssignee = config.assignees?.[task.id];
-        if (savedAssignee) setAssigneeId(savedAssignee.id);
 
         const savedTags = config.tags?.[task.id] || [];
         setTags(savedTags);
@@ -153,6 +162,7 @@ export default function TaskModal({
 
   useEffect(() => {
     setDraft(task);
+    setAssigneeId(task.assigneeId || '');
     loadLocalMetadata();
   }, [task]);
 
@@ -163,16 +173,19 @@ export default function TaskModal({
       if (stored) {
         const config = JSON.parse(stored);
         
-        // Handle Assignee
+        // Handle Assignee local notification
         if (updates.assigneeId !== undefined) {
-          if (!config.assignees) config.assignees = {};
           if (updates.assigneeId) {
             const memberUser = members.find(m => m.userId === updates.assigneeId)?.user;
-            if (memberUser) {
-              config.assignees[task.id] = memberUser;
+            if (memberUser && memberUser.id !== currentUser?.id) {
+              // Trigger backend notification
+              notificationService.createNotification({
+                userId: memberUser.id,
+                type: 'assignment',
+                message: `You were assigned to task: "${task.title}"`,
+                metadata: { taskId: task.id, projectId: task.projectId }
+              }).catch(console.error);
             }
-          } else {
-            delete config.assignees[task.id];
           }
         }
 
@@ -277,6 +290,7 @@ export default function TaskModal({
         status: draft.status,
         priority: draft.priority,
         dueDate: draft.dueDate ?? null,
+        assigneeId: assigneeId || null,
       });
       setDraft(updated);
       loadLocalMetadata();
