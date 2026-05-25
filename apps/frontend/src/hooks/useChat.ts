@@ -21,7 +21,7 @@ export function useChat(projectId: string) {
     const fetchInitial = async () => {
       try {
         store.setLoading(true);
-        const res = await api.get(`/chat/${projectId}/messages?limit=50`);
+        const res = await api.get(`/api/chat/${projectId}/messages?limit=50`);
         store.setMessages(projectId, res.data);
         if (res.data.length < 50) {
           store.setHasMore(projectId, false);
@@ -40,7 +40,7 @@ export function useChat(projectId: string) {
     const onNewMessage = (msg: any) => {
       store.addMessage(msg);
       // Marking as seen if we are receiving this
-      api.post(`/chat/${projectId}/seen`).catch(() => {});
+      api.post(`/api/chat/${projectId}/seen`).catch(() => {});
     };
 
     const onMessageEdited = (data: { id: string; content: string; editedAt: string }) => {
@@ -108,7 +108,7 @@ export function useChat(projectId: string) {
     store.addMessage(tempMsg);
 
     try {
-      await api.post(`/chat/${projectId}/messages`, { content, replyToId });
+      await api.post(`/api/chat/${projectId}/messages`, { content, replyToId });
       // addMessage handles replacing temp message by checking existing id logic, 
       // but since the server returns a real id, the temp-msg will be filtered out 
       // and the real one added.
@@ -120,7 +120,7 @@ export function useChat(projectId: string) {
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     try {
-      await api.put(`/chat/${projectId}/messages/${messageId}`, { content });
+      await api.put(`/api/chat/${projectId}/messages/${messageId}`, { content });
     } catch (err) {
       console.error('Failed to edit message', err);
     }
@@ -128,7 +128,7 @@ export function useChat(projectId: string) {
 
   const deleteMessage = useCallback(async (messageId: string) => {
     try {
-      await api.delete(`/chat/${projectId}/messages/${messageId}`);
+      await api.delete(`/api/chat/${projectId}/messages/${messageId}`);
     } catch (err) {
       console.error('Failed to delete message', err);
     }
@@ -136,7 +136,7 @@ export function useChat(projectId: string) {
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     try {
-      await api.post(`/chat/${projectId}/messages/${messageId}/reactions`, { emoji });
+      await api.post(`/api/chat/${projectId}/messages/${messageId}/reactions`, { emoji });
     } catch (err) {
       console.error('Failed to toggle reaction', err);
     }
@@ -148,7 +148,7 @@ export function useChat(projectId: string) {
     try {
       store.setLoading(true);
       const oldestMsg = messages[0];
-      const res = await api.get(`/chat/${projectId}/messages?before=${encodeURIComponent(oldestMsg.createdAt)}&limit=50`);
+      const res = await api.get(`/api/chat/${projectId}/messages?before=${encodeURIComponent(oldestMsg.createdAt)}&limit=50`);
       
       store.prependMessages(projectId, res.data);
       if (res.data.length < 50) {
