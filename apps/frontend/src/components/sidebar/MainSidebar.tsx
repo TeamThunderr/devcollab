@@ -12,6 +12,7 @@ import useWorkspaceStore from "../../stores/workspaceStore";
 import { useProjectStore } from "../../stores/projectStore";
 import useAuthStore from "../../stores/authStore";
 import { useBillingStore } from "../../stores/billingStore";
+import useChatStore from "../../stores/chatStore";
 import SubscriptionBadge from "../billing/SubscriptionBadge";
 
 // ─── Nav item types ───────────────────────────────────────────────────────────
@@ -110,6 +111,8 @@ export default function MainSidebar(): React.ReactElement {
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const projects = useProjectStore((s) => s.projects);
   const { subscription } = useBillingStore();
+  const setChatOpen = useChatStore((s) => s.setChatOpen);
+  const unreadCount = useChatStore((s) => projectId ? (s.unreadCounts[projectId] || 0) : 0);
 
   const activeProject = projects.find((p) => p.id === projectId);
 
@@ -167,6 +170,23 @@ export default function MainSidebar(): React.ReactElement {
           {projectNav.map((item) => (
             <SidebarNavLink key={item.label} item={item} />
           ))}
+          
+          <button
+            onClick={() => setChatOpen(true)}
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 group border border-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+              </span>
+              Chat
+            </div>
+            {unreadCount > 0 && (
+              <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </button>
         </nav>
 
         {/* User footer */}

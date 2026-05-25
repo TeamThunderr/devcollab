@@ -6,6 +6,7 @@ import {
   handlePresenceDisconnect,
   registerPresenceHandlers,
 } from './handlers/presence.handler';
+import { registerChatHandlers } from './handlers/chat.handler';
 
 interface JwtPayload {
   userId: string;
@@ -152,6 +153,7 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
     socket.join(`user:${userId}`);
 
     registerPresenceHandlers(io, socket as Parameters<typeof registerPresenceHandlers>[1]);
+    registerChatHandlers(io, socket as any);
 
     socket.on('join:project', ({ projectId }) => {
       if (!projectId) return;
