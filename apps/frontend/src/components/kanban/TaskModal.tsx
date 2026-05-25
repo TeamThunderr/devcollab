@@ -54,9 +54,10 @@ export default function TaskModal({
     // Default based on workspace role
     const wsMember = workspaceMembers.find(m => m.userId === userId);
     if (wsMember) {
-      if (wsMember.role === 'OWNER' || wsMember.role === 'owner') return 'Owner';
-      if (wsMember.role === 'ADMIN' || wsMember.role === 'admin') return 'Admin';
-      if (wsMember.role === 'VIEWER' || wsMember.role === 'viewer') return 'Viewer';
+      const role = (wsMember.role as string).toUpperCase();
+      if (role === 'OWNER') return 'Owner';
+      if (role === 'ADMIN') return 'Admin';
+      if (role === 'VIEWER') return 'Viewer';
     }
     return 'Developer';
   };
