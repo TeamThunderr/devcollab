@@ -1,5 +1,6 @@
 import { query } from '../../db/client';
 import { CreateTaskInput, UpdateTaskInput } from './task.schema';
+import { requireProjectAccess } from '../../middleware/projectAccess';
 
 const statusToDb: Record<string, string> = {
   TODO: 'todo',
@@ -82,6 +83,7 @@ async function getCommentsByTaskIds(taskIds: string[]) {
 
 export class TaskService {
   async createTask(data: CreateTaskInput, userId: string) {
+    await requireProjectAccess(userId, data.projectId);
     const result = await query(
       `INSERT INTO tasks (title, description, status, priority, due_date, project_id, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -99,7 +101,9 @@ export class TaskService {
     return mapTask({ ...result.rows[0], comments: [] });
   }
 
-  async getTasksByProject(projectId: string, filters?: { status?: string; priority?: string }) {
+  async getTasksByProject(projectId: string, userId: string, filters?: { status?: string; priority?: string }) {
+    await requireProjectAccess(userId, projectId);
+    
     const where: string[] = ['t.project_id = $1'];
     const params: any[] = [projectId];
 
@@ -124,7 +128,7 @@ export class TaskService {
     return result.rows.map(row => mapTask({ ...row, comments: commentsByTask.get(row.id) ?? [] }));
   }
 
-  async getTaskById(taskId: string) {
+  async getTaskById(taskId: string, userId: string) {
     const result = await query(
       `SELECT t.*, u.email AS creator_email, u.name AS creator_name
        FROM tasks t
@@ -136,11 +140,19 @@ export class TaskService {
     if (!task) {
       return null;
     }
+    
+    await requireProjectAccess(userId, task.project_id);
+    
     const commentsByTask = await getCommentsByTaskIds([taskId]);
     return mapTask({ ...task, comments: commentsByTask.get(taskId) ?? [] });
   }
 
-  async updateTask(taskId: string, data: UpdateTaskInput) {
+  async updateTask(taskId: string, data: UpdateTaskInput, userId: string) {
+    // First get project id
+    const taskCheck = await query('SELECT project_id FROM tasks WHERE id = $1', [taskId]);
+    if (taskCheck.rowCount === 0) throw new Error('Task not found');
+    await requireProjectAccess(userId, taskCheck.rows[0].project_id);
+
     const result = await query(
       `UPDATE tasks
        SET title = COALESCE($2, title),
@@ -169,7 +181,11 @@ export class TaskService {
     return mapTask({ ...task, comments: commentsByTask.get(taskId) ?? [] });
   }
 
-  async deleteTask(taskId: string) {
+  async deleteTask(taskId: string, userId: string) {
+    const taskCheck = await query('SELECT project_id FROM tasks WHERE id = $1', [taskId]);
+    if (taskCheck.rowCount === 0) throw new Error('Task not found');
+    await requireProjectAccess(userId, taskCheck.rows[0].project_id);
+
     const result = await query('DELETE FROM tasks WHERE id = $1', [taskId]);
     if (!result.rowCount) {
       throw new Error('Task not found');
@@ -177,6 +193,10 @@ export class TaskService {
   }
 
   async addComment(taskId: string, content: string, userId: string) {
+    const taskCheck = await query('SELECT project_id FROM tasks WHERE id = $1', [taskId]);
+    if (taskCheck.rowCount === 0) throw new Error('Task not found');
+    await requireProjectAccess(userId, taskCheck.rows[0].project_id);
+
     const result = await query(
       `INSERT INTO task_comments (task_id, user_id, content)
        VALUES ($1, $2, $3)
@@ -186,7 +206,11 @@ export class TaskService {
     return mapComment(result.rows[0]);
   }
 
-  async getTaskComments(taskId: string) {
+  async getTaskComments(taskId: string, userId: string) {
+    const taskCheck = await query('SELECT project_id FROM tasks WHERE id = $1', [taskId]);
+    if (taskCheck.rowCount === 0) throw new Error('Task not found');
+    await requireProjectAccess(userId, taskCheck.rows[0].project_id);
+
     const result = await query(
       `SELECT tc.*, u.email, u.name
        FROM task_comments tc

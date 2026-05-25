@@ -108,10 +108,14 @@ export default function MainSidebar(): React.ReactElement {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
+  const activeWorkspaceMember = useWorkspaceStore((s) => 
+    s.members.find((m) => m.userId === user?.id)
+  );
   const projects = useProjectStore((s) => s.projects);
   const { subscription } = useBillingStore();
 
   const activeProject = projects.find((p) => p.id === projectId);
+  const isOwnerOrAdmin = activeWorkspaceMember?.role === "OWNER" || activeWorkspaceMember?.role === "ADMIN";
 
   // ── Condition B: Project-level navigation ────────────────────────────────
   if (workspaceId && projectId) {
@@ -135,6 +139,11 @@ export default function MainSidebar(): React.ReactElement {
         label: "Editor",
         to: `/w/${workspaceId}/p/${projectId}/editor`,
         icon: <Icon d={ICONS.editor} />,
+      },
+      {
+        label: "Members",
+        to: `/w/${workspaceId}/p/${projectId}/members`,
+        icon: <Icon d={ICONS.members} />,
       },
     ];
 
@@ -176,6 +185,7 @@ export default function MainSidebar(): React.ReactElement {
   }
 
   // ── Condition A: Workspace-level navigation ──────────────────────────────
+
   const workspaceNav: NavItem[] = workspaceId
     ? [
         {
@@ -194,16 +204,20 @@ export default function MainSidebar(): React.ReactElement {
           to: `/w/${workspaceId}/snippets`,
           icon: <Icon d={ICONS.snippets} />,
         },
-        {
-          label: "Members",
-          to: `/w/${workspaceId}/members`,
-          icon: <Icon d={ICONS.members} />,
-        },
-        {
-          label: "Billing",
-          to: `/w/${workspaceId}/billing`,
-          icon: <Icon d={ICONS.billing} />,
-        },
+        ...(isOwnerOrAdmin
+          ? [
+              {
+                label: "Members",
+                to: `/w/${workspaceId}/members`,
+                icon: <Icon d={ICONS.members} />,
+              },
+              {
+                label: "Billing",
+                to: `/w/${workspaceId}/billing`,
+                icon: <Icon d={ICONS.billing} />,
+              },
+            ]
+          : []),
       ]
     : [];
 

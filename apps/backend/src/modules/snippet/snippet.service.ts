@@ -1,5 +1,6 @@
 import { query } from '../../db/client';
 import { CreateSnippetInput, UpdateSnippetInput } from './snippet.schema';
+import { requireProjectAccess } from '../../middleware/projectAccess';
 
 function mapSnippet(snippet: any) {
   return {
@@ -22,6 +23,7 @@ function mapSnippet(snippet: any) {
 
 export class SnippetService {
   async createSnippet(data: CreateSnippetInput, userId: string) {
+    await requireProjectAccess(userId, data.projectId);
     const result = await query(
       `INSERT INTO snippets (title, language, code, description, tags, project_id, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -31,7 +33,8 @@ export class SnippetService {
     return mapSnippet(result.rows[0]);
   }
 
-  async getSnippetsByProject(projectId: string) {
+  async getSnippetsByProject(projectId: string, userId: string) {
+    await requireProjectAccess(userId, projectId);
     const result = await query(
       `SELECT s.*, u.email AS creator_email, u.name AS creator_name
        FROM snippets s
@@ -43,7 +46,7 @@ export class SnippetService {
     return result.rows.map(mapSnippet);
   }
 
-  async getSnippetById(snippetId: string) {
+  async getSnippetById(snippetId: string, userId: string) {
     const result = await query(
       `SELECT s.*, u.email AS creator_email, u.name AS creator_name
        FROM snippets s
@@ -51,10 +54,18 @@ export class SnippetService {
        WHERE s.id = $1`,
       [snippetId]
     );
-    return result.rows[0] ? mapSnippet(result.rows[0]) : null;
+    const snippet = result.rows[0];
+    if (!snippet) return null;
+    
+    await requireProjectAccess(userId, snippet.project_id);
+    return mapSnippet(snippet);
   }
 
-  async updateSnippet(snippetId: string, data: UpdateSnippetInput) {
+  async updateSnippet(snippetId: string, data: UpdateSnippetInput, userId: string) {
+    const check = await query('SELECT project_id FROM snippets WHERE id = $1', [snippetId]);
+    if (check.rowCount === 0) throw new Error('Snippet not found');
+    await requireProjectAccess(userId, check.rows[0].project_id);
+
     const result = await query(
       `UPDATE snippets
        SET title = COALESCE($2, title),
@@ -73,14 +84,19 @@ export class SnippetService {
     return mapSnippet(result.rows[0]);
   }
 
-  async deleteSnippet(snippetId: string) {
+  async deleteSnippet(snippetId: string, userId: string) {
+    const check = await query('SELECT project_id FROM snippets WHERE id = $1', [snippetId]);
+    if (check.rowCount === 0) throw new Error('Snippet not found');
+    await requireProjectAccess(userId, check.rows[0].project_id);
+
     const result = await query('DELETE FROM snippets WHERE id = $1', [snippetId]);
     if (!result.rowCount) {
       throw new Error('Snippet not found');
     }
   }
 
-  async searchSnippets(projectId: string, search: string) {
+  async searchSnippets(projectId: string, search: string, userId: string) {
+    await requireProjectAccess(userId, projectId);
     const normalizedQuery = search.trim();
     const result = await query(
       `SELECT s.*, u.email AS creator_email, u.name AS creator_name

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { disconnectSocket, connectSocket } from "../lib/socket";
+import { disconnectSocket, connectSocket, updateSocketToken } from "../lib/socket";
 import { authService, AuthUser } from "../services/api/auth.service";
 
 export interface AuthStore {
@@ -27,7 +27,10 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   isInitialized: false,
   error: null,
 
-  setAuthToken: (token: string) => set({ accessToken: token, isAuthenticated: true }),
+  setAuthToken: (token: string) => {
+    set({ accessToken: token, isAuthenticated: true });
+    updateSocketToken(token);
+  },
 
   login: async (email, password) => {
     set({ isLoading: true, error: null });

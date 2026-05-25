@@ -82,8 +82,8 @@ export default function Topbar(): React.ReactElement {
           className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold hover:bg-blue-700 transition-colors ml-1 overflow-hidden"
           title="Your Profile"
         >
-          {user?.avatar_url ? (
-            <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+          {user?.avatar ? (
+            <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
           ) : (
             user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'
           )}

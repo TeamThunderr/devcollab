@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, Component, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/authStore';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -15,7 +15,7 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean,
   static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
   render() {
     if (this.state.hasError) {
-      return <div className="p-10 text-red-600"><h1 className="text-2xl font-bold">React Crashed</h1><pre className="mt-4">{String(this.state.error?.stack)}</pre></div>;
+      return <div className="p-10 text-red-600"><h1 className="text-2xl font-bold">React Crashed</h1><pre className="mt-4">{String((this.state.error as Error | null)?.stack)}</pre></div>;
     }
     return this.props.children;
   }

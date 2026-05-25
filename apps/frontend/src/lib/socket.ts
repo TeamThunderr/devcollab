@@ -90,6 +90,19 @@ export function connectSocket(token: string, workspaceId: string): void {
 }
 
 /**
+ * Update the token for an existing socket, e.g. after silent refresh.
+ * If the socket is disconnected due to a 401, this will trigger a reconnect.
+ */
+export function updateSocketToken(token: string): void {
+  if (socket.auth) {
+    (socket.auth as any).token = token;
+  }
+  if (!socket.connected && (socket.auth as any).workspaceId) {
+    socket.connect();
+  }
+}
+
+/**
  * Gracefully disconnect the socket.
  * Call this on logout or when the user leaves a workspace.
  */

@@ -16,7 +16,7 @@ export default function SnippetEditorPage(): React.ReactElement {
   const projectParam = queryParams.get('project');
   const effectiveProjectId = projectId || projectParam;
 
-  const { projects, fetchProjects } = useProjectStore();
+  const { projects } = useProjectStore();
   const { createSnippet, updateSnippet, deleteSnippet } = useSnippetStore();
 
   const [loading, setLoading] = useState(false);
@@ -39,12 +39,10 @@ export default function SnippetEditorPage(): React.ReactElement {
 
   const isNew = snippetId === 'new';
 
-  // 1. Load projects in workspace for dropdown selection
+  // 1. Removed redundant fetchProjects since WorkspaceLayout handles it.
   useEffect(() => {
-    if (workspaceId) {
-      void fetchProjects(workspaceId);
-    }
-  }, [workspaceId, fetchProjects]);
+    // keeping empty for any future workspace-level init
+  }, [workspaceId]);
 
   // Set default project in selector when projects list is populated
   useEffect(() => {

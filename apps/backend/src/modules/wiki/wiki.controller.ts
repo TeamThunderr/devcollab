@@ -9,7 +9,7 @@ export async function getPagesHandler(
 ) {
   try {
     const { projectId } = request.params;
-    const pages = await wikiService.getPages(projectId);
+    const pages = await wikiService.getPages(projectId, request.user!.userId);
     return reply.send(pages);
   } catch (error) {
     request.log.error(error);
@@ -23,7 +23,7 @@ export async function getPageHandler(
 ) {
   try {
     const { id } = request.params;
-    const page = await wikiService.getPage(id);
+    const page = await wikiService.getPage(id, request.user!.userId);
     if (!page) {
       return reply.status(404).send({ message: 'Page not found' });
     }
@@ -45,7 +45,7 @@ export async function createPageHandler(
     const { projectId } = request.params;
     const userId = request.user!.userId;
     const data = { ...request.body, projectId, createdBy: userId };
-    const newPage = await wikiService.createPage(data);
+    const newPage = await wikiService.createPage(data, userId);
     return reply.status(201).send(newPage);
   } catch (error) {
     request.log.error(error);
@@ -63,7 +63,7 @@ export async function updatePageHandler(
   try {
     const { id } = request.params;
     const userId = request.user!.userId;
-    const updatedPage = await wikiService.updatePage(id, { ...request.body, updatedBy: userId });
+    const updatedPage = await wikiService.updatePage(id, { ...request.body, updatedBy: userId }, userId);
     return reply.send(updatedPage);
   } catch (error) {
     request.log.error(error);
@@ -77,7 +77,7 @@ export async function deletePageHandler(
 ) {
   try {
     const { id } = request.params;
-    await wikiService.deletePage(id);
+    await wikiService.deletePage(id, request.user!.userId);
     return reply.status(204).send();
   } catch (error) {
     request.log.error(error);
@@ -93,7 +93,7 @@ export async function getVersionsHandler(
 ) {
   try {
     const { id } = request.params;
-    const versions = await wikiService.getVersions(id);
+    const versions = await wikiService.getVersions(id, request.user!.userId);
     return reply.send(versions);
   } catch (error) {
     request.log.error(error);
@@ -108,7 +108,7 @@ export async function createVersionHandler(
   try {
     const { id } = request.params;
     const userId = request.user!.userId;
-    const version = await wikiService.createVersion(id, userId);
+    const version = await wikiService.createVersion(id, userId, userId);
     return reply.status(201).send(version);
   } catch (error) {
     request.log.error(error);
@@ -123,7 +123,7 @@ export async function restoreVersionHandler(
   try {
     const { id, versionId } = request.params;
     const userId = request.user!.userId;
-    const restoredPage = await wikiService.restoreVersion(id, versionId, userId);
+    const restoredPage = await wikiService.restoreVersion(id, versionId, userId, userId);
     return reply.send(restoredPage);
   } catch (error) {
     request.log.error(error);

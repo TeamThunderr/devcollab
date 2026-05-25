@@ -156,15 +156,14 @@ export default function WorkspaceOverview(): React.ReactElement {
   const { workspaceId } = useParams<{ workspaceId: string }>();
 
   const { activeWorkspace, members, isLoading: wsLoading } = useWorkspaceStore();
-  const { projects, fetchProjects } = useProjectStore();
+  const { projects } = useProjectStore();
   const { activities, isLoading: actLoading, fetchActivities } = useActivityStore();
 
   useEffect(() => {
     if (workspaceId) {
-      fetchProjects(workspaceId).catch(console.error);
       fetchActivities(workspaceId, true).catch(console.error);
     }
-  }, [workspaceId, fetchProjects, fetchActivities]);
+  }, [workspaceId, fetchActivities]);
 
   // Derived stats
   const totalTasks = projects.reduce((acc, p) => acc + (p._count?.tasks ?? 0), 0);

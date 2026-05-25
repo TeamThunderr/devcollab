@@ -6,6 +6,8 @@ import {
   handlePresenceDisconnect,
   registerPresenceHandlers,
 } from './handlers/presence.handler';
+import { requireProjectAccess } from '../middleware/projectAccess';
+import { query } from '../db/client';
 
 interface JwtPayload {
   userId: string;
@@ -153,10 +155,15 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
 
     registerPresenceHandlers(io, socket as Parameters<typeof registerPresenceHandlers>[1]);
 
-    socket.on('join:project', ({ projectId }) => {
+    socket.on('join:project', async ({ projectId }) => {
       if (!projectId) return;
-      socket.join(`project:${projectId}`);
-      socket.emit('joined:project', { projectId });
+      try {
+        await requireProjectAccess(userId, projectId);
+        socket.join(`project:${projectId}`);
+        socket.emit('joined:project', { projectId });
+      } catch (err) {
+        socket.emit('error', { message: 'Unauthorized to join project' });
+      }
     });
 
     socket.on('leave:project', ({ projectId }) => {
@@ -164,19 +171,27 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
       socket.leave(`project:${projectId}`);
     });
 
-    socket.on('join:task', ({ taskId }) => {
+    socket.on('join:task', async ({ taskId }) => {
       if (!taskId) return;
-      socket.join(`task:${taskId}`);
-      socket.data.activeTasks.add(`task:${taskId}`);
-      socket.emit('joined:task', { taskId });
-      io.to(`task:${taskId}`).emit('task:viewing', {
-        taskId,
-        user: {
-          userId: socket.data.user.userId,
-          name: socket.data.user.name ?? socket.data.user.email,
-          avatar: socket.data.user.avatar ?? null,
-        },
-      });
+      try {
+        const taskCheck = await query('SELECT project_id FROM tasks WHERE id = $1', [taskId]);
+        if (taskCheck.rowCount && taskCheck.rowCount > 0) {
+          await requireProjectAccess(userId, taskCheck.rows[0].project_id);
+          socket.join(`task:${taskId}`);
+          socket.data.activeTasks.add(`task:${taskId}`);
+          socket.emit('joined:task', { taskId });
+          io.to(`task:${taskId}`).emit('task:viewing', {
+            taskId,
+            user: {
+              userId: socket.data.user.userId,
+              name: socket.data.user.name ?? socket.data.user.email,
+              avatar: socket.data.user.avatar ?? null,
+            },
+          });
+        }
+      } catch (err) {
+        socket.emit('error', { message: 'Unauthorized to join task' });
+      }
     });
 
     socket.on('leave:task', ({ taskId }) => {
