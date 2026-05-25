@@ -10,7 +10,6 @@ import { z } from "zod";
 import { authenticate } from "../../middleware/authenticate";
 import { verifyProjectAccess } from "../../middleware/rbac.middleware";
 import { query } from "../../db/client";
-import { query } from "../../db/client";
 import * as aiService from "./ai.service";
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
