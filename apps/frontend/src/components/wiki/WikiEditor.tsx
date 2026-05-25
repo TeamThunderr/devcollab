@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
@@ -377,7 +377,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
                 {showEmojiPicker && (
                   <div className="absolute top-full mt-2 left-0 z-50 shadow-2xl">
                     <EmojiPicker
-                      theme="dark"
+                      theme={"dark" as any}
                       onEmojiClick={(emojiData) => {
                         updatePage(activePage.id, { icon: emojiData.emoji });
                         setShowEmojiPicker(false);

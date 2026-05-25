@@ -35,12 +35,12 @@ export const Callout = Node.create({
 
   addCommands() {
     return {
-      setCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }) => {
+      setCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }: any) => {
         return commands.setNode(this.name, options);
       },
-      toggleCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }) => {
+      toggleCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }: any) => {
         return commands.toggleNode(this.name, 'paragraph', options);
       },
-    };
+    } as any;
   },
 });

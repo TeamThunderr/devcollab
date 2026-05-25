@@ -11,7 +11,6 @@ import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';
 import { usePresence } from '../../hooks/usePresence';
-import { DatePicker } from '../../components/ui/DatePicker';
 import { Task, TaskStatus, TaskPriority } from '../../types';
 import ListView from './ListView';
 import CalendarView from './CalendarView';
@@ -40,13 +39,7 @@ interface ProjectWorkspaceConfig {
   checklists?: Record<string, any[]>;
 }
 
-const getCommitSHA = (id: string): string => {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash).toString(16).padEnd(7, 'f').substring(0, 7);
-};
+
 
 export default function TasksPage(): React.ReactElement {
   const { workspaceId, projectId: pid } = useParams<{ workspaceId: string; projectId: string }>();
@@ -57,12 +50,12 @@ export default function TasksPage(): React.ReactElement {
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
   const { projects, fetchProjects, projectMembers, fetchProjectMembers, assignProjectMember, removeProjectMember } = useProjectStore();
   const { members, fetchWorkspaceDetails } = useWorkspaceStore();
+  const activeProjMembers = pid ? (projectMembers[pid] || []) : [];
   const { user } = useAuthStore();
   const { fetchSubscription } = useBillingStore();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'mytasks' | 'activity' | 'ai' | 'snippets'>('dashboard');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [showMembersModal, setShowMembersModal] = useState(false);
@@ -118,7 +111,6 @@ export default function TasksPage(): React.ReactElement {
 
 
   // Task Creation & Draft Recovery States
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [hasActiveDraft, setHasActiveDraft] = useState(false);
   const [draftRecoveryKey, setDraftRecoveryKey] = useState<string | null>(null);
 
@@ -210,7 +202,7 @@ export default function TasksPage(): React.ReactElement {
     if (wsMember?.role === 'ADMIN') return 'Admin';
     if (activeProject?.createdBy?.id === userId) return 'Owner';
 
-    const pm = projectMembers.find(m => m.userId === userId);
+    const pm = activeProjMembers.find(m => m.userId === userId);
     if (pm) {
       if (pm.role === 'ADMIN') return 'Admin';
       if (pm.role === 'VIEWER') return 'Viewer';
@@ -416,7 +408,12 @@ export default function TasksPage(): React.ReactElement {
       comments: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      createdBy: user || { id: 'current', name: 'You', email: '' },
+      createdBy: {
+        id: user?.id || 'current',
+        name: user?.name || 'You',
+        email: user?.email || '',
+        avatar: user?.avatar || undefined,
+      },
     };
     setSelectedTask(draftTask);
   };
@@ -805,7 +802,7 @@ export default function TasksPage(): React.ReactElement {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center text-xs">
                   {canCreateTask ? (
-                    <button type="button" onClick={() => void handleInstantTaskCreate('TODO')} disabled={isCreatingTask} className="p-2.5 bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 text-indigo-300 font-bold rounded-xl transition">
+                    <button type="button" onClick={() => void handleInstantTaskCreate('TODO')} className="p-2.5 bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 text-indigo-300 font-bold rounded-xl transition">
                       + New Task
                     </button>
                   ) : (
@@ -917,7 +914,6 @@ export default function TasksPage(): React.ReactElement {
                   <button
                     type="button"
                     onClick={() => void handleInstantTaskCreate('TODO')}
-                    disabled={isCreatingTask}
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
                   >
                     <Plus className="h-3.5 w-3.5" /> Create Task
@@ -1632,10 +1628,10 @@ export default function TasksPage(): React.ReactElement {
 
             {/* List current project members */}
             <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 premium-scrollbar">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block text-left font-mono">Current Members ({projectMembers.length})</label>
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block text-left font-mono">Current Members ({activeProjMembers.length})</label>
               
               <div className="space-y-2">
-                {projectMembers.map((member) => (
+                {activeProjMembers.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.03] hover:border-white/[0.06] transition duration-150">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-1 ring-white/[0.04] flex-shrink-0">
@@ -1705,7 +1701,7 @@ export default function TasksPage(): React.ReactElement {
                 
                 {(() => {
                   const unassignedWorkspaceMembers = members.filter(
-                    (wm) => !projectMembers.some((pm) => pm.userId === wm.userId)
+                    (wm) => !activeProjMembers.some((pm) => pm.userId === wm.userId)
                   );
 
                   if (unassignedWorkspaceMembers.length === 0) {

@@ -13,8 +13,8 @@ import {
 export default function ProjectsPage(): React.ReactElement {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
-  const { projects, loading, fetchProjects, createProject, deleteProject, assignProjectMember } = useProjectStore();
-  const { activeWorkspace, fetchWorkspaceDetails, members } = useWorkspaceStore();
+  const { projects, loading, createProject, deleteProject, assignProjectMember } = useProjectStore();
+  const { activeWorkspace, members } = useWorkspaceStore();
   const { user } = useAuthStore();
   const { subscription, upgradeToPro } = useBillingStore();
 
