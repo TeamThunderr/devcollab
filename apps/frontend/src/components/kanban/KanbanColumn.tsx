@@ -9,6 +9,7 @@ interface KanbanColumnProps {
   title: string;
   status: string;
   tasks: Task[];
+  config?: any;
   onTaskClick?: (task: Task) => void;
   onAddTask?: (status: string) => void;
   onRenameColumn?: (status: string, newTitle: string) => void;
@@ -27,6 +28,7 @@ export default function KanbanColumn({
   title,
   status,
   tasks,
+  config,
   onTaskClick,
   onAddTask,
   onRenameColumn,
@@ -184,7 +186,7 @@ export default function KanbanColumn({
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
         <div className="space-y-2.5 mt-1">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onClick={onTaskClick} />
+            <TaskCard key={task.id} task={task} config={config} onClick={onTaskClick} />
           ))}
           {tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.04] px-4 py-8 text-center text-xs text-slate-500 bg-white/[0.005] min-h-[120px] transition-all relative overflow-hidden group">

@@ -6,6 +6,7 @@ import { MessageSquare, Paperclip, Calendar, CheckSquare } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
+  config?: any;
   onClick?: (task: Task) => void;
 }
 
@@ -22,7 +23,7 @@ const tagColors = [
   'bg-pink-500/10 text-pink-400 border-pink-500/15',
 ];
 
-export default function TaskCard({ task, onClick }: TaskCardProps): React.ReactElement {
+export default function TaskCard({ task, config, onClick }: TaskCardProps): React.ReactElement {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: {
@@ -32,24 +33,32 @@ export default function TaskCard({ task, onClick }: TaskCardProps): React.ReactE
     },
   });
 
-  // Load local storage extensions for checklists, assignees, sprints, comments
+  // Load extensions reactively or from localStorage fallback to prevent stale states
   const localProjectData = React.useMemo(() => {
+    if (config) {
+      const taskAssignee = config.assignees?.[task.id];
+      const taskTags = config.tags?.[task.id] || [];
+      const taskAttachments = config.attachments?.[task.id] || [];
+      const savedChecklist = config.checklists?.[task.id] || [];
+      const sprint = config.sprints?.find((s: any) => s.taskIds?.includes(task.id));
+      return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist, sprint };
+    }
     try {
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
-        const config = JSON.parse(stored);
-        const taskAssignee = config.assignees?.[task.id];
-        const taskTags = config.tags?.[task.id] || [];
-        const taskAttachments = config.attachments?.[task.id] || [];
-        const savedChecklist = config.checklists?.[task.id] || [];
-        const sprint = config.sprints?.find((s: any) => s.taskIds?.includes(task.id));
+        const parsed = JSON.parse(stored);
+        const taskAssignee = parsed.assignees?.[task.id];
+        const taskTags = parsed.tags?.[task.id] || [];
+        const taskAttachments = parsed.attachments?.[task.id] || [];
+        const savedChecklist = parsed.checklists?.[task.id] || [];
+        const sprint = parsed.sprints?.find((s: any) => s.taskIds?.includes(task.id));
         return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist, sprint };
       }
     } catch (e) {
       // Ignore
     }
     return { assignee: undefined, tags: [], attachments: [], checklist: [], sprint: undefined };
-  }, [task.id, task.projectId]);
+  }, [task.id, task.projectId, config]);
 
   const { assignee, tags, attachments, checklist, sprint } = localProjectData;
 
