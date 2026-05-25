@@ -16,6 +16,7 @@ import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 // ─── Global pages ─────────────────────────────────────────────────────────────
 import WorkspaceList from "./pages/workspace/WorkspaceList";
 import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
+import ProfilePage from "./pages/profile/ProfilePage";
 
 // ─── Workspace pages ──────────────────────────────────────────────────────────
 import WorkspaceOverview from "./pages/workspace/WorkspaceOverview";
@@ -70,6 +71,7 @@ function App(): React.ReactElement {
         <Route element={<GlobalLayout />}>
           <Route path="/workspaces" element={<WorkspaceList />} />
           <Route path="/onboarding/create-workspace" element={<CreateWorkspaceOnboardingPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         {/* ── Workspace-level routes: /w/:workspaceId/* ── */}

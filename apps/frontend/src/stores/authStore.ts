@@ -13,6 +13,7 @@ export interface AuthStore {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (data: Partial<AuthUser>) => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
   setAuthToken: (token: string) => void;
   clearAuth: () => void;
@@ -69,6 +70,17 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     } finally {
       disconnectSocket();
       set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
+    }
+  },
+
+  updateProfile: async (data: Partial<AuthUser>) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedUser = await authService.updateProfile(data);
+      set({ user: updatedUser, isLoading: false });
+    } catch (error: any) {
+      set({ error: error.response?.data?.error || "Failed to update profile", isLoading: false });
+      throw error;
     }
   },
 

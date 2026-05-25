@@ -36,10 +36,17 @@ export default function InviteAcceptPage(): React.ReactElement {
         }
       } catch (error: any) {
         if (mounted) {
+          const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to accept invitation.';
+          
+          if (error.response?.status === 403 && errMsg.includes('different email address')) {
+            useAuthStore.getState().logout().then(() => {
+              navigate('/login', { state: { from: location }, replace: true });
+            });
+            return;
+          }
+
           setStatus('error');
-          setErrorMessage(
-            error.response?.data?.message || error.message || 'Failed to accept invitation.'
-          );
+          setErrorMessage(errMsg);
         }
       }
     };

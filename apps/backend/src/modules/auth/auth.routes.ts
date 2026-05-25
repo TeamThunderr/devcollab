@@ -9,6 +9,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/refresh', authController.refresh);
   
   fastify.get('/me', { preHandler: [verifyAuth] }, authController.getMe);
+  fastify.patch('/me', { preHandler: [verifyAuth] }, authController.updateMe);
 };
 
 export default authRoutes;

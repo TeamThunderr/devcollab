@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { authService } from './auth.service';
-import { registerSchema, loginSchema } from './auth.schema';
+import { registerSchema, loginSchema, updateUserSchema } from './auth.schema';
 import { AppError } from '../../utils/errors';
 
 export const authController = {
@@ -82,6 +82,18 @@ export const authController = {
       const user = await authService.getMe(request.user!.userId);
       return reply.send({ user });
     } catch (error: any) {
+      if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  },
+
+  async updateMe(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = updateUserSchema.parse(request.body);
+      const user = await authService.updateMe(request.user!.userId, data);
+      return reply.send({ user });
+    } catch (error: any) {
+      if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
       if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });
       return reply.status(500).send({ error: 'Internal Server Error' });
     }
