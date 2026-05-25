@@ -7,6 +7,7 @@ interface WorkspaceStore {
   activeWorkspace: Workspace | null;
   members: WorkspaceMember[];
   isLoading: boolean;
+  hasFetchedWorkspaces: boolean;
   error: string | null;
 
   fetchWorkspaces: () => Promise<void>;
@@ -24,6 +25,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   activeWorkspace: null,
   members: [],
   isLoading: false,
+  hasFetchedWorkspaces: false,
   error: null,
 
   clearError: () => set({ error: null }),
@@ -32,11 +34,12 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const workspaces = await workspaceService.getWorkspaces();
-      set({ workspaces, isLoading: false });
+      set({ workspaces, isLoading: false, hasFetchedWorkspaces: true });
     } catch (error: any) {
       set({ 
         error: error.response?.data?.message || error.message || 'Failed to fetch workspaces', 
-        isLoading: false 
+        isLoading: false,
+        hasFetchedWorkspaces: true
       });
       throw error;
     }

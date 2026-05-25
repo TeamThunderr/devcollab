@@ -5,7 +5,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import CreateWorkspaceModal from '../../components/workspace/CreateWorkspaceModal';
 
 export default function WorkspaceList(): React.ReactElement {
-  const { workspaces, isLoading, fetchWorkspaces } = useWorkspaceStore();
+  const { workspaces, isLoading, hasFetchedWorkspaces, fetchWorkspaces } = useWorkspaceStore();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -15,10 +15,10 @@ export default function WorkspaceList(): React.ReactElement {
 
   // Intercept completely new users
   useEffect(() => {
-    if (!isLoading && workspaces.length === 0) {
+    if (!isLoading && hasFetchedWorkspaces && workspaces.length === 0) {
       navigate('/onboarding/create-workspace', { replace: true });
     }
-  }, [isLoading, workspaces.length, navigate]);
+  }, [isLoading, hasFetchedWorkspaces, workspaces.length, navigate]);
 
   return (
     <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
