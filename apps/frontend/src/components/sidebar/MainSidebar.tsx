@@ -14,6 +14,7 @@ import useAuthStore from "../../stores/authStore";
 import { useBillingStore } from "../../stores/billingStore";
 import useChatStore from "../../stores/chatStore";
 import SubscriptionBadge from "../billing/SubscriptionBadge";
+import { usePresence } from "../../hooks/usePresence";
 
 // ─── Nav item types ───────────────────────────────────────────────────────────
 
@@ -115,6 +116,8 @@ export default function MainSidebar(): React.ReactElement {
   const unreadCount = useChatStore((s) => projectId ? (s.unreadCounts[projectId] || 0) : 0);
 
   const activeProject = projects.find((p) => p.id === projectId);
+  const { onlineUsers } = usePresence(workspaceId || '', projectId);
+  const projectOnlineUsers = onlineUsers.filter(u => u.userId !== user?.id && u.projectId === projectId);
 
   // ── Condition B: Project-level navigation ────────────────────────────────
   if (workspaceId && projectId) {
@@ -188,6 +191,41 @@ export default function MainSidebar(): React.ReactElement {
             )}
           </button>
         </nav>
+
+        {/* Active Now section */}
+        {projectOnlineUsers.length > 0 && (
+          <div className="border-t border-white/[0.04] py-2">
+            <h3 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest px-4 py-1.5">
+              Active Now
+            </h3>
+            <div className="space-y-1">
+              {projectOnlineUsers.slice(0, 5).map(u => (
+                <div key={u.userId} className="flex items-center gap-2 px-4 py-1.5 group cursor-default">
+                  <div className="relative flex-shrink-0">
+                    {u.avatar ? (
+                      <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover ring-1 ring-white/[0.04]" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-[9px] font-bold text-white ring-1 ring-white/[0.04]">
+                        {(u.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-green-400 rounded-full ring-1 ring-[#17191d]"></span>
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors truncate">
+                      {u.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {projectOnlineUsers.length > 5 && (
+                <div className="px-4 py-1 text-[10px] text-slate-500 font-medium">
+                  +{projectOnlineUsers.length - 5} more
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* User footer */}
         <UserFooter user={user} onLogout={async () => { await logout(); navigate("/login"); }} />

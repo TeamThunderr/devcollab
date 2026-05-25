@@ -7,7 +7,8 @@ import {
   deleteMessage,
   toggleReaction,
   getUnreadCount,
-  markSeen
+  markSeen,
+  getProjectMembers
 } from './chat.controller'; // IDE refresh
 
 export default async function chatRoutes(fastify: FastifyInstance) {
@@ -21,4 +22,6 @@ export default async function chatRoutes(fastify: FastifyInstance) {
   
   fastify.get('/:projectId/unread', getUnreadCount);
   fastify.post('/:projectId/seen', markSeen);
+  
+  fastify.get('/:projectId/members', getProjectMembers);
 }

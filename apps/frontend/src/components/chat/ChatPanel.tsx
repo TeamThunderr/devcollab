@@ -3,6 +3,11 @@ import { useChat } from '../../hooks/useChat';
 import useAuthStore from '../../stores/authStore';
 import { formatMessageTime, formatDateSeparator, isSameGroup } from '../../lib/formatTime';
 import EmojiPicker from './EmojiPicker';
+import MentionPicker from './MentionPicker';
+import api from '../../lib/axios';
+import { useParams } from 'react-router-dom';
+import { usePresence } from '../../hooks/usePresence';
+import OnlineAvatars from '../presence/OnlineAvatars';
 
 interface ChatPanelProps {
   projectId: string;
@@ -12,6 +17,11 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps): React.ReactElement {
   const { user } = useAuthStore();
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const { onlineUsers } = usePresence(workspaceId || '', projectId);
+  
+  const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
+
   const {
     messages,
     sendMessage,
@@ -32,8 +42,20 @@ export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [showEmojiPickerFor, setShowEmojiPickerFor] = useState<string | null>(null);
 
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  const [mentionStartIndex, setMentionStartIndex] = useState(-1);
+  const [projectMembers, setProjectMembers] = useState([]);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    api.get('/api/chat/' + projectId + '/members')
+      .then(res => setProjectMembers(res.data.data || res.data))
+      .catch(console.error);
+  }, [projectId]);
 
   // Auto-scroll logic
   const scrollToBottom = (behavior: 'auto' | 'smooth' = 'smooth') => {
@@ -103,31 +125,104 @@ export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps
   };
 
   const renderMessageContent = (content: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return content.split(urlRegex).map((part, i) => {
-      if (part.match(urlRegex)) {
-        return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:underline break-all">{part}</a>;
+    const parts = [];
+    let lastIndex = 0;
+    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+    let match;
+    
+    while ((match = mentionRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ type: 'text', content: content.slice(lastIndex, match.index) });
       }
-      return <span key={i} className="whitespace-pre-wrap">{part}</span>;
+      parts.push({ type: 'mention', name: match[1], id: match[2] });
+      lastIndex = match.index + match[0].length;
+    }
+    
+    if (lastIndex < content.length) {
+      parts.push({ type: 'text', content: content.slice(lastIndex) });
+    }
+
+    return parts.map((part, i) => {
+      if (part.type === 'mention') {
+        return (
+          <span key={i} className="text-blue-400 font-medium cursor-pointer hover:underline">
+            @{part.name}
+          </span>
+        );
+      }
+      
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      return (part.content || '').split(urlRegex).map((subPart, j) => {
+        if (subPart.match(urlRegex)) {
+          return <a key={`${i}-${j}`} href={subPart} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:underline break-all">{subPart}</a>;
+        }
+        return <span key={`${i}-${j}`} className="whitespace-pre-wrap">{subPart}</span>;
+      });
     });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputContent(value);
+    handleTyping();
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+      const query = textBeforeCursor.slice(atIndex + 1);
+      if (!query.includes(' ') && !query.includes('\n')) {
+        setMentionQuery(query);
+        setMentionStartIndex(atIndex);
+        setShowMentionPicker(true);
+      } else {
+        setShowMentionPicker(false);
+      }
+    } else {
+      setShowMentionPicker(false);
+    }
+  };
+
+  const handleMentionSelect = (member: { id: string; name: string }) => {
+    const before = inputContent.slice(0, mentionStartIndex);
+    const after = inputContent.slice(mentionStartIndex + mentionQuery.length + 1);
+    const mention = '@[' + member.name + '](' + member.id + ')';
+    const newValue = before + mention + ' ' + after;
+    setInputContent(newValue);
+    setShowMentionPicker(false);
+    setMentionQuery('');
+    inputRef.current?.focus();
   };
 
   if (!isOpen) return <></>;
 
   return (
     <div className="fixed right-0 top-0 h-full w-full sm:w-80 bg-gray-950 border-l border-gray-800 flex flex-col z-40 transform transition-transform duration-300 ease-in-out">
-      {/* Header */}
       <div className="flex-shrink-0 h-14 border-b border-gray-800 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
           <div className="flex flex-col">
             <span className="font-medium text-white text-sm">Project Chat</span>
-            <span className="text-xs text-gray-500">Live</span>
+            <span className="text-xs text-gray-500 flex items-center gap-1.5">
+              {othersOnline.length > 0 ? (
+                <>
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse ring-1 ring-gray-950"></span>
+                  {othersOnline.length} active
+                </>
+              ) : (
+                'Just you'
+              )}
+            </span>
           </div>
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
+        
+        <div className="flex items-center gap-4">
+          {workspaceId && <OnlineAvatars workspaceId={workspaceId} projectId={projectId} size="sm" />}
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
       </div>
 
       {/* Messages Area */}
@@ -304,23 +399,30 @@ export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps
           </div>
         )}
 
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl flex items-end gap-2 px-3 py-2 focus-within:border-blue-500 transition-colors">
+        <div className="relative bg-gray-900 border border-gray-700 rounded-2xl flex items-end gap-2 px-3 py-2 focus-within:border-blue-500 transition-colors">
+          {showMentionPicker && (
+            <MentionPicker
+              members={projectMembers}
+              query={mentionQuery}
+              onSelect={handleMentionSelect}
+              onClose={() => setShowMentionPicker(false)}
+            />
+          )}
           <textarea
-            value={inputContent}
-            onChange={(e) => {
-              setInputContent(e.target.value);
-              handleTyping();
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="Message #project-chat"
-            className="flex-1 bg-transparent text-sm text-white resize-none outline-none min-h-[20px] max-h-[120px] py-0.5"
-            rows={1}
             ref={(el) => {
+              // Merge refs for inputRef and the dynamic height logic
+              (inputRef as any).current = el;
               if (el) {
                 el.style.height = 'auto';
                 el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
               }
             }}
+            value={inputContent}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Message #project-chat"
+            className="flex-1 bg-transparent text-sm text-white resize-none outline-none min-h-[20px] max-h-[120px] py-0.5"
+            rows={1}
           />
           <button
             onClick={handleSubmit}

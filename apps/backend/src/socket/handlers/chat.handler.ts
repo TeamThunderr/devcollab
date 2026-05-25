@@ -7,10 +7,14 @@ export function registerChatHandlers(io: Server, socket: Socket) {
     
     // Mark as seen
     if (redis && socket.data?.user?.userId) {
-      await redis.set(
-        'chat:seen:' + projectId + ':' + socket.data.user.userId,
-        new Date().toISOString()
-      );
+      try {
+        await redis.set(
+          'chat:seen:' + projectId + ':' + socket.data.user.userId,
+          new Date().toISOString()
+        );
+      } catch (err) {
+        console.error('Redis chat:seen set failed', err);
+      }
     }
     socket.emit('chat:joined', { projectId });
   });

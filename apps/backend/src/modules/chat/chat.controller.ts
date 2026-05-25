@@ -101,11 +101,48 @@ export const sendMessage = async (
     throw new AppError(400, 'Content must be between 1 and 4000 characters');
   }
 
+  const senderRes = await query(`SELECT name FROM users WHERE id = $1`, [userId]);
+  const senderName = senderRes.rows[0]?.name || 'Someone';
+
+  const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+  const mentionedUserIds: string[] = [];
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    const mentionedName = match[1];
+    const mentionedUserId = match[2];
+    mentionedUserIds.push(mentionedUserId);
+
+    const messagePreview = content.length > 50 ? content.substring(0, 50) + '...' : content;
+    const bodyStr = `${senderName} mentioned you in project chat: ${messagePreview}`;
+
+    const notifRes = await query(
+      `INSERT INTO notifications (user_id, type, title, body, related_task_id)
+       VALUES ($1, 'mention', 'New mention in chat', $2, NULL)
+       RETURNING id, created_at`,
+      [mentionedUserId, bodyStr]
+    );
+
+    const notificationId = notifRes.rows[0].id;
+    const createdAt = notifRes.rows[0].created_at;
+
+    io.to('user:' + mentionedUserId).emit('notification:new', {
+      id: notificationId,
+      userId: mentionedUserId,
+      type: 'mention',
+      message: 'New mention in chat',
+      body: bodyStr,
+      metadata: {},
+      readAt: null,
+      createdAt: new Date(createdAt).toISOString()
+    });
+  }
+
   const insertResult = await query(
-    `INSERT INTO messages (project_id, user_id, content, reply_to_id)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO messages (project_id, user_id, content, reply_to_id, mentions)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id, created_at, type`,
-    [projectId, userId, content, replyToId || null]
+    [projectId, userId, content, replyToId || null, mentionedUserIds]
   );
   
   const newId = insertResult.rows[0].id;
@@ -295,4 +332,26 @@ export const markSeen = async (
     await redis.set(`chat:seen:${projectId}:${userId}`, new Date().toISOString());
   }
   return reply.send({ success: true });
+};
+
+export const getProjectMembers = async (
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply
+) => {
+  const { projectId } = request.params;
+
+  const result = await query(
+    `SELECT u.id, u.name, u.avatar_url
+     FROM project_members pm
+     JOIN users u ON pm.user_id = u.id
+     WHERE pm.project_id = $1
+     ORDER BY u.name ASC`,
+    [projectId]
+  );
+
+  return reply.send(result.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    avatarUrl: row.avatar_url
+  })));
 };

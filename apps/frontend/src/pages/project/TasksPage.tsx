@@ -9,6 +9,8 @@ import { useBillingStore } from '../../stores/billingStore';
 import { useSnippetStore } from '../../stores/snippetStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
+import OnlineAvatars from '../../components/presence/OnlineAvatars';
+import { usePresence } from '../../hooks/usePresence';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { Task, TaskStatus, TaskPriority } from '../../types';
 import ListView from './ListView';
@@ -55,6 +57,9 @@ export default function TasksPage(): React.ReactElement {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const { onlineUsers } = usePresence(workspaceId || '', pid);
+  const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
 
   // Switcher & Filters States
   const [taskView, setTaskView] = useState<'board' | 'list' | 'calendar'>(() => {
@@ -712,15 +717,23 @@ export default function TasksPage(): React.ReactElement {
                 ))}
               </div>
 
-              {canCreateTask && (
-                <button
-                  type="button"
-                  onClick={() => { setTaskStatus('TODO'); setTaskDue(undefined); setShowTaskForm(true); }}
-                  className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Create Task
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {othersOnline.length > 0 && (
+                  <div className="flex flex-col items-end hidden sm:flex">
+                    <OnlineAvatars workspaceId={workspaceId} projectId={pid} size="sm" />
+                    <span className="text-[10px] text-gray-500 mt-0.5">{othersOnline.length} people viewing</span>
+                  </div>
+                )}
+                {canCreateTask && (
+                  <button
+                    type="button"
+                    onClick={() => { setTaskStatus('TODO'); setTaskDue(undefined); setShowTaskForm(true); }}
+                    className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Create Task
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Developer-centric Filter selectors */}
