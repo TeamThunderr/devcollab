@@ -12,7 +12,9 @@ import useWorkspaceStore from "../../stores/workspaceStore";
 import { useProjectStore } from "../../stores/projectStore";
 import useAuthStore from "../../stores/authStore";
 import { useBillingStore } from "../../stores/billingStore";
+import useChatStore from "../../stores/chatStore";
 import SubscriptionBadge from "../billing/SubscriptionBadge";
+import { usePresence } from "../../hooks/usePresence";
 
 // ─── Nav item types ───────────────────────────────────────────────────────────
 
@@ -113,8 +115,12 @@ export default function MainSidebar(): React.ReactElement {
   );
   const projects = useProjectStore((s) => s.projects);
   const { subscription } = useBillingStore();
+  const setChatOpen = useChatStore((s) => s.setChatOpen);
+  const unreadCount = useChatStore((s) => projectId ? (s.unreadCounts[projectId] || 0) : 0);
 
   const activeProject = projects.find((p) => p.id === projectId);
+  const { onlineUsers } = usePresence(workspaceId || '', projectId);
+  const projectOnlineUsers = onlineUsers.filter(u => u.userId !== user?.id && u.projectId === projectId);
   const isOwnerOrAdmin = activeWorkspaceMember?.role === "OWNER" || activeWorkspaceMember?.role === "ADMIN";
 
   // ── Condition B: Project-level navigation ────────────────────────────────
@@ -176,7 +182,59 @@ export default function MainSidebar(): React.ReactElement {
           {projectNav.map((item) => (
             <SidebarNavLink key={item.label} item={item} />
           ))}
+          
+          <button
+            onClick={() => setChatOpen(true)}
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 group border border-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+              </span>
+              Chat
+            </div>
+            {unreadCount > 0 && (
+              <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </button>
         </nav>
+
+        {/* Active Now section */}
+        {projectOnlineUsers.length > 0 && (
+          <div className="border-t border-white/[0.04] py-2">
+            <h3 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest px-4 py-1.5">
+              Active Now
+            </h3>
+            <div className="space-y-1">
+              {projectOnlineUsers.slice(0, 5).map(u => (
+                <div key={u.userId} className="flex items-center gap-2 px-4 py-1.5 group cursor-default">
+                  <div className="relative flex-shrink-0">
+                    {u.avatar ? (
+                      <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover ring-1 ring-white/[0.04]" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-[9px] font-bold text-white ring-1 ring-white/[0.04]">
+                        {(u.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-green-400 rounded-full ring-1 ring-[#17191d]"></span>
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors truncate">
+                      {u.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {projectOnlineUsers.length > 5 && (
+                <div className="px-4 py-1 text-[10px] text-slate-500 font-medium">
+                  +{projectOnlineUsers.length - 5} more
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* User footer */}
         <UserFooter user={user} onLogout={async () => { await logout(); navigate("/login"); }} />

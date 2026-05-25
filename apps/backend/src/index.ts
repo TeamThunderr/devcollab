@@ -30,6 +30,7 @@ import notificationRoutes from './modules/notification/notification.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import billingRoutes from './modules/billing/billing.routes';
 import waitlistRoutes from './modules/waitlist/waitlist.routes';
+import chatRoutes from './modules/chat/chat.routes';
 
 export const fastify = Fastify({ logger: true });
 
@@ -62,6 +63,7 @@ async function bootstrap() {
   fastify.register(paymentRoutes, { prefix: '/api/payments' });
   fastify.register(billingRoutes, { prefix: '/api/billing' });
   fastify.register(waitlistRoutes, { prefix: '/api/waitlist' });
+  fastify.register(chatRoutes, { prefix: '/api/chat' });
 
   fastify.get('/api/health', async (_request, reply) => {
     return reply.send({ status: 'ok', timestamp: new Date().toISOString() });

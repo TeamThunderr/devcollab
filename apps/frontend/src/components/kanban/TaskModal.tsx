@@ -8,6 +8,8 @@ import { notificationService } from '../../services/api/notification.service';
 
 interface TaskModalProps {
   task: Task;
+  config: any;
+  onUpdateMetadata: (taskId: string, category: 'assignees' | 'tags' | 'attachments' | 'checklists', data: any) => void;
   onClose: () => void;
   onSave: (updates: {
     status?: TaskStatus;
@@ -21,8 +23,25 @@ interface TaskModalProps {
   onAddComment: (taskId: string, content: string) => Promise<Comment>;
 }
 
+const parseLocalDate = (dateStr?: string): Date | undefined => {
+  if (!dateStr) return undefined;
+  const matches = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!matches) return new Date(dateStr);
+  const [_, year, month, day] = matches;
+  return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0);
+};
+
+const formatLocalDateToUTCNoon = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T12:00:00.000Z`;
+};
+
 export default function TaskModal({
   task,
+  config,
+  onUpdateMetadata,
   onClose,
   onSave,
   onDelete,
@@ -40,16 +59,10 @@ export default function TaskModal({
   }, [task.projectId, fetchProjectMembers, projectMembers]);
 
   const getMemberRole = (userId: string): string => {
-    try {
-      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
-      if (stored) {
-        const config = JSON.parse(stored);
-        if (config.ownerId === userId) return 'Owner';
-        if (config.projectRoles && config.projectRoles[userId]) {
-          return config.projectRoles[userId];
-        }
-      }
-    } catch {}
+    if (config?.ownerId === userId) return 'Owner';
+    if (config?.projectRoles && config.projectRoles[userId]) {
+      return config.projectRoles[userId];
+    }
     
     // Default based on workspace role
     const wsMember = workspaceMembers.find(m => m.userId === userId);
@@ -66,17 +79,11 @@ export default function TaskModal({
     const role = getMemberRole(userId);
     if (role === 'Owner') return true;
 
-    try {
-      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
-      if (stored) {
-        const config = JSON.parse(stored);
-        if (config.rolePermissions && config.rolePermissions[role]) {
-          if (config.rolePermissions[role][permissionKey] !== undefined) {
-            return !!config.rolePermissions[role][permissionKey];
-          }
-        }
+    if (config?.rolePermissions && config.rolePermissions[role]) {
+      if (config.rolePermissions[role][permissionKey] !== undefined) {
+        return !!config.rolePermissions[role][permissionKey];
       }
-    } catch {}
+    }
 
     const defaultPermissions: Record<string, Record<string, boolean>> = {
       Admin: {
@@ -100,15 +107,7 @@ export default function TaskModal({
     return !!defaultPermissions[role]?.[permissionKey];
   };
 
-  const isArchived = (() => {
-    try {
-      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
-      if (stored) {
-        return !!JSON.parse(stored).archived;
-      }
-    } catch {}
-    return false;
-  })();
+  const isArchived = !!config?.archived;
 
   const canEdit = currentUser && !isArchived ? hasPermission(currentUser.id, 'edit_task') : false;
   const canDelete = currentUser && !isArchived ? hasPermission(currentUser.id, 'delete_task') : false;
@@ -119,8 +118,8 @@ export default function TaskModal({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
 
-  // Local Storage metadata states
-  const [assigneeId, setAssigneeId] = useState<string>(task.assigneeId || '');
+  // Local Storage metadata states driven by config prop reactively
+  const [assigneeId, setAssigneeId] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [sprintId, setSprintId] = useState<string>('');
@@ -128,7 +127,7 @@ export default function TaskModal({
   const [newChecklistItem, setNewChecklistItem] = useState('');
 
   // Attachments state
-  const [attachments, setAttachments] = useState<{ id: string; name: string; size: number; uploadedAt: string }[]>([]);
+  const [attachments, setAttachments] = useState<{ id: string; name: string; size: number; type?: string; data?: string; uploadedAt: string }[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadingName, setUploadingName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -143,15 +142,17 @@ export default function TaskModal({
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
         const config = JSON.parse(stored);
+        const savedAssignee = config.assignees?.[task.id];
+        if (savedAssignee) setAssigneeId(savedAssignee.id);
 
-        const savedTags = config.tags?.[task.id] || [];
-        setTags(savedTags);
+    const savedTags = config?.tags?.[task.id] || [];
+    setTags(savedTags);
 
-        const savedAttachments = config.attachments?.[task.id] || [];
-        setAttachments(savedAttachments);
+    const savedAttachments = config?.attachments?.[task.id] || [];
+    setAttachments(savedAttachments);
 
-        const activeSprint = config.sprints?.find((s: any) => s.taskIds?.includes(task.id));
-        if (activeSprint) setSprintId(activeSprint.id);
+    const activeSprint = config?.sprints?.find((s: any) => s.taskIds?.includes(task.id));
+    setSprintId(activeSprint?.id || '');
 
         const savedChecklist = config.checklists?.[task.id] || [];
         setChecklist(savedChecklist);
@@ -163,91 +164,85 @@ export default function TaskModal({
 
   useEffect(() => {
     setDraft(task);
-    setAssigneeId(task.assigneeId || '');
     loadLocalMetadata();
   }, [task]);
 
-  // Save local metadata changes back to localStorage
+  // Save local metadata changes back to parent
   const saveLocalMetadata = (updates: { assigneeId?: string; tags?: string[]; attachments?: any[]; sprintId?: string; checklist?: any[] }) => {
     try {
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
-        const config = JSON.parse(stored);
+        const localConfig = JSON.parse(stored);
         
         // Handle Assignee local notification
         if (updates.assigneeId !== undefined) {
+          if (!config.assignees) config.assignees = {};
           if (updates.assigneeId) {
             const memberUser = members.find(m => m.userId === updates.assigneeId)?.user;
-            if (memberUser && memberUser.id !== currentUser?.id) {
-              // Trigger backend notification
-              notificationService.createNotification({
-                userId: memberUser.id,
-                type: 'assignment',
-                message: `You were assigned to task: "${task.title}"`,
-                metadata: { taskId: task.id, projectId: task.projectId }
-              }).catch(console.error);
+            if (memberUser) {
+              config.assignees[task.id] = memberUser;
             }
+          } else {
+            delete config.assignees[task.id];
           }
         }
 
         // Handle Tags
         if (updates.tags !== undefined) {
-          if (!config.tags) config.tags = {};
-          config.tags[task.id] = updates.tags;
+          if (!localConfig.tags) localConfig.tags = {};
+          localConfig.tags[task.id] = updates.tags;
+          onUpdateMetadata(task.id, 'tags', updates.tags);
         }
 
         // Handle Attachments
         if (updates.attachments !== undefined) {
-          if (!config.attachments) config.attachments = {};
-          config.attachments[task.id] = updates.attachments;
+          if (!localConfig.attachments) localConfig.attachments = {};
+          localConfig.attachments[task.id] = updates.attachments;
+          onUpdateMetadata(task.id, 'attachments', updates.attachments);
         }
 
         // Handle Checklist
         if (updates.checklist !== undefined) {
-          if (!config.checklists) config.checklists = {};
-          config.checklists[task.id] = updates.checklist;
+          if (!localConfig.checklists) localConfig.checklists = {};
+          localConfig.checklists[task.id] = updates.checklist;
+          onUpdateMetadata(task.id, 'checklists', updates.checklist);
         }
 
         // Handle Sprint
         if (updates.sprintId !== undefined) {
-          if (!config.sprints) config.sprints = [];
+          if (!localConfig.sprints) localConfig.sprints = [];
           // Remove from previous sprint
-          config.sprints = config.sprints.map((s: any) => ({
+          localConfig.sprints = localConfig.sprints.map((s: any) => ({
             ...s,
             taskIds: (s.taskIds || []).filter((id: string) => id !== task.id)
           }));
           // Add to new sprint
           if (updates.sprintId) {
-            config.sprints = config.sprints.map((s: any) => {
+            localConfig.sprints = localConfig.sprints.map((s: any) => {
               if (s.id === updates.sprintId) {
                 return { ...s, taskIds: [...(s.taskIds || []), task.id] };
               }
               return s;
             });
           }
-        }
-
-        // Log an activity for metadata updates
-        if (!config.activities) config.activities = [];
-        let activityMsg = '';
-        if (updates.assigneeId !== undefined) activityMsg = `updated assignee for "${task.title}"`;
-        if (updates.tags !== undefined) activityMsg = `updated tags for "${task.title}"`;
-        if (updates.attachments !== undefined) activityMsg = `modified attachments for "${task.title}"`;
-        if (updates.checklist !== undefined) activityMsg = `modified checklist for "${task.title}"`;
-        if (updates.sprintId !== undefined) activityMsg = `moved "${task.title}" to a sprint`;
-
-        if (activityMsg) {
-          config.activities.unshift({
+          
+          // Log an activity for metadata updates
+          if (!localConfig.activities) localConfig.activities = [];
+          localConfig.activities.unshift({
             id: `act-${Date.now()}`,
             userId: currentUser?.id || 'unknown',
             userName: currentUser?.name || 'Workspace Member',
             action: 'task_update',
-            details: activityMsg,
+            details: `moved "${task.title}" to a sprint`,
             timestamp: new Date().toISOString()
           });
-        }
 
-        localStorage.setItem(`devcollab_project_workspace_${task.projectId}`, JSON.stringify(config));
+          // Save sprints directly to localStorage
+          localStorage.setItem(`devcollab_project_workspace_${task.projectId}`, JSON.stringify(localConfig));
+          
+          // Force TasksPage to update the config state reactively
+          onUpdateMetadata(task.id, 'checklists', checklist);
+        }
       }
     } catch (e) {
       // Ignore
@@ -294,7 +289,6 @@ export default function TaskModal({
         assigneeId: assigneeId || null,
       });
       setDraft(updated);
-      loadLocalMetadata();
     } finally {
       setIsSaving(false);
     }
@@ -371,36 +365,72 @@ export default function TaskModal({
     saveLocalMetadata({ tags: nextTags });
   }
 
-  // Simulated Attachments handler
-  function handleSimulateUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // Real Attachments handler using FileReader & Base64 encoding
+  function uploadFile(file: File) {
+    if (file.size > 1.5 * 1024 * 1024) {
+      alert("To prevent exceeding browser localStorage limits, attachments must be under 1.5 MB.");
+      return;
+    }
 
     setUploadingName(file.name);
-    setUploadProgress(0);
+    setUploadProgress(10);
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 20;
-      setUploadProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          const newAttachment = {
-            id: `att-${Date.now()}`,
-            name: file.name,
-            size: file.size,
-            uploadedAt: new Date().toISOString()
-          };
-          const nextAttachments = [newAttachment, ...attachments];
-          setAttachments(nextAttachments);
-          saveLocalMetadata({ attachments: nextAttachments });
-          setUploadProgress(null);
-          setUploadingName('');
-        }, 300);
+    const reader = new FileReader();
+    
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percent);
       }
-    }, 150);
+    };
+
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      const newAttachment = {
+        id: `att-${Date.now()}`,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        data: base64Data, // Save real Base64 data URI
+        uploadedAt: new Date().toISOString()
+      };
+      const nextAttachments = [newAttachment, ...attachments];
+      setAttachments(nextAttachments);
+      saveLocalMetadata({ attachments: nextAttachments });
+      setUploadProgress(null);
+      setUploadingName('');
+    };
+
+    reader.onerror = () => {
+      alert("Failed to read the file content.");
+      setUploadProgress(null);
+      setUploadingName('');
+    };
+
+    reader.readAsDataURL(file);
   }
+
+  function handleSimulateUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) uploadFile(file);
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (canEdit) setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    if (!canEdit) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadFile(file);
+  };
 
   function handleDeleteAttachment(attId: string) {
     const nextAttachments = attachments.filter(a => a.id !== attId);
@@ -598,7 +628,14 @@ export default function TaskModal({
             </div>
 
             {/* Attachments Section */}
-            <div className="space-y-3 pt-2">
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`space-y-3 pt-2 rounded-xl transition-all duration-200 ${
+                isDraggingFile ? 'bg-indigo-500/10 border border-dashed border-indigo-500/30 p-3 scale-[1.01]' : 'border border-transparent'
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                   📎 Attachments ({attachments.length})
@@ -640,41 +677,63 @@ export default function TaskModal({
                 </div>
               ) : (
                 <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-                  {attachments.map((file) => (
-                     <div key={file.id} className="flex items-center justify-between p-2.5 border border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-900/40">
-                      <div className="min-w-0 flex items-center gap-2">
-                        <span className="text-xl">📄</span>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate" title={file.name}>
-                            {file.name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            {(file.size / 1024).toFixed(1)} KB • {new Date(file.uploadedAt).toLocaleDateString()}
-                          </p>
+                  {attachments.map((file) => {
+                    const isImage = file.type?.startsWith('image/') || /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(file.name);
+                    return (
+                      <div key={file.id} className="flex items-center justify-between p-2.5 border border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-900/40">
+                        <div className="min-w-0 flex items-center gap-2.5">
+                          {isImage && file.data ? (
+                            <img 
+                              src={file.data} 
+                              alt={file.name} 
+                              className="w-9 h-9 rounded-lg object-cover border border-slate-250 dark:border-slate-800 bg-white" 
+                            />
+                          ) : (
+                            <span className="text-xl w-9 h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg">📄</span>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[150px]" title={file.name}>
+                              {file.name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {(file.size / 1024).toFixed(1)} KB • {new Date(file.uploadedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 ml-2">
+                          {file.data ? (
+                            <a
+                              href={file.data}
+                              download={file.name}
+                              className="p-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 flex items-center justify-center"
+                              title="Download"
+                            >
+                              ⬇️
+                            </a>
+                          ) : (
+                            <a
+                              href="#"
+                              onClick={(e) => { e.preventDefault(); alert(`Simulated download for ${file.name}`); }}
+                              className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 flex items-center justify-center"
+                              title="Download"
+                            >
+                              ⬇️
+                            </a>
+                          )}
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAttachment(file.id)}
+                              className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 flex items-center justify-center"
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 ml-2">
-                        <a
-                          href="#"
-                          onClick={(e) => { e.preventDefault(); alert(`Downloading simulated file: ${file.name}`); }}
-                          className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
-                          title="Download"
-                        >
-                          ⬇️
-                        </a>
-                        {canEdit && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteAttachment(file.id)}
-                            className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
-                            title="Delete"
-                          >
-                            🗑️
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -753,18 +812,39 @@ export default function TaskModal({
                               {new Date(comment.createdAt).toLocaleString()}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                          <div className="text-xs text-slate-650 dark:text-slate-300 leading-relaxed whitespace-pre-wrap text-left">
                             {parts.map((part, i) => {
                               if (part.startsWith('@')) {
+                                  const mentionName = part.substring(1).trim();
                                   return (
-                                    <span key={i} className="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-semibold px-1 rounded inline-block">
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => {
+                                        const matched = members.find(m => 
+                                          (m.user?.name || '').toLowerCase() === mentionName.toLowerCase() ||
+                                          (m.user?.email || '').toLowerCase().includes(mentionName.toLowerCase())
+                                        );
+                                        if (matched && matched.user) {
+                                          setSelectedMentionedUser(matched.user);
+                                          setMentionedUserRole(matched.role);
+                                        } else {
+                                          const loose = members.find(m => (m.user?.name || '').toLowerCase().includes(mentionName.toLowerCase()));
+                                          if (loose && loose.user) {
+                                            setSelectedMentionedUser(loose.user);
+                                            setMentionedUserRole(loose.role);
+                                          }
+                                        }
+                                      }}
+                                      className="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-semibold px-1 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition inline-block text-left"
+                                    >
                                       {part}
-                                    </span>
+                                    </button>
                                   );
                                 }
                                 return part;
                               })}
-                            </p>
+                            </div>
                           </div>
                         </article>
                       );
@@ -867,11 +947,11 @@ export default function TaskModal({
                   Due date
                   <div className="mt-1.5">
                     <DatePicker
-                      date={draft.dueDate ? new Date(draft.dueDate) : undefined}
+                      date={parseLocalDate(draft.dueDate)}
                       setDate={(date) =>
                         setDraft((current) => ({
                           ...current,
-                          dueDate: date ? date.toISOString() : undefined,
+                          dueDate: date ? formatLocalDateToUTCNoon(date) : undefined,
                         }))
                       }
                       placeholder="Select a due date"
@@ -956,6 +1036,42 @@ export default function TaskModal({
             </div>
           </div>
         </div>
+
+        {/* Floating profile overlay for clickable mentions */}
+        {selectedMentionedUser && (
+          <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+            <div className="w-80 bg-[#17191d] border border-white/[0.08] rounded-2xl p-5 text-white shadow-2xl text-left animate-in zoom-in-95 duration-150 relative">
+              <button 
+                type="button" 
+                onClick={() => setSelectedMentionedUser(null)} 
+                className="absolute top-3.5 right-4 text-slate-500 hover:text-white transition text-sm font-sans"
+              >
+                ✕
+              </button>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-indigo-650 flex items-center justify-center font-bold text-lg text-white">
+                  {(selectedMentionedUser.name || selectedMentionedUser.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-bold text-white truncate">{selectedMentionedUser.name || 'Developer'}</h4>
+                  <p className="text-xs text-slate-400 truncate mt-0.5">{selectedMentionedUser.email}</p>
+                  <span className="inline-block text-[9px] uppercase font-mono tracking-wider px-2 py-0.5 rounded border border-white/[0.04] bg-white/[0.02] text-indigo-400 mt-1.5 font-semibold">
+                    {mentionedUserRole}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 pt-3.5 border-t border-white/[0.04] flex justify-end">
+                <button 
+                  type="button" 
+                  onClick={() => setSelectedMentionedUser(null)}
+                  className="px-3.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition"
+                >
+                  Close Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
   );
 }

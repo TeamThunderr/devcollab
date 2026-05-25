@@ -6,6 +6,7 @@ import {
   handlePresenceDisconnect,
   registerPresenceHandlers,
 } from './handlers/presence.handler';
+import { registerChatHandlers } from './handlers/chat.handler';
 import { requireProjectAccess } from '../middleware/projectAccess';
 import { query } from '../db/client';
 
@@ -154,6 +155,7 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
     socket.join(`user:${userId}`);
 
     registerPresenceHandlers(io, socket as Parameters<typeof registerPresenceHandlers>[1]);
+    registerChatHandlers(io, socket as any);
 
     socket.on('join:project', async ({ projectId }) => {
       if (!projectId) return;

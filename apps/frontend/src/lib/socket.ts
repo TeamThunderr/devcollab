@@ -24,6 +24,10 @@ interface ClientToServerEvents {
     workspaceId: string;
     projectId?: string;
   }) => void;
+  "chat:join": (payload: { projectId: string }) => void;
+  "chat:leave": (payload: { projectId: string }) => void;
+  "chat:typing": (payload: { projectId: string }) => void;
+  "chat:stop-typing": (payload: { projectId: string }) => void;
 }
 
 // Events we receive from the server
@@ -39,6 +43,13 @@ interface ServerToClientEvents {
   "notification:new": (data: unknown) => void;
   "task:viewing": (data: unknown) => void;
   "task:stopped-viewing": (data: unknown) => void;
+  "chat:joined": (data: { projectId: string }) => void;
+  "message:new": (data: any) => void;
+  "message:edited": (data: any) => void;
+  "message:deleted": (data: any) => void;
+  "message:reaction": (data: any) => void;
+  "chat:typing": (data: any) => void;
+  "chat:stop-typing": (data: any) => void;
   error: (data: { message: string }) => void;
 }
 

@@ -9,8 +9,12 @@ import useAuthStore from '../../stores/authStore';
 import { useSnippetStore } from '../../stores/snippetStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
+import OnlineAvatars from '../../components/presence/OnlineAvatars';
+import { usePresence } from '../../hooks/usePresence';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { Task, TaskStatus, TaskPriority } from '../../types';
+import ListView from './ListView';
+import CalendarView from './CalendarView';
 import {
   Search, Plus, Clock, Bot, Calendar,
   TrendingUp, ChevronRight, CheckCircle2, Layers,
@@ -30,6 +34,11 @@ interface ProjectWorkspaceConfig {
   projectRoles?: Record<string, string>;
   rolePermissions?: Record<string, Record<string, boolean>>;
   archived?: boolean;
+  assignees?: Record<string, any>;
+  tags?: Record<string, string[]>;
+  attachments?: Record<string, any[]>;
+  checklists?: Record<string, any[]>;
+  sprints?: any[];
 }
 
 export default function TasksPage(): React.ReactElement {
@@ -48,6 +57,34 @@ export default function TasksPage(): React.ReactElement {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const { onlineUsers } = usePresence(workspaceId || '', pid);
+  const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
+
+  // Switcher & Filters States
+  const [taskView, setTaskView] = useState<'board' | 'list' | 'calendar'>(() => {
+    return (localStorage.getItem('devcollab_last_task_view') as any) || 'board';
+  });
+
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterPriority, setFilterPriority] = useState<string>('');
+  const [filterAssignee, setFilterAssignee] = useState<string>('');
+  const [filterLabel, setFilterLabel] = useState<string>('');
+  const [filterDueDate, setFilterDueDate] = useState<string>('');
+
+  // Memoized local storage lookup to derive labels for filtering
+  const localMetadata = useMemo(() => {
+    try {
+      const stored = localStorage.getItem(`devcollab_project_workspace_${pid}`);
+      if (stored) {
+        const config = JSON.parse(stored);
+        return {
+          tags: config.tags || {},
+        };
+      }
+    } catch {}
+    return { tags: {} };
+  }, [tasks, pid]);
 
   // Snippets store and state
   const { snippets, fetchSnippetsByProject } = useSnippetStore();
@@ -84,9 +121,21 @@ export default function TasksPage(): React.ReactElement {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
 
-  // Optimistic/Local tasks tracking
-  const [localTasks, setLocalTasks] = useState<Task[]>([]);
+  // Project Workspace local metadata config
   const [config, setConfig] = useState<ProjectWorkspaceConfig | null>(null);
+
+  const handleUpdateMetadata = (taskId: string, category: 'assignees' | 'tags' | 'attachments' | 'checklists', data: any) => {
+    updateProjectConfig(prev => {
+      const next = { ...prev };
+      if (!next[category]) next[category] = {};
+      if (data === null || data === undefined) {
+        delete next[category][taskId];
+      } else {
+        next[category][taskId] = data;
+      }
+      return next;
+    });
+  };
 
   const activeProject = useMemo(() => {
     return projects.find(p => p.id === pid);
@@ -194,9 +243,7 @@ export default function TasksPage(): React.ReactElement {
     }
   }, [pid, fetchTasksByProject]);
 
-  useEffect(() => {
-    setLocalTasks(tasks);
-  }, [tasks]);
+
 
 
   const updateProjectConfig = (updater: (prev: ProjectWorkspaceConfig) => ProjectWorkspaceConfig) => {
@@ -237,30 +284,8 @@ export default function TasksPage(): React.ReactElement {
     setIsCreatingTask(true);
     setTitleError(null);
 
-    const tempId = `temp-${Date.now()}`;
-    const tempTask: Task = {
-      id: tempId,
-      title: taskTitle.trim(),
-      description: taskDesc.trim() || undefined,
-      status: taskStatus,
-      priority: taskPrio,
-      dueDate: taskDue ? taskDue.toISOString() : undefined,
-      projectId: pid,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: {
-        id: user?.id || 'owner',
-        email: user?.email || 'owner@devcollab.com',
-        name: user?.name || 'Workspace Member'
-      },
-      comments: []
-    };
-
-    // Pre-insert optimistically so it instantly appears in the board lane
-    setLocalTasks(prev => [tempTask, ...prev]);
-
     try {
-      const added = await createTask({
+      await createTask({
         title: taskTitle.trim(),
         description: taskDesc.trim() || undefined,
         status: taskStatus,
@@ -268,9 +293,6 @@ export default function TasksPage(): React.ReactElement {
         dueDate: taskDue ? taskDue.toISOString() : undefined,
         projectId: pid
       });
-
-      // Replace the optimistic temp task with the actual added task
-      setLocalTasks(prev => prev.map(t => t.id === tempId ? added : t));
       logActivity(`created task: "${taskTitle.trim()}"`);
 
       // Reset form and close modal smoothly
@@ -279,8 +301,6 @@ export default function TasksPage(): React.ReactElement {
       setTaskDue(undefined);
       setShowTaskForm(false);
     } catch (err: any) {
-      // Revert optimistic task on error
-      setLocalTasks(prev => prev.filter(t => t.id !== tempId));
       alert(`Failed to create task: ${err.message || err}`);
     } finally {
       setIsCreatingTask(false);
@@ -295,19 +315,16 @@ export default function TasksPage(): React.ReactElement {
     const { active, over } = event;
     if (!over) return;
 
-    const activeTask = localTasks.find(t => t.id === active.id);
+    const activeTask = tasks.find(t => t.id === active.id);
     if (!activeTask) return;
 
     const overId = String(over.id);
     const nextStatus = (['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'].includes(overId) ? overId : 'TODO') as TaskStatus;
 
     if (activeTask.status !== nextStatus) {
-      setLocalTasks(prev => prev.map(t => t.id === active.id ? { ...t, status: nextStatus } : t));
       logActivity(`moved task "${activeTask.title}" to ${nextStatus.replace('_', ' ')}`);
-
-      void updateTask(activeTask.id, { status: nextStatus }).catch(() => {
-        setLocalTasks(tasks);
-        alert("Failed to synchronize board placement. Reverting status.");
+      void updateTask(activeTask.id, { status: nextStatus }).catch((err) => {
+        alert(`Failed to update task placement: ${err.message}`);
       });
     }
   };
@@ -333,8 +350,8 @@ export default function TasksPage(): React.ReactElement {
     setAiSuggestions([]);
 
     setTimeout(() => {
-      const completed = localTasks.filter(t => t.status === 'DONE').length;
-      const total = localTasks.length;
+      const completed = tasks.filter(t => t.status === 'DONE').length;
+      const total = tasks.length;
       const progress = total ? Math.round((completed / total) * 100) : 0;
       setAiSummary(`📊 DevCollab AI Project Status Report:\n\nThis stream is currently resolving **${progress}%** of all tracked milestones (${completed}/${total} completed tasks). The delivery index is stable. To accelerate velocity, consider breaking down pending high priority deliverables in the In Progress column.`);
       setAiLoading(false);
@@ -344,14 +361,13 @@ export default function TasksPage(): React.ReactElement {
   const handleAddAISugToBoard = async (sug: typeof aiSuggestions[number]) => {
     if (!pid) return;
     try {
-      const added = await createTask({
+      await createTask({
         title: sug.title,
         description: sug.description,
         status: 'TODO',
         priority: sug.priority,
         projectId: pid
       });
-      setLocalTasks(prev => [added, ...prev]);
       logActivity(`created task from AI suggestion: "${sug.title}"`);
       alert(`Added "${sug.title}" to Kanban Todo lane!`);
     } catch (err: any) {
@@ -360,25 +376,101 @@ export default function TasksPage(): React.ReactElement {
   };
 
   // Stats
-  const completedCount = useMemo(() => localTasks.filter(t => t.status === 'DONE').length, [localTasks]);
-  const totalCount = useMemo(() => localTasks.length, [localTasks]);
+  const completedCount = useMemo(() => tasks.filter(t => t.status === 'DONE').length, [tasks]);
+  const totalCount = useMemo(() => tasks.length, [tasks]);
   const percentComplete = useMemo(() => totalCount ? Math.round((completedCount / totalCount) * 100) : 0, [completedCount, totalCount]);
 
   const upcomingDeadlines = useMemo(() => {
-    return localTasks
+    return tasks
       .filter(t => t.dueDate && t.status !== 'DONE')
       .map(t => ({ ...t, parsedDate: new Date(t.dueDate!) }))
       .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime())
       .slice(0, 3);
-  }, [localTasks]);
+  }, [tasks]);
 
-  const filteredKanbanTasks = useMemo(() => {
-    if (!searchQuery.trim()) return localTasks;
-    return localTasks.filter(t =>
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }, [localTasks, searchQuery]);
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(t => {
+      // 1. Search Query
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesTitle = t.title.toLowerCase().includes(query);
+        const matchesDesc = t.description?.toLowerCase().includes(query) || false;
+        if (!matchesTitle && !matchesDesc) return false;
+      }
+
+      // 2. Status
+      if (filterStatus && t.status !== filterStatus) return false;
+
+      // 3. Priority
+      if (filterPriority && t.priority !== filterPriority) return false;
+
+      // Local metadata lookups for assignee and tags
+      let localAssigneeId = '';
+      let localTags: string[] = [];
+      try {
+        const stored = localStorage.getItem(`devcollab_project_workspace_${t.projectId}`);
+        if (stored) {
+          const cfg = JSON.parse(stored);
+          localAssigneeId = cfg.assignees?.[t.id]?.id || '';
+          localTags = cfg.tags?.[t.id] || [];
+        }
+      } catch {}
+
+      // 4. Assignee
+      if (filterAssignee && localAssigneeId !== filterAssignee) return false;
+
+      // 5. Label
+      if (filterLabel && !localTags.includes(filterLabel)) return false;
+
+      // 6. Due Date
+      if (filterDueDate) {
+        if (!t.dueDate) {
+          return filterDueDate === 'no_due_date';
+        }
+        
+        const due = new Date(t.dueDate);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+        if (filterDueDate === 'overdue') {
+          return due < new Date() && t.status !== 'DONE';
+        } else if (filterDueDate === 'today') {
+          return due >= today && due < tomorrow;
+        } else if (filterDueDate === 'week') {
+          return due >= today && due <= endOfWeek;
+        }
+      }
+
+      return true;
+    });
+  }, [tasks, searchQuery, filterStatus, filterPriority, filterAssignee, filterLabel, filterDueDate]);
+
+  const filteredActivities = useMemo(() => {
+    if (!config?.activities) return [];
+    return config.activities.filter(act => {
+      // 1. Filter by Member / Assignee (loose match by userName)
+      if (filterAssignee) {
+        const memberName = members.find(m => m.userId === filterAssignee)?.user?.name || '';
+        if (memberName && !act.userName.toLowerCase().includes(memberName.toLowerCase())) return false;
+      }
+      
+      // 2. Search query filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesDetails = act.details.toLowerCase().includes(query);
+        const matchesUser = act.userName.toLowerCase().includes(query);
+        if (!matchesDetails && !matchesUser) return false;
+      }
+      
+      return true;
+    });
+  }, [config?.activities, filterAssignee, searchQuery, members]);
 
   return (
     <div className="min-h-screen bg-[#121316] text-slate-200 font-sans antialiased premium-scrollbar selection:bg-indigo-500/30 selection:text-white">
@@ -488,7 +580,7 @@ export default function TasksPage(): React.ReactElement {
               <div className="glass-panel rounded-2xl p-6 space-y-4 text-left">
                 <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Recent Milestones</h3>
                 <div className="divide-y divide-white/[0.03]">
-                  {localTasks.length === 0 ? (
+                  {tasks.length === 0 ? (
                     <div className="text-center py-8 space-y-2.5">
                       <p className="text-xs text-slate-500 italic">No milestones built yet.</p>
                       <button type="button" onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }} className="px-3 py-1.5 border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-indigo-400 font-bold rounded-lg text-[10px] transition">
@@ -496,7 +588,7 @@ export default function TasksPage(): React.ReactElement {
                       </button>
                     </div>
                   ) : (
-                    localTasks.slice(0, 4).map(task => (
+                    tasks.slice(0, 4).map((task: Task) => (
                       <div key={task.id} className="flex justify-between items-center py-3 hover:bg-white/[0.01] px-2 rounded-xl transition cursor-pointer" onClick={() => setSelectedTask(task)}>
                         <div className="min-w-0 flex items-center gap-2.5">
                           <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${task.status === 'DONE' ? 'text-emerald-500' : 'text-slate-500'}`} />
@@ -594,13 +686,137 @@ export default function TasksPage(): React.ReactElement {
                 />
               </div>
 
-              {canCreateTask && (
+              {/* Segmented view switcher */}
+              <div className="flex items-center gap-1 bg-black/25 border border-white/[0.04] rounded-xl p-0.5 self-start">
+                {[
+                  { id: 'board', label: 'Board' },
+                  { id: 'list', label: 'List' },
+                  { id: 'calendar', label: 'Calendar' }
+                ].map(view => (
+                  <button
+                    key={view.id}
+                    onClick={() => {
+                      setTaskView(view.id as any);
+                      localStorage.setItem('devcollab_last_task_view', view.id);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition ${
+                      taskView === view.id
+                        ? 'bg-indigo-650 text-white shadow-sm border border-white/[0.04]'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {view.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                {othersOnline.length > 0 && (
+                  <div className="flex flex-col items-end hidden sm:flex">
+                    <OnlineAvatars workspaceId={workspaceId} projectId={pid} size="sm" />
+                    <span className="text-[10px] text-gray-500 mt-0.5">{othersOnline.length} people viewing</span>
+                  </div>
+                )}
+                {canCreateTask && (
+                  <button
+                    type="button"
+                    onClick={() => { setTaskStatus('TODO'); setTaskDue(undefined); setShowTaskForm(true); }}
+                    className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Create Task
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Developer-centric Filter selectors */}
+            <div className="flex flex-wrap gap-2 items-center bg-black/10 border border-white/[0.03] rounded-xl p-2.5">
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 mr-1.5">Filters:</span>
+
+              {/* Status Selector */}
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-slate-950 border border-white/[0.04] text-[10px] font-bold text-slate-400 hover:text-white rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
+              >
+                <option value="">All Statuses</option>
+                <option value="TODO">To Do</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="IN_REVIEW">In Review</option>
+                <option value="DONE">Done</option>
+              </select>
+
+              {/* Priority Selector */}
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                className="bg-slate-950 border border-white/[0.04] text-[10px] font-bold text-slate-400 hover:text-white rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
+              >
+                <option value="">All Priorities</option>
+                <option value="P0">P0 (Critical)</option>
+                <option value="P1">P1 (High)</option>
+                <option value="P2">P2 (Normal)</option>
+              </select>
+
+              {/* Assignee Selector */}
+              <select
+                value={filterAssignee}
+                onChange={(e) => setFilterAssignee(e.target.value)}
+                className="bg-slate-950 border border-white/[0.04] text-[10px] font-bold text-slate-400 hover:text-white rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 transition max-w-[140px] cursor-pointer"
+              >
+                <option value="">Anyone</option>
+                {members.map(m => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.user?.name || m.user?.email || 'Unknown'}
+                  </option>
+                ))}
+              </select>
+
+              {/* Due Date Filter */}
+              <select
+                value={filterDueDate}
+                onChange={(e) => setFilterDueDate(e.target.value)}
+                className="bg-slate-950 border border-white/[0.04] text-[10px] font-bold text-slate-400 hover:text-white rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
+              >
+                <option value="">Any Due Date</option>
+                <option value="overdue">Overdue</option>
+                <option value="today">Due Today</option>
+                <option value="week">Due This Week</option>
+                <option value="no_due_date">No Due Date</option>
+              </select>
+
+              {/* Labels Filter */}
+              <select
+                value={filterLabel}
+                onChange={(e) => setFilterLabel(e.target.value)}
+                className="bg-slate-950 border border-white/[0.04] text-[10px] font-bold text-slate-400 hover:text-white rounded-lg px-2.5 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
+              >
+                <option value="">All Labels</option>
+                {Array.from(
+                  new Set(
+                    Object.values(localMetadata.tags || {}).flat() as string[]
+                  )
+                ).map(tag => (
+                  <option key={tag} value={tag}>
+                    🏷️ {tag}
+                  </option>
+                ))}
+              </select>
+
+              {/* Clear filters trigger */}
+              {(filterStatus || filterPriority || filterAssignee || filterLabel || filterDueDate) && (
                 <button
                   type="button"
-                  onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }}
-                  className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
+                  onClick={() => {
+                    setFilterStatus('');
+                    setFilterPriority('');
+                    setFilterAssignee('');
+                    setFilterLabel('');
+                    setFilterDueDate('');
+                  }}
+                  className="px-2.5 py-1 border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-extrabold uppercase rounded-lg text-[9px] transition"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Create Task
+                  Clear Filters
                 </button>
               )}
             </div>
@@ -609,24 +825,56 @@ export default function TasksPage(): React.ReactElement {
               <div className="py-24 text-center">
                 <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
               </div>
-            ) : (
+            ) : taskView === 'board' ? (
               <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
                 <div className="flex gap-6 overflow-x-auto pb-4 select-none items-start min-h-[480px] premium-scrollbar">
                   {config?.columns?.map(col => {
-                    const colTasks = filteredKanbanTasks.filter(t => t.status === col.id);
+                    const colTasks = filteredTasks.filter(t => t.status === col.id);
                     return (
                       <KanbanColumn
                         key={col.id}
                         title={col.title}
                         status={col.id}
                         tasks={colTasks}
+                        config={config}
                         onTaskClick={setSelectedTask}
-                        onAddTask={canCreateTask ? (colId) => { setTaskStatus(colId as TaskStatus); setShowTaskForm(true); } : undefined}
+                        onAddTask={canCreateTask ? (colId) => { setTaskStatus(colId as TaskStatus); setTaskDue(undefined); setShowTaskForm(true); } : undefined}
                       />
                     );
                   })}
                 </div>
               </DndContext>
+            ) : taskView === 'list' ? (
+              <ListView
+                tasks={filteredTasks}
+                members={members}
+                config={config}
+                onUpdateMetadata={handleUpdateMetadata}
+                onTaskClick={setSelectedTask}
+                onUpdateTask={async (id, updates) => {
+                  const res = await updateTask(id, { ...updates, dueDate: updates.dueDate === null ? undefined : updates.dueDate });
+                  logActivity(`updated task: "${res.title}"`);
+                  return res;
+                }}
+                projectId={pid!}
+              />
+            ) : (
+              <CalendarView
+                tasks={filteredTasks}
+                config={config}
+                onUpdateMetadata={handleUpdateMetadata}
+                onTaskClick={setSelectedTask}
+                onUpdateTask={async (id, updates) => {
+                  const res = await updateTask(id, { ...updates, dueDate: updates.dueDate === null ? undefined : updates.dueDate });
+                  logActivity(`updated task: "${res.title}"`);
+                  return res;
+                }}
+                onDayClick={(date) => {
+                  setTaskStatus('TODO');
+                  setTaskDue(date);
+                  setShowTaskForm(true);
+                }}
+              />
             )}
           </div>
         )}
@@ -634,16 +882,60 @@ export default function TasksPage(): React.ReactElement {
         {/* ─── TAB 3: TIMELINE AUDIT FEED ──────────────────────────────────────── */}
         {activeTab === 'activity' && canManageAuditFeed && (
           <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-150">
-            <div className="text-left space-y-1 pb-4 border-b border-white/[0.04]">
-              <h2 className="text-base font-bold text-white">Timeline Audit Logs</h2>
-              <p className="text-[10px] text-slate-500 leading-none">Chronological pipeline logs tracking workspace updates.</p>
+            <div className="text-left space-y-1 pb-4 border-b border-white/[0.04] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-white">Timeline Audit Logs</h2>
+                <p className="text-[10px] text-slate-500 leading-none mt-1">Chronological pipeline logs tracking workspace updates.</p>
+              </div>
+
+              {/* Audit Filter Controls */}
+              <div className="flex flex-wrap gap-2 items-center bg-black/20 border border-white/[0.04] rounded-xl p-2 self-start sm:self-center">
+                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 px-1">Filter Logs:</span>
+                
+                <div className="flex items-center gap-1.5 bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 w-32 focus-within:border-indigo-500/35 transition">
+                  <Search className="h-3 w-3 text-slate-500 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search details..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-transparent text-[9px] w-full outline-none placeholder-slate-600 text-slate-200"
+                  />
+                </div>
+
+                <select
+                  value={filterAssignee}
+                  onChange={(e) => setFilterAssignee(e.target.value)}
+                  className="bg-slate-950 border border-white/[0.04] text-[9px] font-bold text-slate-400 hover:text-white rounded-lg px-1.5 py-1 outline-none focus:border-indigo-500 transition cursor-pointer max-w-[100px]"
+                >
+                  <option value="">All Members</option>
+                  {members.map(m => (
+                    <option key={m.userId} value={m.userId}>
+                      👤 {m.user?.name || m.user?.email || 'Unknown'}
+                    </option>
+                  ))}
+                </select>
+
+                {(searchQuery || filterAssignee) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setFilterAssignee('');
+                    }}
+                    className="px-1.5 py-0.5 border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-extrabold uppercase rounded text-[8px] transition"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="relative border-l border-white/[0.04] pl-6 ml-4 space-y-6 py-2 text-left">
-              {config?.activities?.length === 0 ? (
+              {filteredActivities.length === 0 ? (
                 <p className="text-[11px] text-slate-500 italic py-4">No logged entries.</p>
               ) : (
-                config?.activities?.map(act => (
+                filteredActivities.map(act => (
                   <div key={act.id} className="relative group">
                     <span className="absolute -left-[29px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#08090a] border border-indigo-500/40 shadow-sm flex items-center justify-center">
                       <span className="w-1 h-1 rounded-full bg-cyan-400"></span>
@@ -984,6 +1276,8 @@ export default function TasksPage(): React.ReactElement {
       {selectedTask && (
         <TaskModal
           task={selectedTask}
+          config={config}
+          onUpdateMetadata={handleUpdateMetadata}
           onClose={() => setSelectedTask(null)}
           onSave={async updates => {
             const res = await updateTask(selectedTask.id, { ...updates, dueDate: updates.dueDate === null ? undefined : updates.dueDate });

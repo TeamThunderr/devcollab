@@ -48,11 +48,30 @@ export function usePresence(workspaceId: string, projectId?: string) {
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        socket.emit("presence:ping", { workspaceId, projectId });
+      }
+    };
+
+    let idleTimer: ReturnType<typeof setTimeout>;
+    const handleMouseMove = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        socket.emit("presence:ping", { workspaceId, projectId });
+      }, 60000);
+    };
+
     socket.on("presence:update", handlePresenceUpdate);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("mousemove", handleMouseMove);
 
     return () => {
       clearInterval(intervalId);
+      clearTimeout(idleTimer);
       socket.off("presence:update", handlePresenceUpdate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("mousemove", handleMouseMove);
     };
   }, [workspaceId, projectId, setOnlineUsers]);
 

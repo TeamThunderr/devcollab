@@ -3,9 +3,12 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task } from '../../types';
 import { MessageSquare, Paperclip, Calendar, CheckSquare } from 'lucide-react';
+import useRealtimeStore from '../../stores/realtimeStore';
+import useAuthStore from '../../stores/authStore';
 
 interface TaskCardProps {
   task: Task;
+  config?: any;
   onClick?: (task: Task) => void;
 }
 
@@ -22,7 +25,7 @@ const tagColors = [
   'bg-pink-500/10 text-pink-400 border-pink-500/15',
 ];
 
-export default function TaskCard({ task, onClick }: TaskCardProps): React.ReactElement {
+export default function TaskCard({ task, config, onClick }: TaskCardProps): React.ReactElement {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: {
@@ -32,26 +35,38 @@ export default function TaskCard({ task, onClick }: TaskCardProps): React.ReactE
     },
   });
 
-  // Load local storage extensions for checklists, assignees, sprints, comments
+  // Load extensions reactively or from localStorage fallback to prevent stale states
   const localProjectData = React.useMemo(() => {
+    if (config) {
+      const taskAssignee = config.assignees?.[task.id];
+      const taskTags = config.tags?.[task.id] || [];
+      const taskAttachments = config.attachments?.[task.id] || [];
+      const savedChecklist = config.checklists?.[task.id] || [];
+      const sprint = config.sprints?.find((s: any) => s.taskIds?.includes(task.id));
+      return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist, sprint };
+    }
     try {
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
-        const config = JSON.parse(stored);
-        const taskAssignee = config.assignees?.[task.id];
-        const taskTags = config.tags?.[task.id] || [];
-        const taskAttachments = config.attachments?.[task.id] || [];
-        const savedChecklist = config.checklists?.[task.id] || [];
-        const sprint = config.sprints?.find((s: any) => s.taskIds?.includes(task.id));
+        const parsed = JSON.parse(stored);
+        const taskAssignee = parsed.assignees?.[task.id];
+        const taskTags = parsed.tags?.[task.id] || [];
+        const taskAttachments = parsed.attachments?.[task.id] || [];
+        const savedChecklist = parsed.checklists?.[task.id] || [];
+        const sprint = parsed.sprints?.find((s: any) => s.taskIds?.includes(task.id));
         return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist, sprint };
       }
     } catch (e) {
       // Ignore
     }
     return { assignee: undefined, tags: [], attachments: [], checklist: [], sprint: undefined };
-  }, [task.id, task.projectId]);
+  }, [task.id, task.projectId, config]);
 
   const { assignee, tags, attachments, checklist, sprint } = localProjectData;
+  const taskViewers = useRealtimeStore(s => s.taskViewers?.[task.id] || []);
+  const currentUser = useAuthStore(s => s.user);
+  
+  const othersViewing = taskViewers.filter(u => u.userId !== currentUser?.id);
 
   const prio = priorityConfig[task.priority] || priorityConfig.P2;
   const initial = assignee ? (assignee.name || assignee.email || '?').charAt(0).toUpperCase() : (task.createdBy?.name || '?').charAt(0).toUpperCase();
@@ -148,6 +163,25 @@ export default function TaskCard({ task, onClick }: TaskCardProps): React.ReactE
 
           {/* Comment & Attachment & Checklist Counts */}
           <div className="flex items-center gap-1.5 flex-shrink-0 text-slate-650">
+            {othersViewing.length > 0 && (
+              <div className="flex items-center mr-1">
+                {othersViewing.slice(0, 2).map((u, i) => (
+                  <div 
+                    key={u.userId} 
+                    className="w-4 h-4 rounded-full ring-1 ring-[#1e2025] overflow-hidden bg-indigo-500 flex items-center justify-center -ml-1.5 first:ml-0 relative"
+                    title={`${u.name} is viewing this`}
+                    style={{ zIndex: i }}
+                  >
+                    {u.avatar ? (
+                      <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[7px] font-bold text-white uppercase">{(u.name || '?').charAt(0)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            
             {totalItems > 0 && (
               <span className="inline-flex items-center gap-0.5 text-[8px] font-bold" title={`${completedItems}/${totalItems} items completed`}>
                 <CheckSquare className="h-2.5 w-2.5" /> {completedItems}/{totalItems}
