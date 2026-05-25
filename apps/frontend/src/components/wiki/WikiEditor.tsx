@@ -2,7 +2,6 @@ import React, { useEffect, useCallback, useRef, useState, useMemo } from 'react'
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
-import { Link } from '@tiptap/extension-link';
 import { Image } from '@tiptap/extension-image';
 import { TaskList } from '@tiptap/extension-task-list';
 import { TaskItem } from '@tiptap/extension-task-item';
@@ -36,6 +35,7 @@ const extensions = [
     codeBlock: false,
     dropcursor: false,
   }),
+  Underline,
   Markdown.configure({
     html: true,
     transformCopiedText: true,
@@ -100,9 +100,9 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
     ({ editor }: { editor: any }) => {
       if (!activePage) return;
       const html = editor.getHTML();
-      
+
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      
+
       saveTimeoutRef.current = setTimeout(() => {
         updatePage(activePage.id, { content: html });
       }, 2000);
@@ -176,7 +176,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
       const content = editor.getText();
       const response = await api.post('/api/wiki/ai/summarize', { content });
       const summaryText = typeof response.data === 'string' ? response.data : response.data.summary || 'Failed to generate summary.';
-      
+
       // Insert at the top of the document as a callout
       editor.commands.insertContentAt(0, `<div data-type="info" class="callout callout-info"><p><strong>✨ AI Summary</strong></p>${summaryText}</div><p></p>`);
     } catch (err) {
@@ -196,7 +196,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
           <span className="text-gray-600">/</span>
           <span className="truncate max-w-[200px] text-gray-200">{activePage.title || 'Untitled'}</span>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <select
             value={activePage.linkedTaskId || ''}
@@ -225,7 +225,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
             {saveStatus === 'saved' && 'Saved'}
             {saveStatus === 'error' && <span className="text-red-400">Error</span>}
           </span>
-          <button 
+          <button
             onClick={handleGenerateSummary}
             disabled={isGeneratingSummary}
             className={`text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 px-3 py-1.5 rounded shadow-sm transition-all flex items-center gap-2 border border-purple-500/30 mr-2 ${isGeneratingSummary ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -233,14 +233,14 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
           >
             ✨ {isGeneratingSummary ? 'Generating...' : 'AI Summary'}
           </button>
-          <button 
+          <button
             onClick={onToggleHistory}
             className="text-xs bg-[#2d2d2d] hover:bg-[#3d3d3d] text-gray-300 px-3 py-1.5 rounded shadow-sm transition-all flex items-center gap-2 border border-[#444] mr-2"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             History
           </button>
-          <button 
+          <button
             onClick={handleManualSave}
             className="text-xs bg-[#333] hover:bg-[#444] text-white px-3 py-1.5 rounded shadow-sm transition-all flex items-center gap-2 border border-[#444]"
           >
@@ -278,10 +278,10 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
           </div>
 
           <div className="flex gap-1 bg-[#1e1e1e] p-1 rounded-md border border-[#333] ml-2">
-            <ToolbarButton 
-              onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} 
-              active={editor.isActive('table')} 
-              icon="⊞ Table" 
+            <ToolbarButton
+              onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+              active={editor.isActive('table')}
+              icon="⊞ Table"
             />
             {editor.isActive('table') && (
               <>
@@ -295,16 +295,16 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
           </div>
 
           <div className="flex gap-1 bg-[#1e1e1e] p-1 rounded-md border border-[#333] ml-2 relative">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleImageUpload} 
-              accept="image/*" 
-              className="hidden" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*"
+              className="hidden"
             />
-            <ToolbarButton 
-              onClick={() => fileInputRef.current?.click()} 
-              icon={isUploading ? "..." : "🖼️ Image"} 
+            <ToolbarButton
+              onClick={() => fileInputRef.current?.click()}
+              icon={isUploading ? "..." : "🖼️ Image"}
               disabled={isUploading}
             />
           </div>
@@ -336,7 +336,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
         {activePage.coverImage && (
           <div className="w-full h-48 sm:h-64 relative group/cover">
             <img src={activePage.coverImage} className="w-full h-full object-cover" alt="Cover" />
-            <button 
+            <button
               onClick={() => updatePage(activePage.id, { coverImage: null })}
               className="absolute top-4 right-4 bg-black/50 hover:bg-black/80 text-white px-3 py-1.5 rounded text-xs opacity-0 group-hover/cover:opacity-100 transition-opacity"
             >
@@ -344,59 +344,59 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
             </button>
           </div>
         )}
-        
+
         <div className="max-w-4xl mx-auto px-12 pt-12 pb-32">
           {/* Controls to add cover/icon if missing */}
           <div className="flex gap-4 opacity-0 group-hover/editor:opacity-100 transition-opacity mb-4">
             {!activePage.icon && (
-               <button onClick={() => updatePage(activePage.id, { icon: '📄' })} className="text-gray-400 hover:text-gray-200 text-sm flex items-center gap-1">
-                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 Add Icon
-               </button>
+              <button onClick={() => updatePage(activePage.id, { icon: '📄' })} className="text-gray-400 hover:text-gray-200 text-sm flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Add Icon
+              </button>
             )}
             {!activePage.coverImage && (
-               <button onClick={() => updatePage(activePage.id, { coverImage: 'https://images.unsplash.com/photo-1707343843437-caacff5cfa74?q=80&w=2940&auto=format&fit=crop' })} className="text-gray-400 hover:text-gray-200 text-sm flex items-center gap-1">
-                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                 Add Cover
-               </button>
+              <button onClick={() => updatePage(activePage.id, { coverImage: 'https://images.unsplash.com/photo-1707343843437-caacff5cfa74?q=80&w=2940&auto=format&fit=crop' })} className="text-gray-400 hover:text-gray-200 text-sm flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                Add Cover
+              </button>
             )}
           </div>
-          
+
           {/* Icon and Title */}
           <div className="flex flex-col mb-8 relative">
             {activePage.icon && (
               <div className="relative group/icon -mt-16 mb-4 z-10 w-max">
-                <span 
-                  className="text-6xl cursor-pointer bg-[#1e1e1e] p-1 rounded inline-block hover:bg-[#252526] transition-colors" 
+                <span
+                  className="text-6xl cursor-pointer bg-[#1e1e1e] p-1 rounded inline-block hover:bg-[#252526] transition-colors"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   title="Change Icon"
                 >
                   {activePage.icon}
                 </span>
-                
+
                 {showEmojiPicker && (
                   <div className="absolute top-full mt-2 left-0 z-50 shadow-2xl">
-                    <EmojiPicker 
-                      theme="dark" 
+                    <EmojiPicker
+                      theme="dark"
                       onEmojiClick={(emojiData) => {
                         updatePage(activePage.id, { icon: emojiData.emoji });
                         setShowEmojiPicker(false);
-                      }} 
+                      }}
                     />
                   </div>
                 )}
               </div>
             )}
-            
-            <input 
-              type="text" 
+
+            <input
+              type="text"
               value={activePage.title}
               onChange={(e) => updatePage(activePage.id, { title: e.target.value })}
               className="bg-transparent text-4xl font-bold text-gray-100 outline-none w-full placeholder-gray-600 mb-4"
               placeholder="Untitled"
             />
           </div>
-          
+
           <EditorContent editor={editor} />
         </div>
       </div>
@@ -409,9 +409,8 @@ function ToolbarButton({ onClick, active, disabled, icon, className = '' }: any)
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${disabled ? 'opacity-30 cursor-not-allowed' : ''} ${
-        active ? 'bg-blue-600/20 text-blue-400 shadow-inner' : 'text-gray-400 hover:bg-[#333] hover:text-gray-100 hover:shadow-sm'
-      } ${className}`}
+      className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${disabled ? 'opacity-30 cursor-not-allowed' : ''} ${active ? 'bg-blue-600/20 text-blue-400 shadow-inner' : 'text-gray-400 hover:bg-[#333] hover:text-gray-100 hover:shadow-sm'
+        } ${className}`}
     >
       {icon}
     </button>

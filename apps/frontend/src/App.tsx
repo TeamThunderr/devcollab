@@ -11,9 +11,11 @@ import ProjectLayout from "./layouts/ProjectLayout";
 // ─── Auth pages ───────────────────────────────────────────────────────────────
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 // ─── Global pages ─────────────────────────────────────────────────────────────
 import WorkspaceList from "./pages/workspace/WorkspaceList";
+import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
 
 // ─── Workspace pages ──────────────────────────────────────────────────────────
 import WorkspaceOverview from "./pages/workspace/WorkspaceOverview";
@@ -28,6 +30,7 @@ import SettingsView from "./pages/settings/SettingsView";
 import TasksView from "./pages/project/TasksView";
 import EditorView from "./pages/editor/EditorView";
 import SnippetsView from "./pages/snippets/SnippetsView";
+import SnippetEditorPage from "./pages/snippets/SnippetEditorPage";
 import WikiView from "./pages/wiki/WikiView";
 
 // ─── Root redirect ────────────────────────────────────────────────────────────
@@ -60,9 +63,13 @@ function App(): React.ReactElement {
           <Route path="/register" element={<RegisterPage />} />
         </Route>
 
+        {/* Public Invite Accept Route */}
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
+
         {/* ── Global protected shell: /workspaces ── */}
         <Route element={<GlobalLayout />}>
           <Route path="/workspaces" element={<WorkspaceList />} />
+          <Route path="/onboarding/create-workspace" element={<CreateWorkspaceOnboardingPage />} />
         </Route>
 
         {/* ── Workspace-level routes: /w/:workspaceId/* ── */}
@@ -70,17 +77,20 @@ function App(): React.ReactElement {
           <Route index element={<WorkspaceOverview />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="activity" element={<ActivityFeedPage />} />
-          <Route path="ai" element={<AIAssistantView />} />
           <Route path="members" element={<MembersPage />} />
           <Route path="billing" element={<BillingPage />} />
           <Route path="settings" element={<SettingsView />} />
+          <Route path="snippets" element={<SnippetsView />} />
+          <Route path="snippets/:snippetId" element={<SnippetEditorPage />} />
 
           {/* ── Project-level routes: /w/:workspaceId/p/:projectId/* ── */}
           <Route path="p/:projectId" element={<ProjectLayout />}>
             <Route index element={<Navigate to="board" replace />} />
             <Route path="board" element={<TasksView />} />
             <Route path="editor" element={<EditorView />} />
+            <Route path="ai" element={<AIAssistantView />} />
             <Route path="snippets" element={<SnippetsView />} />
+            <Route path="snippets/:snippetId" element={<SnippetEditorPage />} />
             <Route path="wiki" element={<WikiView />} />
           </Route>
         </Route>

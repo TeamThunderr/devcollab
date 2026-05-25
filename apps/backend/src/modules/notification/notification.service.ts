@@ -47,6 +47,18 @@ export const notificationService = {
     const where: string[] = ['user_id = $1'];
     const params: any[] = [userId];
 
+    where.push(`(
+      related_task_id IS NULL OR 
+      related_task_id IN (
+        SELECT t.id 
+        FROM tasks t
+        JOIN projects p ON p.id = t.project_id
+        JOIN workspace_members wm ON wm.workspace_id = p.workspace_id AND wm.user_id = $1
+        LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+        WHERE wm.role IN ('owner', 'admin') OR pm.id IS NOT NULL
+      )
+    )`);
+
     if (filters.isRead === 'true') {
       where.push('read_at IS NOT NULL');
     } else if (filters.isRead === 'false') {

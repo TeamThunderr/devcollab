@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import useEditorStore from "../../stores/editorStore";
-import { useParams,useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../../lib/axios";
 
 export default function TopMenuBar() {

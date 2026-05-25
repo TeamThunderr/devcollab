@@ -5,6 +5,7 @@ import { CreateWorkspaceInput, InviteMemberInput, AcceptInviteInput } from './wo
 import { Role, WorkspaceMembership } from '../../middleware/rbac.middleware';
 import { activityService } from '../activity/activity.service';
 import { notificationService } from '../notification/notification.service';
+import { sendInviteEmail } from '../../utils/mail';
 
 function toDbRole(role: Role): string {
   return role.toLowerCase();
@@ -47,7 +48,7 @@ export const workspaceService = {
   async createWorkspace(userId: string, data: CreateWorkspaceInput) {
     const owned = await query<{ plan: string }>('SELECT plan FROM workspaces WHERE owner_id = $1', [userId]);
     const hasPro = owned.rows.some(workspace => workspace.plan === 'pro');
-    if (!hasPro && (owned.rowCount ?? 0) >= 1) {
+    if (process.env.NODE_ENV === 'production' && !hasPro && (owned.rowCount ?? 0) >= 1) {
       throw new AppError(403, 'Free plan limit reached: You can only create 1 workspace. Upgrade an existing workspace to PRO to create more.');
     }
 
@@ -118,7 +119,7 @@ export const workspaceService = {
   },
 
   async inviteMember(workspaceId: string, inviterId: string, data: InviteMemberInput) {
-    const workspaceResult = await query<{ plan: string }>('SELECT plan FROM workspaces WHERE id = $1', [workspaceId]);
+    const workspaceResult = await query<{ plan: string; name: string }>('SELECT plan, name FROM workspaces WHERE id = $1', [workspaceId]);
     const workspace = workspaceResult.rows[0];
     if (!workspace) {
       throw new AppError(404, 'Workspace not found');
@@ -149,15 +150,36 @@ export const workspaceService = {
       throw new AppError(400, 'User is already a member of this workspace');
     }
 
+    const pendingInvite = await query(
+      `SELECT id FROM workspace_invites 
+       WHERE workspace_id = $1 AND email = $2 AND used_at IS NULL AND expires_at > NOW()`,
+      [workspaceId, data.email]
+    );
+    if (pendingInvite.rowCount) {
+      throw new AppError(400, 'A pending invite already exists for this email');
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const inviteResult = await query(
-      `INSERT INTO workspace_invites (workspace_id, email, token, role, expires_at)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, workspace_id, email, token, role, expires_at, used_at, created_at`,
-      [workspaceId, data.email, token, toDbRole(data.role), expiresAt]
+      `INSERT INTO workspace_invites (workspace_id, email, token, role, expires_at, invited_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, workspace_id, email, token, role, expires_at, used_at, created_at, invited_by`,
+      [workspaceId, data.email, token, toDbRole(data.role), expiresAt, inviterId]
     );
     const invite = inviteResult.rows[0];
+
+    const inviterResult = await query('SELECT name, email FROM users WHERE id = $1', [inviterId]);
+    const inviter = inviterResult.rows[0];
+
+    sendInviteEmail({
+      to: data.email,
+      inviterName: inviter?.name || 'A team member',
+      inviterEmail: inviter?.email || 'unknown@devcollab.com',
+      workspaceName: workspace.name,
+      role: data.role,
+      token,
+    }).catch((err) => console.error('Failed to send invite email:', err));
 
     await activityService.createActivity({
       workspaceId,
@@ -213,7 +235,14 @@ export const workspaceService = {
     }
 
     const membership = await transaction(async (client) => {
-      await client.query('UPDATE workspace_invites SET used_at = NOW() WHERE id = $1', [invite.id]);
+      const updateResult = await client.query(
+        'UPDATE workspace_invites SET used_at = NOW() WHERE id = $1 AND used_at IS NULL RETURNING id',
+        [invite.id]
+      );
+      if (updateResult.rowCount === 0) {
+        throw new AppError(400, 'Invite has already been processed concurrently');
+      }
+
       const result = await client.query(
         `INSERT INTO workspace_members (workspace_id, user_id, role)
          VALUES ($1, $2, $3)

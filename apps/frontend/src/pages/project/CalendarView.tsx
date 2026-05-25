@@ -1,237 +1,220 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, startOfDay, endOfDay, isToday } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useTaskStore } from '../../stores/taskStore';
+import React, { useState } from 'react';
 import { Task } from '../../types';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from 'date-fns';
+import { ChevronLeft, ChevronRight, Plus, Calendar } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export default function CalendarView(): React.ReactElement {
-  const { workspaceId, projectId: pid } = useParams<{ workspaceId: string; projectId: string }>();
-  const { tasks, loading, error, fetchTasksByProject } = useTaskStore();
-  
+interface CalendarViewProps {
+  tasks: Task[];
+  config: any;
+  onUpdateMetadata: (taskId: string, category: 'assignees' | 'tags' | 'attachments' | 'checklists', data: any) => void;
+  onTaskClick: (task: Task) => void;
+  onUpdateTask: (taskId: string, updates: any) => Promise<any>;
+  onDayClick: (date: Date) => void;
+}
+
+const formatLocalDateToUTCNoon = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T12:00:00.000Z`;
+};
+
+const priorityConfig: Record<Task['priority'], { dot: string }> = {
+  P0: { dot: 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.4)]' },
+  P1: { dot: 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.4)]' },
+  P2: { dot: 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]' },
+};
+
+const statusBorder: Record<Task['status'], string> = {
+  TODO: 'border-l-[3px] border-slate-500/40 bg-slate-500/[0.04]',
+  IN_PROGRESS: 'border-l-[3px] border-cyan-500/50 bg-cyan-500/[0.04]',
+  IN_REVIEW: 'border-l-[3px] border-purple-500/50 bg-purple-500/[0.04]',
+  DONE: 'border-l-[3px] border-emerald-500/50 bg-emerald-500/[0.04]',
+};
+
+export default function CalendarView({
+  tasks,
+  config: _config,
+  onUpdateMetadata: _onUpdateMetadata,
+  onTaskClick,
+  onUpdateTask,
+  onDayClick
+}: CalendarViewProps): React.ReactElement {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [tasksForDate, setTasksForDate] = useState<Task[]>([]);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (pid) {
-      void fetchTasksByProject(pid);
-    }
-  }, [fetchTasksByProject, pid]);
-
+  // Month intervals calculations
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  const handleSelectDate = (date: Date) => {
-    setSelectedDate(date);
-    const dayStart = startOfDay(date);
-    const dayEnd = endOfDay(date);
-    setTasksForDate(
-      tasks.filter(task => {
-        if (!task.dueDate) return false;
-        const taskDate = new Date(task.dueDate);
-        return taskDate >= dayStart && taskDate <= dayEnd;
-      })
-    );
-  };
-
   const handlePrevMonth = () => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1));
-    setSelectedDate(null);
-    setTasksForDate([]);
   };
 
   const handleNextMonth = () => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1));
-    setSelectedDate(null);
-    setTasksForDate([]);
   };
 
+  // Timezone-proof day filtering using strict prefix comparison
   const getTasksForDay = (date: Date): Task[] => {
-    const dayStart = startOfDay(date);
-    const dayEnd = endOfDay(date);
+    const dateStr = format(date, 'yyyy-MM-dd');
     return tasks.filter(task => {
       if (!task.dueDate) return false;
-      const taskDate = new Date(task.dueDate);
-      return taskDate >= dayStart && taskDate <= dayEnd;
+      return task.dueDate.substring(0, 10) === dateStr;
     });
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'P0':
-        return 'bg-rose-100 text-rose-700 border-rose-200';
-      case 'P1':
-        return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'P2':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
-      default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
-    }
+  // Rescheduling Drag & Drop handlers
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData('text/plain', taskId);
+    e.dataTransfer.effectAllowed = 'move';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'TODO':
-        return 'bg-slate-50 border-l-2 border-slate-400';
-      case 'IN_PROGRESS':
-        return 'bg-cyan-50 border-l-2 border-cyan-500';
-      case 'IN_REVIEW':
-        return 'bg-purple-50 border-l-2 border-purple-500';
-      case 'DONE':
-        return 'bg-emerald-50 border-l-2 border-emerald-500';
-      default:
-        return 'bg-slate-50';
+  const handleDragOver = (e: React.DragEvent, dateStr: string) => {
+    e.preventDefault();
+    setDragOverDate(dateStr);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverDate(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetDate: Date) => {
+    e.preventDefault();
+    setDragOverDate(null);
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (taskId) {
+      // Optimistically update locally using the timezone-proof YYYY-MM-DD noon format
+      const formattedDate = formatLocalDateToUTCNoon(targetDate);
+      await onUpdateTask(taskId, { dueDate: formattedDate });
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6 lg:px-10">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-800 p-8 text-white shadow-xl sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Link to={`/${workspaceId}/projects`} className="text-sm uppercase tracking-widest text-cyan-200 hover:text-white transition">
-              ← Back to Projects
-            </Link>
-            <h1 className="mt-2 text-4xl font-semibold tracking-tight">Calendar View</h1>
-            <p className="mt-3 max-w-2xl text-sm text-slate-200">
-              Visualize your project tasks on a calendar based on due dates.
-            </p>
-          </div>
+    <div className="rounded-2xl border border-white/[0.04] bg-[#17191d] p-6 shadow-sm space-y-6 text-left select-none">
+      {/* Month Navigation Panel */}
+      <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+        <div className="flex items-center gap-2.5">
+          <Calendar className="h-4.5 w-4.5 text-indigo-400" />
+          <h2 className="text-base font-extrabold text-white tracking-tight">
+            {format(currentDate, 'MMMM yyyy')}
+          </h2>
+        </div>
+        
+        <div className="flex items-center gap-1.5 bg-black/20 border border-white/[0.04] rounded-lg p-0.5">
+          <button
+            onClick={handlePrevMonth}
+            className="p-1 rounded hover:bg-white/[0.03] transition text-slate-400 hover:text-white"
+            title="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setCurrentDate(new Date())}
+            className="px-2 py-0.5 text-[9px] font-extrabold uppercase text-slate-400 hover:text-white hover:bg-white/[0.03] rounded transition"
+          >
+            Today
+          </button>
+          <button
+            onClick={handleNextMonth}
+            className="p-1 rounded hover:bg-white/[0.03] transition text-slate-400 hover:text-white"
+            title="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Grid of Days */}
+      <div>
+        {/* Day Headers (Sun-Sat) */}
+        <div className="grid grid-cols-7 gap-1.5 mb-2 text-center">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-1">
+              {day}
+            </div>
+          ))}
         </div>
 
-        {error ? (
-          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        ) : null}
+        {/* Days cells */}
+        <div className="grid grid-cols-7 gap-1.5">
+          {days.map(day => {
+            const dayTasks = getTasksForDay(day);
+            const isCurrentMonth = isSameMonth(day, currentDate);
+            const isTodayDate = isToday(day);
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const isDraggingOver = dragOverDate === dateStr;
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Calendar */}
-          <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            {/* Month Navigation */}
-            <div className="flex items-center justify-between mb-6">
-              <button
-                onClick={handlePrevMonth}
-                className="p-2 rounded-lg hover:bg-slate-100 transition"
+            return (
+              <div
+                key={dateStr}
+                onDragOver={(e) => handleDragOver(e, dateStr)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => void handleDrop(e, day)}
+                className={cn(
+                  'min-h-[105px] p-2.5 rounded-xl border transition-all duration-150 relative group/cell flex flex-col justify-between',
+                  !isCurrentMonth && 'bg-[#121316]/20 border-white/[0.01] text-slate-650 pointer-events-none opacity-40',
+                  isCurrentMonth && 'bg-[#121316]/50 border-white/[0.03] hover:border-indigo-500/20 hover:bg-[#1a1c22]',
+                  isTodayDate && 'border-indigo-500/40 bg-indigo-500/[0.02]',
+                  isDraggingOver && 'border-dashed border-indigo-500/50 bg-indigo-500/10 scale-[1.01]'
+                )}
               >
-                <ChevronLeft className="h-6 w-6 text-slate-600" />
-              </button>
-              <h2 className="text-2xl font-semibold text-slate-900">
-                {format(currentDate, 'MMMM yyyy')}
-              </h2>
-              <button
-                onClick={handleNextMonth}
-                className="p-2 rounded-lg hover:bg-slate-100 transition"
-              >
-                <ChevronRight className="h-6 w-6 text-slate-600" />
-              </button>
-            </div>
-
-            {/* Day Headers */}
-            <div className="grid grid-cols-7 gap-2 mb-2">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="h-12 flex items-center justify-center text-sm font-semibold text-slate-600">
-                  {day}
+                {/* Header of Cell (Day Number + Hover Plus Indicator) */}
+                <div className="flex items-center justify-between">
+                  <span className={cn(
+                    'text-[11px] font-extrabold',
+                    !isCurrentMonth && 'text-slate-650',
+                    isCurrentMonth && 'text-slate-400',
+                    isTodayDate && 'text-indigo-400 font-black'
+                  )}>
+                    {format(day, 'd')}
+                  </span>
+                  
+                  {isCurrentMonth && (
+                    <button
+                      type="button"
+                      onClick={() => onDayClick(day)}
+                      className="opacity-0 group-hover/cell:opacity-100 p-0.5 rounded border border-white/[0.04] bg-[#0c0d10] text-slate-400 hover:text-white transition"
+                      title="Add task on this date"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
 
-            {/* Calendar Days */}
-            <div className="grid grid-cols-7 gap-2">
-              {days.map(day => {
-                const dayTasks = getTasksForDay(day);
-                const isCurrentMonth = isSameMonth(day, currentDate);
-                const isTodayDate = isToday(day);
-                const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
-
-                return (
-                  <div
-                    key={format(day, 'yyyy-MM-dd')}
-                    onClick={() => handleSelectDate(day)}
-                    className={cn(
-                      'min-h-24 p-2 rounded-lg border-2 transition cursor-pointer',
-                      !isCurrentMonth && 'bg-slate-50 border-slate-100 text-slate-400',
-                      isCurrentMonth && 'border-slate-200 hover:border-cyan-300 hover:bg-slate-50',
-                      isTodayDate && 'border-cyan-500 bg-cyan-50',
-                      isSelected && 'border-cyan-600 bg-cyan-100'
-                    )}
-                  >
-                    <div className={cn(
-                      'text-sm font-semibold mb-1',
-                      !isCurrentMonth && 'text-slate-400',
-                      isCurrentMonth && 'text-slate-900',
-                      isTodayDate && 'text-cyan-600'
-                    )}>
-                      {format(day, 'd')}
+                {/* Day Tasks Pills Container */}
+                <div className="space-y-1.5 mt-2 flex-1 flex flex-col justify-start">
+                  {dayTasks.slice(0, 3).map(task => {
+                    const prio = priorityConfig[task.priority] || priorityConfig.P2;
+                    return (
+                      <div
+                        key={task.id}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onClick={() => onTaskClick(task)}
+                        className={cn(
+                          'text-[9px] px-2 py-1 rounded-md border border-white/[0.03] font-bold text-slate-200 cursor-grab active:cursor-grabbing truncate flex items-center gap-1.5 select-none hover:text-indigo-300 hover:border-indigo-500/10 transition',
+                          statusBorder[task.status]
+                        )}
+                        title={`${task.title} (${task.status.replace('_', ' ')})`}
+                      >
+                        <span className={cn('w-1 h-1 rounded-full flex-shrink-0', prio.dot)}></span>
+                        <span className="truncate">{task.title}</span>
+                      </div>
+                    );
+                  })}
+                  
+                  {dayTasks.length > 3 && (
+                    <div className="text-[8px] text-slate-500 font-extrabold px-1 text-center">
+                      +{dayTasks.length - 3} more tasks
                     </div>
-                    <div className="space-y-1">
-                      {dayTasks.slice(0, 2).map(task => (
-                        <div
-                          key={task.id}
-                          className={cn(
-                            'text-xs px-1.5 py-0.5 rounded border truncate font-medium',
-                            getStatusColor(task.status)
-                          )}
-                          title={task.title}
-                        >
-                          {task.title}
-                        </div>
-                      ))}
-                      {dayTasks.length > 2 && (
-                        <div className="text-xs text-slate-500 px-1.5">
-                          +{dayTasks.length - 2} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Sidebar - Selected Date Tasks */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">
-              {selectedDate ? format(selectedDate, 'PPP') : 'Select a Date'}
-            </h3>
-            
-            {loading ? (
-              <div className="text-sm text-slate-500">Loading tasks...</div>
-            ) : selectedDate && tasksForDate.length > 0 ? (
-              <div className="space-y-3">
-                {tasksForDate.map(task => (
-                  <div
-                    key={task.id}
-                    className={cn('p-3 rounded-lg border', getStatusColor(task.status))}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-medium text-sm text-slate-900 flex-1">{task.title}</h4>
-                      <span className={cn('text-xs font-semibold px-2 py-1 rounded border', getPriorityColor(task.priority))}>
-                        {task.priority}
-                      </span>
-                    </div>
-                    {task.description && (
-                      <p className="text-xs text-slate-600 mb-2">{task.description}</p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500 uppercase font-semibold">{task.status.replace('_', ' ')}</span>
-                    </div>
-                  </div>
-                ))}
+                  )}
+                </div>
               </div>
-            ) : selectedDate ? (
-              <div className="text-sm text-slate-500 text-center py-8">
-                No tasks scheduled for this date.
-              </div>
-            ) : (
-              <div className="text-sm text-slate-500 text-center py-8">
-                Click on a date to view tasks.
-              </div>
-            )}
-          </div>
+            );
+          })}
         </div>
       </div>
     </div>

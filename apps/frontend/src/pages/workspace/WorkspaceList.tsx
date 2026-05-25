@@ -1,16 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import CreateWorkspaceModal from '../../components/workspace/CreateWorkspaceModal';
 
 export default function WorkspaceList(): React.ReactElement {
-  const { workspaces, isLoading, fetchWorkspaces } = useWorkspaceStore();
+  const { workspaces, isLoading, hasFetchedWorkspaces, fetchWorkspaces } = useWorkspaceStore();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchWorkspaces();
   }, [fetchWorkspaces]);
+
+  // Intercept completely new users
+  useEffect(() => {
+    if (!isLoading && hasFetchedWorkspaces && workspaces.length === 0) {
+      navigate('/onboarding/create-workspace', { replace: true });
+    }
+  }, [isLoading, hasFetchedWorkspaces, workspaces.length, navigate]);
 
   return (
     <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
@@ -35,24 +43,6 @@ export default function WorkspaceList(): React.ReactElement {
       {isLoading && workspaces.length === 0 ? (
         <div className="flex items-center justify-center py-20">
           <LoadingSpinner size="lg" />
-        </div>
-      ) : workspaces.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center flex flex-col items-center">
-          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No workspaces yet</h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-md mb-6">
-            Get started by creating your first workspace. A workspace contains your projects, tasks, and team members.
-          </p>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-          >
-            Create Workspace
-          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

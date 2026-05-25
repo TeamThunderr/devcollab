@@ -54,7 +54,37 @@ export class SnippetService {
     return result.rows[0] ? mapSnippet(result.rows[0]) : null;
   }
 
-  async updateSnippet(snippetId: string, data: UpdateSnippetInput) {
+  async updateSnippet(snippetId: string, userId: string, data: UpdateSnippetInput) {
+    const snipRes = await query<{ created_by: string; project_id: string }>(
+      'SELECT created_by, project_id FROM snippets WHERE id = $1',
+      [snippetId]
+    );
+    const snip = snipRes.rows[0];
+    if (!snip) {
+      throw new Error('Snippet not found');
+    }
+
+    const isCreator = snip.created_by === userId;
+
+    const wsMemberRes = await query<{ role: string }>(
+      `SELECT role FROM workspace_members wm
+       JOIN projects p ON p.workspace_id = wm.workspace_id
+       WHERE p.id = $1 AND wm.user_id = $2`,
+      [snip.project_id, userId]
+    );
+    const wsRole = wsMemberRes.rows[0]?.role;
+    const isWorkspaceAdmin = wsRole === 'OWNER' || wsRole === 'ADMIN';
+
+    const projMemberRes = await query<{ role: string }>(
+      'SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2',
+      [snip.project_id, userId]
+    );
+    const isProjectAdmin = projMemberRes.rows[0]?.role === 'ADMIN';
+
+    if (!isCreator && !isWorkspaceAdmin && !isProjectAdmin) {
+      throw new Error('Unauthorized snippet modification');
+    }
+
     const result = await query(
       `UPDATE snippets
        SET title = COALESCE($2, title),
@@ -67,13 +97,40 @@ export class SnippetService {
        RETURNING id, title, language, code, description, tags, project_id, created_by, created_at, updated_at`,
       [snippetId, data.title ?? null, data.language ?? null, data.code ?? null, data.description ?? null, data.tags ?? null]
     );
-    if (!result.rows[0]) {
-      throw new Error('Snippet not found');
-    }
     return mapSnippet(result.rows[0]);
   }
 
-  async deleteSnippet(snippetId: string) {
+  async deleteSnippet(snippetId: string, userId: string) {
+    const snipRes = await query<{ created_by: string; project_id: string }>(
+      'SELECT created_by, project_id FROM snippets WHERE id = $1',
+      [snippetId]
+    );
+    const snip = snipRes.rows[0];
+    if (!snip) {
+      throw new Error('Snippet not found');
+    }
+
+    const isCreator = snip.created_by === userId;
+
+    const wsMemberRes = await query<{ role: string }>(
+      `SELECT role FROM workspace_members wm
+       JOIN projects p ON p.workspace_id = wm.workspace_id
+       WHERE p.id = $1 AND wm.user_id = $2`,
+      [snip.project_id, userId]
+    );
+    const wsRole = wsMemberRes.rows[0]?.role;
+    const isWorkspaceAdmin = wsRole === 'OWNER' || wsRole === 'ADMIN';
+
+    const projMemberRes = await query<{ role: string }>(
+      'SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2',
+      [snip.project_id, userId]
+    );
+    const isProjectAdmin = projMemberRes.rows[0]?.role === 'ADMIN';
+
+    if (!isCreator && !isWorkspaceAdmin && !isProjectAdmin) {
+      throw new Error('Unauthorized snippet modification');
+    }
+
     const result = await query('DELETE FROM snippets WHERE id = $1', [snippetId]);
     if (!result.rowCount) {
       throw new Error('Snippet not found');

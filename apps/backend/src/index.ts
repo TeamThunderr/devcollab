@@ -15,6 +15,7 @@ import initSocket from './socket/socket';
 import { aiConfig } from './config/ai.config';
 import { pool } from './db/client';
 import { initDatabase } from './db/init';
+import { sendTestEmail } from './utils/mail';
 
 import authRoutes from './modules/auth/auth.routes';
 import workspaceRoutes from './modules/workspace/workspace.routes';
@@ -29,6 +30,7 @@ import notificationRoutes from './modules/notification/notification.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import billingRoutes from './modules/billing/billing.routes';
 import waitlistRoutes from './modules/waitlist/waitlist.routes';
+import chatRoutes from './modules/chat/chat.routes';
 
 export const fastify = Fastify({ logger: true });
 
@@ -61,9 +63,21 @@ async function bootstrap() {
   fastify.register(paymentRoutes, { prefix: '/api/payments' });
   fastify.register(billingRoutes, { prefix: '/api/billing' });
   fastify.register(waitlistRoutes, { prefix: '/api/waitlist' });
+  fastify.register(chatRoutes, { prefix: '/api/chat' });
 
   fastify.get('/api/health', async (_request, reply) => {
     return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  fastify.get('/api/test-email', async (request, reply) => {
+    try {
+      // Send to the SMTP_USER itself, or can accept ?to= parameter
+      const targetEmail = (request.query as any).to || process.env.SMTP_USER;
+      await sendTestEmail(targetEmail);
+      return reply.send({ status: 'success', message: 'Test email sent to ' + targetEmail });
+    } catch (error: any) {
+      return reply.status(500).send({ status: 'error', error: error.message });
+    }
   });
 
   await initDatabase();

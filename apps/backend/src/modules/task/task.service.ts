@@ -48,12 +48,18 @@ function mapTask(task: any) {
     priority: priorityToApi(task.priority),
     dueDate: task.due_date?.toISOString?.() ?? task.due_date ?? undefined,
     projectId: task.project_id,
+    assigneeId: task.assignee_id ?? undefined,
     createdAt: task.created_at?.toISOString?.() ?? task.created_at,
     updatedAt: task.updated_at?.toISOString?.() ?? task.updated_at,
     createdBy: task.created_by ? {
       id: task.created_by,
       email: task.creator_email,
       name: task.creator_name,
+    } : undefined,
+    assignee: task.assignee_id ? {
+      id: task.assignee_id,
+      email: task.assignee_email,
+      name: task.assignee_name,
     } : undefined,
     comments: comments.map(mapComment),
   };
@@ -81,22 +87,25 @@ async function getCommentsByTaskIds(taskIds: string[]) {
 }
 
 export class TaskService {
-  async createTask(data: CreateTaskInput, userId: string) {
+  async createTask(data: CreateTaskInput & { assigneeId?: string | null }, userId: string) {
     const result = await query(
-      `INSERT INTO tasks (title, description, status, priority, due_date, project_id, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, title, description, status, priority, due_date, project_id, created_by, created_at, updated_at`,
+      `INSERT INTO tasks (title, description, status, priority, due_date, assignee_id, project_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
         data.title,
         data.description ?? null,
         statusToDb[data.status ?? 'TODO'],
         priorityToDb(data.priority ?? 'P1'),
         data.dueDate ? new Date(data.dueDate) : null,
+        data.assigneeId ?? null,
         data.projectId,
         userId,
       ]
     );
-    return mapTask({ ...result.rows[0], comments: [] });
+    const createdTask = await this.getTaskById(result.rows[0].id);
+    if (!createdTask) throw new Error('Failed to fetch created task');
+    return createdTask;
   }
 
   async getTasksByProject(projectId: string, filters?: { status?: string; priority?: string }) {
@@ -113,9 +122,12 @@ export class TaskService {
     }
 
     const result = await query(
-      `SELECT t.*, u.email AS creator_email, u.name AS creator_name
+      `SELECT t.*, 
+              u.email AS creator_email, u.name AS creator_name,
+              ua.email AS assignee_email, ua.name AS assignee_name
        FROM tasks t
        JOIN users u ON u.id = t.created_by
+       LEFT JOIN users ua ON ua.id = t.assignee_id
        WHERE ${where.join(' AND ')}
        ORDER BY t.created_at DESC`,
       params
@@ -126,9 +138,12 @@ export class TaskService {
 
   async getTaskById(taskId: string) {
     const result = await query(
-      `SELECT t.*, u.email AS creator_email, u.name AS creator_name
+      `SELECT t.*, 
+              u.email AS creator_email, u.name AS creator_name,
+              ua.email AS assignee_email, ua.name AS assignee_name
        FROM tasks t
        JOIN users u ON u.id = t.created_by
+       LEFT JOIN users ua ON ua.id = t.assignee_id
        WHERE t.id = $1`,
       [taskId]
     );
@@ -140,7 +155,7 @@ export class TaskService {
     return mapTask({ ...task, comments: commentsByTask.get(taskId) ?? [] });
   }
 
-  async updateTask(taskId: string, data: UpdateTaskInput) {
+  async updateTask(taskId: string, data: UpdateTaskInput & { assigneeId?: string | null }) {
     const result = await query(
       `UPDATE tasks
        SET title = COALESCE($2, title),
@@ -148,9 +163,10 @@ export class TaskService {
            status = COALESCE($4::task_status, status),
            priority = COALESCE($5::task_priority, priority),
            due_date = CASE WHEN $6::boolean THEN $7 ELSE due_date END,
+           assignee_id = CASE WHEN $8::boolean THEN $9 ELSE assignee_id END,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, title, description, status, priority, due_date, project_id, created_by, created_at, updated_at`,
+       RETURNING id`,
       [
         taskId,
         data.title ?? null,
@@ -159,14 +175,16 @@ export class TaskService {
         data.priority ? priorityToDb(data.priority) : null,
         data.dueDate !== undefined,
         data.dueDate ? new Date(data.dueDate) : null,
+        data.assigneeId !== undefined,
+        data.assigneeId ?? null,
       ]
     );
-    const task = result.rows[0];
-    if (!task) {
+    if (!result.rows[0]) {
       throw new Error('Task not found');
     }
-    const commentsByTask = await getCommentsByTaskIds([taskId]);
-    return mapTask({ ...task, comments: commentsByTask.get(taskId) ?? [] });
+    const updatedTask = await this.getTaskById(taskId);
+    if (!updatedTask) throw new Error('Task not found');
+    return updatedTask;
   }
 
   async deleteTask(taskId: string) {

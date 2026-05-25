@@ -18,6 +18,7 @@ interface TaskStore {
     priority: TaskPriority;
     dueDate?: string | null;
     projectId: string;
+    assigneeId?: string | null;
   }) => Promise<Task>;
   updateTask: (id: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'comments' | 'projectId'>>) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
@@ -33,7 +34,7 @@ interface TaskStore {
   addCommentState: (taskId: string, comment: Comment) => void;
 }
 
-export const useTaskStore = create<TaskStore>((set) => ({
+export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   loading: false,
   error: undefined,
@@ -56,25 +57,65 @@ export const useTaskStore = create<TaskStore>((set) => ({
   },
 
   createTask: async (data) => {
+    const tempId = `temp-${Date.now()}`;
+    const tempTask: Task = {
+      id: tempId,
+      title: data.title,
+      description: data.description ?? undefined,
+      status: data.status,
+      priority: data.priority,
+      dueDate: data.dueDate ?? undefined,
+      projectId: data.projectId,
+      assigneeId: data.assigneeId ?? undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: {
+        id: 'temp-user',
+        email: 'you@devcollab.com',
+        name: 'You'
+      },
+      comments: []
+    };
+
+    // Prepend optimistic placeholder immediately
+    set((state) => ({
+      tasks: [tempTask, ...state.tasks],
+    }));
+
     try {
       const response = await api.post('/api/tasks', data);
+      // Replace the temp task with the actual added task
       set((state) => ({
-        tasks: [response.data, ...state.tasks],
+        tasks: state.tasks.map((t) => (t.id === tempId ? response.data : t)),
       }));
       return response.data;
     } catch (error: any) {
+      // Revert the temp task on error
+      set((state) => ({
+        tasks: state.tasks.filter((t) => t.id !== tempId),
+      }));
       throw new Error(error.response?.data?.message || error.message);
     }
   },
 
   updateTask: async (id, updates) => {
+    const originalTasks = get().tasks;
+
+    // Apply updates optimistically in state immediately
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+
     try {
       const response = await api.patch(`/api/tasks/${id}`, updates);
+      // Re-align task with actual response database payload
       set((state) => ({
         tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...response.data } : t)),
       }));
       return response.data;
     } catch (error: any) {
+      // Rollback to original state on failure
+      set({ tasks: originalTasks });
       throw new Error(error.response?.data?.message || error.message);
     }
   },

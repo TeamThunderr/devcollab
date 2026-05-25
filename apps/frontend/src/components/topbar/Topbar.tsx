@@ -72,7 +72,7 @@ export default function Topbar(): React.ReactElement {
       {/* Right — actions */}
       <div className="flex items-center gap-3 flex-shrink-0">
         {workspaceId && (
-          <OnlineAvatars workspaceId={workspaceId} projectId={projectId} />
+          <OnlineAvatars workspaceId={workspaceId} projectId={projectId} showCount={true} />
         )}
         <NotificationBell />
       </div>

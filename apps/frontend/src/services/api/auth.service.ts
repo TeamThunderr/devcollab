@@ -5,6 +5,7 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatar: string | null;
+  platformRole?: 'USER' | 'SUPER_ADMIN';
 }
 
 export interface AuthResponse {
