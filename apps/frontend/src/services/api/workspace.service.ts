@@ -42,5 +42,11 @@ export const workspaceService = {
   async removeMember(workspaceId: string, memberId: string): Promise<{ message: string }> {
     const response = await api.delete<{ message: string }>(`/api/workspaces/${workspaceId}/members/${memberId}`);
     return response.data;
+  },
+
+  // Accept a workspace invite
+  async acceptInvite(token: string): Promise<{ message: string; membership: WorkspaceMember }> {
+    const response = await api.post<{ message: string; membership: WorkspaceMember }>('/api/workspaces/invites/accept', { token });
+    return response.data;
   }
 };

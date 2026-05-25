@@ -1,0 +1,1 @@
+ALTER TABLE workspace_invites ADD COLUMN IF NOT EXISTS invited_by UUID REFERENCES users(id) ON DELETE SET NULL;
