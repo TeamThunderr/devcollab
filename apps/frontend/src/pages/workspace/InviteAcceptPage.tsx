@@ -31,7 +31,7 @@ export default function InviteAcceptPage(): React.ReactElement {
           setStatus('success');
           // Wait a moment so the user sees success, then navigate
           setTimeout(() => {
-            navigate(`/${result.membership.workspaceId}`, { replace: true });
+            navigate(`/w/${result.membership.workspaceId}`, { replace: true });
           }, 1500);
         }
       } catch (error: any) {

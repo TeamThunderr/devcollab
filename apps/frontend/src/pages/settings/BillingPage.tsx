@@ -43,7 +43,7 @@ export default function BillingPage(): React.ReactElement {
   const isAllowed = canManageBilling(userRole);
 
   if (!isAllowed && members.length > 0) {
-    return <Navigate to={`/${workspaceId}/dashboard`} replace />;
+    return <Navigate to={`/w/${workspaceId}`} replace />;
   }
 
   const currentPlan = subscription?.plan || 'FREE';

@@ -19,7 +19,7 @@ export default function CreateWorkspaceOnboardingPage(): React.ReactElement {
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const workspace = await createWorkspace({ name, slug });
       if (workspace) {
-        navigate(`/${workspace.id}/dashboard`, { replace: true });
+        navigate(`/w/${workspace.id}`, { replace: true });
       }
     } catch (err) {
       setIsSubmitting(false);

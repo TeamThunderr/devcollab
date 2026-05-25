@@ -77,7 +77,7 @@ export default function WorkspaceSettingsPage(): React.ReactElement {
 
   // Prevent members/viewers from accessing settings
   if (!isAllowed && !isLoading && members.length > 0) {
-    return <Navigate to={`/${workspaceId}/dashboard`} replace />;
+    return <Navigate to={`/w/${workspaceId}`} replace />;
   }
 
   return (
