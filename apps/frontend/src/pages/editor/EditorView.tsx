@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import ActivityBar from "../../components/editor/ActivityBar";
 import Sidebar from "../../components/editor/Sidebar";
 import EditorTabs from "../../components/editor/EditorTabs";
@@ -7,6 +7,8 @@ import BottomPanel from "../../components/editor/BottomPanel";
 import CommandPalette from "../../components/editor/CommandPalette";
 import TopMenuBar from "../../components/editor/TopMenuBar";
 import useEditorStore from "../../stores/editorStore";
+import useWorkspaceStore from "../../stores/workspaceStore";
+import useAuthStore from "../../stores/authStore";
 import { useParams } from "react-router-dom";
 
 export default function EditorView() {
@@ -14,7 +16,15 @@ export default function EditorView() {
   
   if (!projectId) return null;
   const { files, activeFileId, updateFile, fetchEditorState, settings } = useEditorStore();
+  const { user: currentUser } = useAuthStore();
+  const { members } = useWorkspaceStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+
+  const isViewer = useMemo(() => {
+    if (!currentUser) return true;
+    const wsMember = members.find(m => m.userId === currentUser.id);
+    return wsMember?.role === 'VIEWER';
+  }, [currentUser, members]);
 
   useEffect(() => {
     fetchEditorState(projectId);
@@ -89,6 +99,7 @@ export default function EditorView() {
                   initialContent={activeFile.content || ''}
                   onContentChange={() => {}}
                   onSave={handleSave}
+                  readOnly={isViewer}
                 />
               </div>
             ) : (

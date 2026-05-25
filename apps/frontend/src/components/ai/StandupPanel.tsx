@@ -39,12 +39,16 @@ function Spinner(): React.ReactElement {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function StandupPanel(): React.ReactElement {
+interface StandupPanelProps {
+  projectId: string;
+}
+
+export default function StandupPanel({ projectId }: StandupPanelProps): React.ReactElement {
   const { content, isStreaming, error, startStream } = useAIStream();
   const [copied, setCopied] = useState(false);
 
   function handleGenerate(): void {
-    void startStream("/api/ai/standup", { projectId: TEST_PROJECT_ID });
+    void startStream("/api/ai/standup", { projectId });
   }
 
   function handleCopy(): void {

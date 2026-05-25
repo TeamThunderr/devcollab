@@ -2,7 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task } from '../../types';
-import { MessageSquare, Paperclip, Calendar, CheckSquare } from 'lucide-react';
+import { MessageSquare, Paperclip, Calendar, CheckSquare, User } from 'lucide-react';
 import useRealtimeStore from '../../stores/realtimeStore';
 import useAuthStore from '../../stores/authStore';
 
@@ -66,8 +66,8 @@ export default function TaskCard({ task, config, onClick }: TaskCardProps): Reac
   const othersViewing = taskViewers.filter(u => u.userId !== currentUser?.id);
 
   const prio = priorityConfig[task.priority] || priorityConfig.P2;
-  const initial = assignee ? (assignee.name || assignee.email || '?').charAt(0).toUpperCase() : '?';
-  const avatarBg = assignee ? 'bg-indigo-650' : 'bg-amber-500/10 text-amber-500 border border-dashed border-amber-500/30';
+  const initial = assignee ? (assignee.name || assignee.email || '?').charAt(0).toUpperCase() : '';
+  const avatarBg = assignee ? 'bg-indigo-650' : 'bg-slate-800 text-slate-500 border border-white/[0.04]';
 
   // Format Due Date styles
   const getDueDateStyles = () => {
@@ -126,7 +126,7 @@ export default function TaskCard({ task, config, onClick }: TaskCardProps): Reac
               className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[7px] font-bold text-white shadow-sm ring-1 ring-[#121316] ${avatarBg}`}
               title={assignee ? assignee.name || assignee.email : (task.createdBy?.name || 'Unassigned')}
             >
-              {initial}
+              {assignee ? initial : <User className="w-2.5 h-2.5" />}
             </div>
             <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-1.5 hidden group-hover/avatar:block bg-black border border-white/[0.04] text-white text-[8px] font-bold px-2 py-0.5 rounded shadow-lg whitespace-nowrap z-30 font-sans">
               {assignee ? assignee.name || assignee.email : `Created by ${task.createdBy?.name || 'Unknown'}`}

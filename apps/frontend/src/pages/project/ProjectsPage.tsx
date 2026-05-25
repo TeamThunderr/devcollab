@@ -13,8 +13,8 @@ import {
 export default function ProjectsPage(): React.ReactElement {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
-  const { projects, loading, fetchProjects, createProject, deleteProject } = useProjectStore();
-  const { activeWorkspace, fetchWorkspaceDetails } = useWorkspaceStore();
+  const { projects, loading, fetchProjects, createProject, deleteProject, assignProjectMember } = useProjectStore();
+  const { activeWorkspace, fetchWorkspaceDetails, members } = useWorkspaceStore();
   const { user } = useAuthStore();
   const { subscription, fetchSubscription, upgradeToPro } = useBillingStore();
 
@@ -26,7 +26,8 @@ export default function ProjectsPage(): React.ReactElement {
   // Unified Creation State
   const [wizardData, setWizardData] = useState({
     name: '',
-    summary: ''
+    summary: '',
+    assignedMembers: [] as Array<{ userId: string; role: 'ADMIN' | 'MEMBER' | 'VIEWER' }>
   });
 
 
@@ -81,7 +82,8 @@ export default function ProjectsPage(): React.ReactElement {
     } else {
       setWizardData({
         name: '',
-        summary: ''
+        summary: '',
+        assignedMembers: []
       });
       setShowCreateModal(true);
     }
@@ -124,6 +126,15 @@ export default function ProjectsPage(): React.ReactElement {
             description: wizardData.summary.trim() || undefined,
             workspaceId
           });
+
+          // Assign selected members
+          if (wizardData.assignedMembers.length > 0) {
+            await Promise.all(
+              wizardData.assignedMembers.map(member => 
+                assignProjectMember(created.id, member.userId, member.role as any)
+              )
+            );
+          }
 
           // Build custom modern project workspace configs
           const newConfig = {
@@ -484,9 +495,56 @@ export default function ProjectsPage(): React.ReactElement {
                       placeholder="Short project summary"
                       value={wizardData.summary}
                       onChange={(e) => setWizardData({ ...wizardData, summary: e.target.value })}
-                      rows={3}
-                      className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition resize-none"
+                      rows={2}
+                      className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition resize-none"
                     />
+                  </div>
+
+                  <div className="space-y-2 mt-1">
+                    <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Assign Members</label>
+                    <div className="max-h-28 overflow-y-auto space-y-1.5 premium-scrollbar bg-slate-950 border border-white/[0.04] rounded-xl p-2">
+                      {members.filter(m => m.user?.id !== user?.id).map((member) => {
+                        const isAssigned = wizardData.assignedMembers.find(am => am.userId === member.userId);
+                        return (
+                          <div key={member.userId} className="flex items-center justify-between text-xs p-1.5 rounded-lg hover:bg-white/[0.02] transition">
+                            <label className="flex items-center gap-2 cursor-pointer flex-1">
+                              <input
+                                type="checkbox"
+                                checked={!!isAssigned}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setWizardData(prev => ({ ...prev, assignedMembers: [...prev.assignedMembers, { userId: member.userId, role: 'MEMBER' }] }));
+                                  } else {
+                                    setWizardData(prev => ({ ...prev, assignedMembers: prev.assignedMembers.filter(am => am.userId !== member.userId) }));
+                                  }
+                                }}
+                                className="accent-indigo-500 w-3.5 h-3.5 cursor-pointer"
+                              />
+                              <span className="text-slate-300">{member.user?.name || member.user?.email}</span>
+                            </label>
+                            {isAssigned && (
+                              <select
+                                value={isAssigned.role}
+                                onChange={(e) => {
+                                  setWizardData(prev => ({
+                                    ...prev,
+                                    assignedMembers: prev.assignedMembers.map(am => am.userId === member.userId ? { ...am, role: e.target.value as any } : am)
+                                  }));
+                                }}
+                                className="bg-[#17191d] border border-white/[0.04] text-[10px] rounded px-1.5 py-0.5 text-slate-300 outline-none"
+                              >
+                                <option value="ADMIN">Lead</option>
+                                <option value="MEMBER">Member</option>
+                                <option value="VIEWER">Viewer</option>
+                              </select>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {members.filter(m => m.user?.id !== user?.id).length === 0 && (
+                        <p className="text-[10px] text-slate-500 italic px-2 py-1">No other members in this workspace.</p>
+                      )}
+                    </div>
                   </div>
 
 

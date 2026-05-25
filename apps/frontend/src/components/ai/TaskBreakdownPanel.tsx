@@ -56,7 +56,11 @@ function Spinner(): React.ReactElement {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function TaskBreakdownPanel(): React.ReactElement {
+interface TaskBreakdownPanelProps {
+  projectId: string;
+}
+
+export default function TaskBreakdownPanel({ projectId }: TaskBreakdownPanelProps): React.ReactElement {
   const addTask = useTaskStore((s) => s.addTask);
   const currentUser = useAuthStore((s) => s.user);
 
@@ -83,7 +87,7 @@ export default function TaskBreakdownPanel(): React.ReactElement {
         },
         body: JSON.stringify({
           featureDescription,
-          projectId: TEST_PROJECT_ID,
+          projectId,
         }),
       });
 
@@ -110,7 +114,7 @@ export default function TaskBreakdownPanel(): React.ReactElement {
     generatedTasks.forEach((task, index) => {
       addTask({
         id: `ai-${Date.now()}-${index}`,
-        projectId: TEST_PROJECT_ID,
+        projectId,
         title: task.title,
         description: task.description,
         status: "TODO",

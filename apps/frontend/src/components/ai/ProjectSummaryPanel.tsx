@@ -39,12 +39,16 @@ function Spinner(): React.ReactElement {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ProjectSummaryPanel(): React.ReactElement {
+interface ProjectSummaryPanelProps {
+  projectId: string;
+}
+
+export default function ProjectSummaryPanel({ projectId }: ProjectSummaryPanelProps): React.ReactElement {
   const { content, isStreaming, error, startStream, reset } = useAIStream();
 
   function handleSummarise(): void {
     void startStream("/api/ai/summarise-project", {
-      projectId: TEST_PROJECT_ID,
+      projectId,
     });
   }
 
