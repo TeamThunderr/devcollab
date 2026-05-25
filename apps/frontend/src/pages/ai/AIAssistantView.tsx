@@ -1,4 +1,3 @@
-// TEMP (real data integration pending) — AI features are functional in mock mode
 
 import React from "react";
 import ProGate from "../../components/common/ProGate";
@@ -28,9 +27,6 @@ function PanelCard({
 // ─── Page component ───────────────────────────────────────────────────────────
 
 export default function AIAssistantView(): React.ReactElement {
-  // During development, AI_MOCK_MODE is always true on the backend.
-  // Show the mock indicator in the UI so the team knows what's active.
-  const isMockMode = true; // TODO: read from backend config endpoint
 
   return (
     <div className="p-6 space-y-6">
@@ -45,20 +41,6 @@ export default function AIAssistantView(): React.ReactElement {
           </p>
         </div>
 
-        {/* AI mode indicator */}
-        {isMockMode && (
-          <div
-            title="Switch AI_MOCK_MODE=false in .env for real AI"
-            className="flex items-center gap-1.5
-                       bg-amber-100 dark:bg-amber-900/30
-                       text-amber-700 dark:text-amber-400
-                       text-xs font-medium
-                       px-3 py-1 rounded-full
-                       cursor-help select-none"
-          >
-            ⚡ Mock Mode
-          </div>
-        )}
       </div>
 
       {/* 2×2 feature grid */}

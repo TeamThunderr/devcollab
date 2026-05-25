@@ -86,3 +86,61 @@ export async function deleteFileHandler(
     return reply.status(500).send({ message: 'Internal server error' });
   }
 }
+
+export async function getEditorStateHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { projectId } = request.params;
+    const userId = request.user!.userId;
+    const state = await editorService.getEditorState(projectId, userId);
+    return reply.send(state);
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ message: 'Internal server error' });
+  }
+}
+
+export async function updateEditorStateHandler(
+  request: FastifyRequest<{ Params: { projectId: string }; Body: any }>,
+  reply: FastifyReply
+) {
+  try {
+    const { projectId } = request.params;
+    const userId = request.user!.userId;
+    const state = await editorService.updateEditorState(projectId, userId, request.body);
+    return reply.send(state);
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ message: 'Internal server error' });
+  }
+}
+
+export async function executeCodeHandler(
+  request: FastifyRequest<{ Params: { projectId: string }; Body: { language: string; content: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { language, content } = request.body;
+    const result = await editorService.executeCode(language, content);
+    return reply.send(result);
+  } catch (error: any) {
+    request.log.error(error);
+    return reply.status(500).send({ message: error.message || 'Execution error' });
+  }
+}
+
+export async function runTerminalCommandHandler(
+  request: FastifyRequest<{ Params: { projectId: string }; Body: { command: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { command } = request.body;
+    const result = await editorService.runTerminalCommand(command);
+    return reply.send(result);
+  } catch (error: any) {
+    request.log.error(error);
+    return reply.status(500).send({ message: error.message || 'Execution error' });
+  }
+}

@@ -5,15 +5,15 @@ import WikiEditor from '../../components/wiki/WikiEditor';
 import VersionHistoryPanel from '../../components/wiki/VersionHistoryPanel';
 
 export default function WikiView() {
-  const { workspaceSlug, pid } = useParams();
+  const { workspaceId, projectId: pid } = useParams();
   const [showHistory, setShowHistory] = useState(false);
 
-  if (!pid || !workspaceSlug) return null;
+  if (!pid || !workspaceId) return null;
 
   return (
     <div className="flex h-full w-full bg-[#1e1e1e] overflow-hidden relative">
       {/* Sidebar for Navigation */}
-      <WikiSidebar projectId={pid} workspaceId={workspaceSlug} />
+      <WikiSidebar projectId={pid} workspaceId={workspaceId} />
       
       {/* Main Rich Text Editor */}
       <WikiEditor projectId={pid} onToggleHistory={() => setShowHistory(true)} />

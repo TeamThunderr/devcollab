@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { validateEnv } from './config/env';
 validateEnv();
@@ -10,8 +10,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
-import fastifyStatic from '@fastify/static';
-import fs from 'fs';
+
 import initSocket from './socket/socket';
 import { aiConfig } from './config/ai.config';
 import { pool } from './db/client';
@@ -30,12 +29,13 @@ import activityRoutes from './modules/activity/activity.routes';
 import notificationRoutes from './modules/notification/notification.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import billingRoutes from './modules/billing/billing.routes';
+import waitlistRoutes from './modules/waitlist/waitlist.routes';
 
-const fastify = Fastify({ logger: true });
+export const fastify = Fastify({ logger: true });
 
 async function bootstrap() {
   await fastify.register(cors, {
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    origin: [process.env.FRONTEND_URL ?? 'http://localhost:5173', 'http://localhost:5174'],
     credentials: true,
   });
 
@@ -44,17 +44,9 @@ async function bootstrap() {
   });
 
   await fastify.register(multipart, {
-    limits: { fileSize: 10 * 1024 * 1024 },
-  });
-
-  const uploadsDir = path.join(__dirname, '../uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-
-  await fastify.register(fastifyStatic, {
-    root: uploadsDir,
-    prefix: '/uploads/',
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
   });
 
   fastify.register(authRoutes, { prefix: '/api/auth' });
@@ -69,6 +61,7 @@ async function bootstrap() {
   fastify.register(notificationRoutes, { prefix: '/api/notifications' });
   fastify.register(paymentRoutes, { prefix: '/api/payments' });
   fastify.register(billingRoutes, { prefix: '/api/billing' });
+  fastify.register(waitlistRoutes, { prefix: '/api/waitlist' });
 
   fastify.get('/api/health', async (_request, reply) => {
     return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
@@ -101,10 +94,8 @@ async function bootstrap() {
     console.error('❌ Socket.IO initialization failed:', err);
   }
 
-  if (!aiConfig.apiKey && !aiConfig.mockMode) {
-    console.warn('⚠️  GEMINI_API_KEY not set and AI_MOCK_MODE is false — AI features will fail');
-  } else if (aiConfig.mockMode) {
-    console.log('🤖 AI running in MOCK mode — no API calls will be made');
+  if (!aiConfig.apiKey) {
+    console.warn('⚠️  GEMINI_API_KEY not set — AI features will fail');
   } else {
     console.log(`🤖 AI running in LIVE mode — using ${aiConfig.model}`);
   }

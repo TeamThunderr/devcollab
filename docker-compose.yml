@@ -46,7 +46,6 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
       GEMINI_FALLBACK_MODEL: ${GEMINI_FALLBACK_MODEL}
-      AI_MOCK_MODE: ${AI_MOCK_MODE}
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
       SMTP_HOST: ${SMTP_HOST}
@@ -67,11 +66,21 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      target: development
     container_name: devcollab-frontend
     ports:
-      - "80:80"
+      - "80:5173"
+    environment:
+      BACKEND_URL: http://backend:3000
     depends_on:
       - backend
+    volumes:
+      - ./apps/frontend/src:/app/apps/frontend/src
+      - ./apps/frontend/index.html:/app/apps/frontend/index.html
+      - ./apps/frontend/package.json:/app/apps/frontend/package.json
+      - ./apps/frontend/vite.config.ts:/app/apps/frontend/vite.config.ts
+      - ./apps/frontend/tailwind.config.js:/app/apps/frontend/tailwind.config.js
+      - ./apps/frontend/postcss.config.js:/app/apps/frontend/postcss.config.js
 
 volumes:
   pgdata:

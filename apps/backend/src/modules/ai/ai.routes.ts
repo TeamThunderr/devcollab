@@ -33,73 +33,7 @@ const breakdownSchema = z.object({
   projectId: z.string(),
 });
 
-// ─── Mock fixture data ────────────────────────────────────────────────────────
-// Temporary — teammate's task/activity API endpoints will replace these.
-
-const mockTasks: aiService.ProjectTask[] = [
-  {
-    title: "Setup Redis",
-    status: "done",
-    assigneeName: "Arjun",
-    priority: "p0",
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    title: "Build Socket.IO",
-    status: "inprogress",
-    assigneeName: "Arjun",
-    priority: "p0",
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    title: "Kanban UI",
-    status: "inprogress",
-    assigneeName: "Riya",
-    priority: "p1",
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    title: "Auth API",
-    status: "inreview",
-    assigneeName: "Dev",
-    priority: "p0",
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    title: "Monaco Editor",
-    status: "todo",
-    assigneeName: "Sneha",
-    priority: "p1",
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const mockActivity: aiService.ActivityItem[] = [
-  {
-    userName: "Arjun",
-    action: "moved to done",
-    taskTitle: "Setup Redis",
-    timestamp: new Date(Date.now() - 3_600_000).toISOString(),
-  },
-  {
-    userName: "Riya",
-    action: "moved to inprogress",
-    taskTitle: "Kanban UI",
-    timestamp: new Date(Date.now() - 7_200_000).toISOString(),
-  },
-  {
-    userName: "Dev",
-    action: "moved to inreview",
-    taskTitle: "Auth API",
-    timestamp: new Date(Date.now() - 1_800_000).toISOString(),
-  },
-  {
-    userName: "Sneha",
-    action: "created",
-    taskTitle: "Monaco Editor",
-    timestamp: new Date(Date.now() - 900_000).toISOString(),
-  },
-];
+// ─── Data fetchers (pending implementation) ──────────────────────────────────
 
 // ─── Route registration ───────────────────────────────────────────────────────
 
@@ -136,8 +70,9 @@ export default async function aiRoutes(
           .send({ success: false, error: parseResult.error.flatten() });
       }
 
-      // TODO: replace mockTasks with a real DB query using parseResult.data.projectId
-      await aiService.summariseProject(reply, mockTasks);
+      // TODO: replace with a real DB query using parseResult.data.projectId
+      const realTasks: aiService.ProjectTask[] = []; // Placeholder
+      await aiService.summariseProject(reply, realTasks);
     }
   );
 
@@ -153,8 +88,9 @@ export default async function aiRoutes(
           .send({ success: false, error: parseResult.error.flatten() });
       }
 
-      // TODO: replace mockActivity with a real activity query for parseResult.data.projectId
-      await aiService.generateStandup(reply, mockActivity);
+      // TODO: replace with a real activity query for parseResult.data.projectId
+      const realActivity: aiService.ActivityItem[] = []; // Placeholder
+      await aiService.generateStandup(reply, realActivity);
     }
   );
 

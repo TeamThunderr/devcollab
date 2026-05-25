@@ -7,6 +7,8 @@ import Topbar from "../components/topbar/Topbar";
 import WorkspaceSwitcher from "../components/workspace/WorkspaceSwitcher";
 import { useBillingStore } from "../stores/billingStore";
 import SubscriptionBadge from "../components/billing/SubscriptionBadge";
+
+import { useProjectStore } from "../stores/projectStore";
 import useWorkspaceStore from "../stores/workspaceStore";
 import { canManageBilling, canAccessSettings } from "../lib/permissions";
 import { WorkspaceRole } from "../types";
@@ -36,17 +38,33 @@ export default function AppLayout(): React.ReactElement {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { fetchSubscription, subscription } = useBillingStore();
+  const { fetchProjects, projects } = useProjectStore();
   const { members } = useWorkspaceStore();
 
   const currentUserMember = members.find((m) => m.userId === user?.id);
   const userRole = currentUserMember?.role || 'VIEWER';
 
-  // Fetch subscription whenever workspace changes
+  // Fetch subscription and projects whenever workspace changes
   React.useEffect(() => {
     if (workspaceId) {
       fetchSubscription(workspaceId);
+      fetchProjects(workspaceId);
     }
-  }, [workspaceId, fetchSubscription]);
+  }, [workspaceId, fetchSubscription, fetchProjects]);
+
+  const activeProjectId = projects[0]?.id;
+  const navItems = workspaceId ? [
+    { emoji: "🏠", label: "Dashboard", to: `/${workspaceId}` },
+    { emoji: "📋", label: "Projects", to: `/${workspaceId}/projects` },
+    ...(activeProjectId ? [
+      { emoji: "✏️", label: "Editor", to: `/${workspaceId}/editor/${activeProjectId}` },
+      { emoji: "📝", label: "Wiki", to: `/${workspaceId}/wiki/${activeProjectId}` },
+      { emoji: "💾", label: "Snippets", to: `/${workspaceId}/snippets/${activeProjectId}` },
+    ] : []),
+    { emoji: "📊", label: "Activity", to: `/${workspaceId}/activity` },
+    { emoji: "🤖", label: "AI Assistant", to: `/${workspaceId}/ai` },
+    { emoji: "💳", label: "Billing", to: `/${workspaceId}/settings/billing` },
+  ] : [];
 
   // Auth guard — redirect unauthenticated users to /login
   if (!isAuthenticated) {
@@ -84,6 +102,8 @@ export default function AppLayout(): React.ReactElement {
         <nav className="flex-1 py-4 overflow-y-auto">
           {workspaceId ? (
             <ul className="space-y-0.5 px-2">
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.to || (item.label !== 'Dashboard' && item.label !== 'Projects' && location.pathname.startsWith(item.to));
               {NAV_ITEMS.map((item) => {
                 if (item.permission && !item.permission(userRole)) {
                   return null;
@@ -93,7 +113,7 @@ export default function AppLayout(): React.ReactElement {
                 return (
                   <li key={item.label}>
                     <Link
-                      to={to}
+                      to={item.to}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors duration-150
                         ${isActive ? 'bg-gray-800 text-white font-medium' : 'text-gray-300 hover:text-white hover:bg-gray-800/50'}`}
                     >

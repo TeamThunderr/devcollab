@@ -1,8 +1,8 @@
 /**
- * apps/frontend/src/components/topbar/Topbar.tsx
+ * src/components/topbar/Topbar.tsx
  *
- * Application topbar. Left: dynamic page title. Right: online avatars,
- * notification bell.
+ * Application topbar. Left: dynamic page title derived from new URL structure.
+ * Right: online presence avatars + notification bell.
  */
 
 import React from "react";
@@ -11,65 +11,69 @@ import useWorkspaceStore from "../../stores/workspaceStore";
 import OnlineAvatars from "../presence/OnlineAvatars";
 import NotificationBell from "../notifications/NotificationBell";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Page title helper ────────────────────────────────────────────────────────
 
-/**
- * Derive a page title from the current pathname.
- * Matches route patterns in order of specificity.
- */
-function usePageTitle(workspaceName: string): string {
+function usePageTitle(): string {
   const location = useLocation();
-  const path = location.pathname;
+  const { pathname } = location;
 
-  if (path.includes("/activity")) return "Activity Feed";
-  if (path.includes("/ai")) return "AI Assistant";
-  if (path.includes("/editor")) return "Code Editor";
-  if (path.includes("/snippets")) return "Snippets";
-  if (path.includes("/wiki")) return "Wiki";
-  if (path.includes("/projects/")) return "Project Board";
+  // Project-level routes: /w/:workspaceId/p/:projectId/<feature>
+  if (pathname.includes("/editor"))   return "Code Editor";
+  if (pathname.includes("/snippets")) return "Snippets";
+  if (pathname.includes("/wiki"))     return "Wiki";
+  if (pathname.includes("/board"))    return "Project Board";
 
-  return workspaceName || "DevCollab";
+  // Workspace-level routes: /w/:workspaceId/<section>
+  if (pathname.includes("/activity")) return "Activity Feed";
+  if (pathname.includes("/ai"))       return "AI Assistant";
+  if (pathname.includes("/members"))  return "Members";
+  if (pathname.includes("/billing"))  return "Billing";
+  if (pathname.includes("/settings")) return "Settings";
+  if (pathname.includes("/projects")) return "Projects";
+
+  // Global routes
+  if (pathname === "/workspaces")     return "Your Workspaces";
+
+  // Workspace dashboard (/ index under workspace)
+  return "Dashboard";
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Topbar(): React.ReactElement {
-  // workspaceStore is still being built; access whatever is available safely
-  const workspace = useWorkspaceStore((s) =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (s as unknown as Record<string, any>).currentWorkspace ?? null
-  );
+  const { workspaceId, projectId } = useParams<{
+    workspaceId?: string;
+    projectId?: string;
+  }>();
 
-  const workspaceName: string =
-    workspace?.name ?? workspace?.title ?? "DevCollab";
-  const workspaceId: string = workspace?.id ?? "";
-
-  const { projectId } = useParams<{ projectId?: string }>();
-  const pageTitle = usePageTitle(workspaceName);
+  const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
+  const pageTitle = usePageTitle();
 
   return (
     <header
-      className="h-14 flex items-center justify-between px-6
-                 bg-white dark:bg-gray-950
-                 border-b border-gray-200 dark:border-gray-800
-                 flex-shrink-0"
+      className="h-12 flex items-center justify-between px-5
+                 bg-slate-950 border-b border-slate-800 flex-shrink-0"
     >
-      {/* Left — page title */}
-      <h1 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-        {pageTitle}
-      </h1>
+      {/* Left — breadcrumb / page title */}
+      <div className="flex items-center gap-2 min-w-0">
+        {activeWorkspace && (
+          <>
+            <span className="text-xs text-slate-500 font-medium truncate hidden sm:block">
+              {activeWorkspace.name}
+            </span>
+            <span className="text-slate-700 text-xs hidden sm:block">/</span>
+          </>
+        )}
+        <h1 className="text-sm font-semibold text-white truncate">
+          {pageTitle}
+        </h1>
+      </div>
 
       {/* Right — actions */}
-      <div className="flex items-center gap-3">
-        {/* Online avatars (only shown when we have a workspaceId) */}
+      <div className="flex items-center gap-3 flex-shrink-0">
         {workspaceId && (
-          <OnlineAvatars
-            workspaceId={workspaceId}
-            projectId={projectId}
-          />
+          <OnlineAvatars workspaceId={workspaceId} projectId={projectId} />
         )}
-
-        {/* Notification bell */}
         <NotificationBell />
       </div>
     </header>

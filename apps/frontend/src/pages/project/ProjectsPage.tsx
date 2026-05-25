@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/projectStore';
 
 export default function ProjectsPage(): React.ReactElement {
-  const { workspaceSlug = 'default-workspace' } = useParams<{ workspaceSlug: string }>();
+  const { workspaceId } = useParams<{ workspaceId: string }>();
   const { projects, loading, error, fetchProjects, createProject, deleteProject } = useProjectStore();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
@@ -11,8 +11,10 @@ export default function ProjectsPage(): React.ReactElement {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    void fetchProjects(workspaceSlug);
-  }, [fetchProjects, workspaceSlug]);
+    if (workspaceId) {
+      void fetchProjects(workspaceId);
+    }
+  }, [fetchProjects, workspaceId]);
 
   async function handleCreateProject() {
     if (!name.trim()) {
@@ -25,7 +27,7 @@ export default function ProjectsPage(): React.ReactElement {
       await createProject({
         name: name.trim(),
         description: description.trim() || undefined,
-        workspaceId: workspaceSlug,
+        workspaceId: workspaceId!,
       });
       setName('');
       setDescription('');
@@ -51,7 +53,7 @@ export default function ProjectsPage(): React.ReactElement {
             <p className="text-sm uppercase tracking-[0.3em] text-cyan-200">Module 2</p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight">Projects</h1>
             <p className="mt-3 max-w-2xl text-sm text-slate-200">
-              Organize delivery streams for workspace <span className="font-semibold">{workspaceSlug}</span>.
+              Organize delivery streams for workspace <span className="font-semibold">{workspaceId}</span>.
             </p>
           </div>
           <button
@@ -151,13 +153,19 @@ export default function ProjectsPage(): React.ReactElement {
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
-                    to={`/${workspaceSlug}/projects/${project.id}`}
+                    to={`/w/${workspaceId}/p/${project.id}/board`}
                     className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                   >
-                    Open Tasks
+                    Open Board
                   </Link>
                   <Link
-                    to={`/${workspaceSlug}/snippets/${project.id}`}
+                    to={`/w/${workspaceId}/p/${project.id}/editor`}
+                    className="rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100"
+                  >
+                    Open Editor
+                  </Link>
+                  <Link
+                    to={`/w/${workspaceId}/p/${project.id}/snippets`}
                     className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-100"
                   >
                     Open Snippets

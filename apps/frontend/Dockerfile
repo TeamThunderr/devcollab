@@ -2,11 +2,20 @@ FROM node:22-alpine AS base
 WORKDIR /app
 
 FROM base AS deps
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
 RUN mkdir -p packages
 RUN npm install
+
+FROM base AS development
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
+COPY . .
+WORKDIR /app/apps/frontend
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host"]
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules

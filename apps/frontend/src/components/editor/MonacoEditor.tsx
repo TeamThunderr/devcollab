@@ -5,7 +5,9 @@ import {
   useState,
   useEffect
 } from "react";
-import Editor, { type OnChange } from "@monaco-editor/react";
+import Editor, { type OnChange, type Monaco } from "@monaco-editor/react";
+import useEditorStore from "../../stores/editorStore";
+import { useParams } from "react-router-dom";
 
 export interface MonacoEditorProps {
   fileId: string;
@@ -14,30 +16,11 @@ export interface MonacoEditorProps {
   initialContent: string;
   onContentChange: (content: string) => void;
   onSave: (content: string) => void;
-  theme?: "vs-dark" | "light";
 }
 
 export interface MonacoEditorHandle {
   getCurrentContent: () => string;
 }
-
-const EDITOR_OPTIONS = {
-  fontSize: 14,
-  fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-  minimap: { enabled: true, scale: 0.75 },
-  wordWrap: "on" as const,
-  lineNumbers: "on" as const,
-  scrollBeyondLastLine: false,
-  automaticLayout: true,
-  tabSize: 2,
-  padding: { top: 16 },
-  formatOnPaste: true,
-  autoIndent: "advanced" as const,
-  matchBrackets: "always" as const,
-  autoClosingBrackets: "always" as const,
-  folding: true,
-  renderLineHighlight: "all" as const,
-} as const;
 
 const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
   (
@@ -48,15 +31,15 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       initialContent,
       onContentChange,
       onSave,
-      theme = "vs-dark",
     },
     ref
   ) => {
+    const { settings } = useEditorStore();
+    const { projectId } = useParams();
     const [content, setContent] = useState(initialContent);
     const [isDirty, setIsDirty] = useState(false);
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Reset content when fileId changes
     useEffect(() => {
       setContent(initialContent);
       setIsDirty(false);
@@ -77,17 +60,46 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       saveTimeoutRef.current = setTimeout(() => {
         onSave(value);
         setIsDirty(false);
-      }, 1500); // 1.5s debounced auto-save
+      }, 1500); 
+    };
+
+    const handleEditorMount = (editor: any, monaco: Monaco) => {
+      // Add Ctrl+S action
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        onSave(editor.getValue());
+        setIsDirty(false);
+      });
+    };
+
+    const EDITOR_OPTIONS = {
+      fontSize: settings.fontSize,
+      fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+      minimap: { enabled: settings.minimap, scale: 0.75 },
+      wordWrap: settings.wordWrap,
+      lineNumbers: "on" as const,
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      tabSize: settings.tabSize,
+      padding: { top: 16 },
+      formatOnPaste: true,
+      autoIndent: "advanced" as const,
+      matchBrackets: "always" as const,
+      autoClosingBrackets: "always" as const,
+      folding: true,
+      renderLineHighlight: "all" as const,
+      bracketPairColorization: { enabled: true, independentColorPoolPerBracketType: true },
+      stickyScroll: { enabled: true },
+      smoothScrolling: true,
+      multiCursorModifier: 'alt' as const,
     };
 
     return (
-      <div className="flex flex-col h-full bg-[#1e1e1e]">
-        {/* Breadcrumb / Status Bar */}
-        <div className="h-7 bg-[#1e1e1e] border-b border-[#2d2d2d] flex items-center justify-between px-4 select-none">
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span>{fileName}</span>
+      <div className={`flex flex-col h-full ${settings.theme === 'vs-dark' ? 'bg-[#1e1e1e]' : 'bg-[#fffffe]'}`}>
+        <div className={`h-[22px] border-b flex items-center justify-between px-4 select-none ${settings.theme === 'vs-dark' ? 'border-[#2d2d2d] bg-[#1e1e1e]' : 'border-gray-200 bg-gray-50'}`}>
+          <div className="flex items-center gap-2 text-[11px] text-gray-500">
+            <span>{projectId}</span>
             <span className="text-gray-600">&gt;</span>
-            <span className="text-[#007acc]">{language}</span>
+            <span className={settings.theme === 'vs-dark' ? 'text-[#cccccc]' : 'text-gray-800'}>{fileName}</span>
           </div>
           
           <div className="flex items-center gap-3">
@@ -98,27 +110,26 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
               </div>
             ) : (
               <div className="flex items-center gap-1.5 opacity-50">
-                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                 <span className="text-[11px] text-gray-400">Saved</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Editor */}
         <div className="flex-1 relative">
           <Editor
             height="100%"
             language={language}
             value={content}
-            theme={theme}
+            theme={settings.theme}
             onChange={handleChange}
             options={EDITOR_OPTIONS}
+            onMount={handleEditorMount}
             loading={
-              <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e]">
+              <div className={`absolute inset-0 flex items-center justify-center ${settings.theme === 'vs-dark' ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-6 h-6 border-2 border-[#007acc] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm text-gray-500">Initializing Monaco Editor...</span>
+                  <span className="text-xs text-gray-500">Initializing Monaco Editor...</span>
                 </div>
               </div>
             }
