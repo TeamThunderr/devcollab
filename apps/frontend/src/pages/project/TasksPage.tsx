@@ -61,6 +61,23 @@ export default function TasksPage(): React.ReactElement {
   const [selectedWorkspaceMemberId, setSelectedWorkspaceMemberId] = useState('');
   const [selectedProjectRole, setSelectedProjectRole] = useState<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER');
 
+  // Highlight tasks freshly added from AI (passed via navigation state)
+  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    return new Set(ids);
+  });
+
+  // If we arrived with aiAddedTaskIds → auto-switch to Board and clear after 4 s
+  useEffect(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    if (ids.length > 0) {
+      setActiveTab('board');
+      setHighlightedTaskIds(new Set(ids));
+      const t = setTimeout(() => setHighlightedTaskIds(new Set()), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [location.state]);
+
   const { onlineUsers } = usePresence(workspaceId || '', pid);
   const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
 
@@ -551,7 +568,8 @@ export default function TasksPage(): React.ReactElement {
         .smooth-lift {
           transition: all 0.15s ease-out;
         }
-      `}</style>      {/* Top Navbar details */}
+      `}</style>
+      {/* Top Navbar details */}
       <div className="border-b border-white/[0.04] bg-[#17191d]/85 backdrop-blur-md sticky top-0 z-30 px-6 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="text-left">
@@ -911,6 +929,7 @@ export default function TasksPage(): React.ReactElement {
                         status={col.id}
                         tasks={colTasks}
                         config={config}
+                        highlightedTaskIds={highlightedTaskIds}
                         onTaskClick={setSelectedTask}
                         onAddTask={canCreateTask ? (colId) => { setTaskStatus(colId as TaskStatus); setTaskDue(undefined); setShowTaskForm(true); } : undefined}
                       />
