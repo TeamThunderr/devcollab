@@ -15,8 +15,8 @@ export default async function register(fastify: FastifyInstance): Promise<void> 
   fastify.patch('/:id', { preHandler: [verifyProjectAccess] }, (request, reply) => projectController.updateProject(request, reply));
   fastify.delete('/:id', { preHandler: [verifyProjectAccess] }, (request, reply) => projectController.deleteProject(request, reply));
 
-  // Project Member assignments
+  // Members routes
   fastify.get('/:id/members', { preHandler: [verifyProjectAccess] }, (request, reply) => projectController.getProjectMembers(request, reply));
-  fastify.post('/:id/members', { preHandler: [verifyProjectAccess] }, (request, reply) => projectController.assignProjectMember(request, reply));
-  fastify.delete('/:id/members/:userId', { preHandler: [verifyProjectAccess] }, (request, reply) => projectController.removeProjectMember(request, reply));
+  fastify.post('/:id/members', { preHandler: [verifyProjectAccess] }, (request, reply) => projectController.assignMember(request, reply));
+  fastify.delete('/:id/members/:userId', { preHandler: [verifyProjectAccess] }, (request, reply) => projectController.removeMember(request, reply));
 }

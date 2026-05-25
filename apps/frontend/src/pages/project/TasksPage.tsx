@@ -5,8 +5,9 @@ import { useTaskStore } from '../../stores/taskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
-import { useBillingStore } from '../../stores/billingStore';
+
 import { useSnippetStore } from '../../stores/snippetStore';
+import { useBillingStore } from '../../stores/billingStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';
@@ -47,10 +48,10 @@ export default function TasksPage(): React.ReactElement {
   const tabParam = queryParams.get('tab');
 
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
-  const { projects, fetchProjects, projectMembers, fetchProjectMembers, assignProjectMember, removeProjectMember } = useProjectStore();
-  const { members, fetchWorkspaceDetails } = useWorkspaceStore();
+  const { projects, projectMembers, fetchProjectMembers, assignProjectMember, removeProjectMember } = useProjectStore();
+  const { members } = useWorkspaceStore();
   const { user } = useAuthStore();
-  const { fetchSubscription } = useBillingStore();
+ const { fetchSubscription } = useBillingStore();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'mytasks' | 'activity' | 'ai' | 'snippets'>('dashboard');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -296,13 +297,6 @@ export default function TasksPage(): React.ReactElement {
     }
   };
 
-  useEffect(() => {
-    if (workspaceId) {
-      void fetchProjects(workspaceId);
-      void fetchWorkspaceDetails(workspaceId);
-      void fetchSubscription(workspaceId);
-    }
-  }, [workspaceId, fetchProjects, fetchWorkspaceDetails, fetchSubscription]);
 
   useEffect(() => {
     if (pid) {

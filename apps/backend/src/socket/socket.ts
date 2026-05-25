@@ -8,6 +8,7 @@ import {
   registerPresenceHandlers,
 } from './handlers/presence.handler';
 import { registerChatHandlers } from './handlers/chat.handler';
+import { requireProjectAccess } from '../middleware/projectAccess';
 
 interface JwtPayload {
   userId: string;
@@ -179,25 +180,12 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
 
     socket.on('join:project', async ({ projectId }) => {
       if (!projectId) return;
-
       try {
-        const wsRole = socket.data.workspaceRole;
-        if (wsRole !== 'OWNER' && wsRole !== 'ADMIN') {
-          const projCheck = await query(
-            'SELECT id FROM project_members WHERE project_id = $1 AND user_id = $2',
-            [projectId, userId]
-          );
-          if (!projCheck.rowCount) {
-            console.warn(`[Socket Project Join Denied] User ${userId} not assigned to project ${projectId}`);
-            socket.emit('error', { message: 'Unauthorized: You are not assigned to this project' });
-            return;
-          }
-        }
-
+        await requireProjectAccess(userId, projectId);
         socket.join(`project:${projectId}`);
         socket.emit('joined:project', { projectId });
       } catch (err) {
-        socket.emit('error', { message: 'Internal server error validating project membership' });
+        socket.emit('error', { message: 'Unauthorized to join project' });
       }
     });
 
@@ -208,44 +196,25 @@ export async function initSocket(httpServer: http.Server): Promise<void> {
 
     socket.on('join:task', async ({ taskId }) => {
       if (!taskId) return;
-
       try {
-        const wsRole = socket.data.workspaceRole;
-        if (wsRole !== 'OWNER' && wsRole !== 'ADMIN') {
-          const taskProj = await query<{ project_id: string }>(
-            'SELECT project_id FROM tasks WHERE id = $1',
-            [taskId]
-          );
-          if (!taskProj.rows[0]) {
-            socket.emit('error', { message: 'Task not found' });
-            return;
-          }
-          const projectId = taskProj.rows[0].project_id;
-
-          const projCheck = await query(
-            'SELECT id FROM project_members WHERE project_id = $1 AND user_id = $2',
-            [projectId, userId]
-          );
-          if (!projCheck.rowCount) {
-            console.warn(`[Socket Task Join Denied] User ${userId} not assigned to project ${projectId} for task ${taskId}`);
-            socket.emit('error', { message: 'Unauthorized: You are not assigned to this project' });
-            return;
-          }
+        const taskCheck = await query('SELECT project_id FROM tasks WHERE id = $1', [taskId]);
+        if (taskCheck.rowCount && taskCheck.rowCount > 0) {
+          await requireProjectAccess(userId, taskCheck.rows[0].project_id);
+          
+          socket.join(`task:${taskId}`);
+          socket.data.activeTasks.add(`task:${taskId}`);
+          socket.emit('joined:task', { taskId });
+          io.to(`task:${taskId}`).emit('task:viewing', {
+            taskId,
+            user: {
+              userId: socket.data.user.userId,
+              name: socket.data.user.name ?? socket.data.user.email,
+              avatar: socket.data.user.avatar ?? null,
+            },
+          });
         }
-
-        socket.join(`task:${taskId}`);
-        socket.data.activeTasks.add(`task:${taskId}`);
-        socket.emit('joined:task', { taskId });
-        io.to(`task:${taskId}`).emit('task:viewing', {
-          taskId,
-          user: {
-            userId: socket.data.user.userId,
-            name: socket.data.user.name ?? socket.data.user.email,
-            avatar: socket.data.user.avatar ?? null,
-          },
-        });
       } catch (err) {
-        socket.emit('error', { message: 'Internal server error validating task project membership' });
+        socket.emit('error', { message: 'Unauthorized to join task' });
       }
     });
 

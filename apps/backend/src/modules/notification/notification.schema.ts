@@ -8,3 +8,12 @@ export const getNotificationsSchema = z.object({
 });
 
 export type GetNotificationsQuery = z.infer<typeof getNotificationsSchema>;
+
+export const createNotificationSchema = z.object({
+  userId: z.string().uuid(),
+  type: z.string(),
+  message: z.string(),
+  metadata: z.any().optional()
+});
+
+export type CreateNotificationPayload = z.infer<typeof createNotificationSchema>;

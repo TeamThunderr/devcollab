@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { query } from '../../db/client';
 import { AppError } from '../../utils/errors';
-import { RegisterInput, LoginInput } from './auth.schema';
+import { RegisterInput, LoginInput, UpdateUserInput } from './auth.schema';
 
 interface UserRow {
   id: string;
@@ -111,6 +111,33 @@ export const authService = {
        FROM users
        WHERE id = $1`,
       [userId]
+    );
+    const user = result.rows[0];
+    if (!user) {
+      throw new AppError(404, 'User not found');
+    }
+
+    return publicUser(user);
+  },
+
+  async updateMe(userId: string, data: UpdateUserInput) {
+    const result = await query<UserRow>(
+      `UPDATE users 
+       SET name = COALESCE($1, name),
+           avatar_url = COALESCE($2, avatar_url),
+           bio = COALESCE($3, bio),
+           skills = COALESCE($4, skills),
+           github_url = COALESCE($5, github_url)
+       WHERE id = $6
+       RETURNING id, email, password_hash, name, avatar_url, bio, skills, github_url, platform_role`,
+      [
+        data.name ?? null, 
+        data.avatar ?? null, 
+        data.bio ?? null, 
+        data.skills ?? null, 
+        data.githubLink ?? null, 
+        userId
+      ]
     );
     const user = result.rows[0];
     if (!user) {

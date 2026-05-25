@@ -45,7 +45,7 @@ export class TaskController {
     try {
       const { projectId } = taskProjectParamSchema.parse(request.params);
       const filters = getTasksQuerySchema.parse(request.query);
-      const tasks = await taskService.getTasksByProject(projectId, filters);
+      const tasks = await taskService.getTasksByProject(projectId, request.user!.userId, filters);
       return reply.send(tasks);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });
@@ -55,7 +55,7 @@ export class TaskController {
   async getTaskById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = taskIdParamSchema.parse(request.params);
-      const task = await taskService.getTaskById(id);
+      const task = await taskService.getTaskById(id, request.user!.userId);
 
       if (!task) {
         return reply.status(404).send({ error: 'Task not found' });
@@ -73,12 +73,12 @@ export class TaskController {
       const data = updateTaskSchema.parse(request.body);
 
       // Get the old task to check if status/assignee has changed
-      const oldTask = await taskService.getTaskById(id);
+      const oldTask = await taskService.getTaskById(id, request.user!.userId);
       if (!oldTask) {
         return reply.status(404).send({ error: 'Task not found' });
       }
 
-      const task = await taskService.updateTask(id, data);
+      const task = await taskService.updateTask(id, data, request.user!.userId);
 
       // Emit real-time socket events
       if (data.status && data.status !== oldTask.status) {
@@ -129,11 +129,11 @@ export class TaskController {
   async deleteTask(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = taskIdParamSchema.parse(request.params);
-      const oldTask = await taskService.getTaskById(id);
+      const oldTask = await taskService.getTaskById(id, request.user!.userId);
       if (!oldTask) {
         return reply.status(404).send({ error: 'Task not found' });
       }
-      await taskService.deleteTask(id);
+      await taskService.deleteTask(id, request.user!.userId);
 
       // Emit real-time delete
       emitToProject(oldTask.projectId, 'task:deleted', { taskId: id });
@@ -152,7 +152,7 @@ export class TaskController {
       const comment = await taskService.addComment(id, data.content, request.user!.userId);
 
       // Get task to retrieve project_id for project-scoped broadcast
-      const task = await taskService.getTaskById(id);
+      const task = await taskService.getTaskById(id, request.user!.userId);
       if (task) {
         emitToProject(task.projectId, 'comment:new', {
           taskId: id,
@@ -169,7 +169,7 @@ export class TaskController {
   async getComments(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = taskIdParamSchema.parse(request.params);
-      const comments = await taskService.getTaskComments(id);
+      const comments = await taskService.getTaskComments(id, request.user!.userId);
       return reply.send(comments);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });

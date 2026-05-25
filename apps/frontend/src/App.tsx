@@ -16,6 +16,7 @@ import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 // ─── Global pages ─────────────────────────────────────────────────────────────
 import WorkspaceList from "./pages/workspace/WorkspaceList";
 import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
+import ProfilePage from "./pages/profile/ProfilePage";
 
 // ─── Workspace pages ──────────────────────────────────────────────────────────
 import WorkspaceOverview from "./pages/workspace/WorkspaceOverview";
@@ -32,6 +33,7 @@ import EditorView from "./pages/editor/EditorView";
 import SnippetsView from "./pages/snippets/SnippetsView";
 import SnippetEditorPage from "./pages/snippets/SnippetEditorPage";
 import WikiView from "./pages/wiki/WikiView";
+import ProjectMembersPage from "./pages/project/ProjectMembersPage";
 
 // ─── Root redirect ────────────────────────────────────────────────────────────
 
@@ -70,6 +72,7 @@ function App(): React.ReactElement {
         <Route element={<GlobalLayout />}>
           <Route path="/workspaces" element={<WorkspaceList />} />
           <Route path="/onboarding/create-workspace" element={<CreateWorkspaceOnboardingPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         {/* ── Workspace-level routes: /w/:workspaceId/* ── */}
@@ -92,6 +95,7 @@ function App(): React.ReactElement {
             <Route path="snippets" element={<SnippetsView />} />
             <Route path="snippets/:snippetId" element={<SnippetEditorPage />} />
             <Route path="wiki" element={<WikiView />} />
+            <Route path="members" element={<ProjectMembersPage />} />
           </Route>
         </Route>
       </Routes>

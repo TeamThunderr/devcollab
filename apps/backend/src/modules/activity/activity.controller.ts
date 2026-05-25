@@ -9,7 +9,7 @@ export const activityController = {
       const { workspaceId } = request.params;
       
       const feed = await activityService.getActivities(
-        workspaceId,
+        workspaceId, request.user!.userId,
         filters,
         request.user!.userId,
         request.membership?.role

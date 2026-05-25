@@ -19,5 +19,16 @@ export const getProjectsQuerySchema = z.object({
   workspaceId: z.string().min(1, 'Workspace ID is required'),
 });
 
+export const assignMemberSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  role: z.string().optional(),
+});
+
+export const projectMemberParamSchema = z.object({
+  id: z.string().min(1, 'Project ID is required'),
+  userId: z.string().min(1, 'User ID is required'),
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type AssignMemberInput = z.infer<typeof assignMemberSchema>;
