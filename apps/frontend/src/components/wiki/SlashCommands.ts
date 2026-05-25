@@ -66,7 +66,7 @@ export const getSuggestionItems = () => {
       },
     },
     {
-      title: 'Task List',
+      title: 'Checklist',
       icon: '☑',
       command: ({ editor, range }: any) => {
         editor.chain().focus().deleteRange(range).toggleTaskList().run();
@@ -91,6 +91,27 @@ export const getSuggestionItems = () => {
       icon: '⊞',
       command: ({ editor, range }: any) => {
         editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+      },
+    },
+    {
+      title: 'Divider',
+      icon: '—',
+      command: ({ editor, range }: any) => {
+        editor.chain().focus().deleteRange(range).setHorizontalRule().run();
+      },
+    },
+    {
+      title: 'Callout (Info)',
+      icon: 'ℹ️',
+      command: ({ editor, range }: any) => {
+        editor.chain().focus().deleteRange(range).setNode('callout', { type: 'info' }).run();
+      },
+    },
+    {
+      title: 'Callout (Warning)',
+      icon: '⚠️',
+      command: ({ editor, range }: any) => {
+        editor.chain().focus().deleteRange(range).setNode('callout', { type: 'warning' }).run();
       },
     },
   ];

@@ -10,6 +10,9 @@ export interface WikiPage {
   content: string;
   linkedTaskId: string | null;
   linkedFileId: string | null;
+  icon: string | null;
+  coverImage: string | null;
+  parentId: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: string;
@@ -34,14 +37,20 @@ interface WikiState {
   isSaving: boolean;
   saveStatus: 'saved' | 'saving' | 'error' | null;
   editorVersion: number;
+  favorites: string[];
 
   // Actions
   fetchPages: (projectId: string) => Promise<void>;
   fetchPage: (id: string) => Promise<void>;
   createPage: (projectId: string, title: string, workspaceId: string) => Promise<WikiPage>;
-  updatePage: (id: string, data: { title?: string; content?: string }) => Promise<void>;
+  updatePage: (id: string, data: Partial<WikiPage>) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
   setActivePageId: (id: string | null) => void;
+  
+  // Favorites & Search
+  fetchFavorites: (projectId: string) => Promise<void>;
+  toggleFavorite: (pageId: string) => Promise<void>;
+  searchPages: (query: string) => WikiPage[];
   
   // Versions
   fetchVersions: (pageId: string) => Promise<void>;
@@ -58,6 +67,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
   isSaving: false,
   saveStatus: null,
   editorVersion: 0,
+  favorites: [],
 
   fetchPages: async (projectId) => {
     set({ isLoading: true });
@@ -167,6 +177,36 @@ const useWikiStore = create<WikiState>((set, get) => ({
       console.error('Failed to restore version:', error);
       throw error;
     }
+  },
+
+  fetchFavorites: async (projectId) => {
+    try {
+      const response = await api.get(`/api/wiki/projects/${projectId}/favorites`);
+      set({ favorites: response.data });
+    } catch (error) {
+      console.error('Failed to fetch favorites:', error);
+    }
+  },
+
+  toggleFavorite: async (pageId) => {
+    try {
+      const response = await api.post(`/api/wiki/pages/${pageId}/favorite`);
+      const { favorited } = response.data;
+      set((state) => ({
+        favorites: favorited 
+          ? [...state.favorites, pageId]
+          : state.favorites.filter(id => id !== pageId)
+      }));
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    }
+  },
+
+  searchPages: (query: string) => {
+    const { pages } = get();
+    if (!query) return pages;
+    const lowerQuery = query.toLowerCase();
+    return pages.filter(p => p.title.toLowerCase().includes(lowerQuery) || p.content.toLowerCase().includes(lowerQuery));
   },
 }));
 
