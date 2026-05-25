@@ -13,8 +13,11 @@ function mapPage(page: any) {
     title: page.title,
     slug: slugify(page.title, page.id),
     content: page.content ?? '',
-    linkedTaskId: null,
-    linkedFileId: null,
+    linkedTaskId: page.linked_task_id ?? null,
+    linkedFileId: page.linked_file_id ?? null,
+    icon: page.icon ?? null,
+    coverImage: page.cover_image ?? null,
+    parentId: page.parent_page_id ?? null,
     createdBy: page.created_by,
     updatedBy: page.updated_by,
     createdAt: page.created_at?.toISOString?.() ?? page.created_at,
@@ -57,26 +60,31 @@ export class WikiService {
     return result.rows[0] ? mapPage(result.rows[0]) : null;
   }
 
-  async createPage(data: { workspaceId: string; projectId: string; title: string; content?: string; createdBy: string }) {
+  async createPage(data: { workspaceId: string; projectId: string; title: string; content?: string; createdBy: string; parentId?: string; icon?: string; coverImage?: string }) {
     const result = await query(
-      `INSERT INTO wiki_pages (project_id, title, content, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $4)
-       RETURNING id, project_id, title, content, parent_page_id, created_by, updated_by, created_at, updated_at`,
-      [data.projectId, data.title, data.content || '', data.createdBy]
+      `INSERT INTO wiki_pages (project_id, title, content, created_by, updated_by, parent_page_id, icon, cover_image)
+       VALUES ($1, $2, $3, $4, $4, $5, $6, $7)
+       RETURNING *`,
+      [data.projectId, data.title, data.content || '', data.createdBy, data.parentId || null, data.icon || null, data.coverImage || null]
     );
     return mapPage({ ...result.rows[0], workspace_id: data.workspaceId });
   }
 
-  async updatePage(id: string, data: { title?: string; content?: string; updatedBy: string }) {
+  async updatePage(id: string, data: { title?: string; content?: string; updatedBy: string; icon?: string | null; coverImage?: string | null; linkedTaskId?: string | null; linkedFileId?: string | null; parentId?: string | null }) {
     const result = await query(
       `UPDATE wiki_pages
        SET title = COALESCE($2, title),
            content = COALESCE($3, content),
+           icon = COALESCE($5, icon),
+           cover_image = COALESCE($6, cover_image),
+           linked_task_id = COALESCE($7, linked_task_id),
+           linked_file_id = COALESCE($8, linked_file_id),
+           parent_page_id = COALESCE($9, parent_page_id),
            updated_by = $4,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, project_id, title, content, parent_page_id, created_by, updated_by, created_at, updated_at`,
-      [id, data.title ?? null, data.content ?? null, data.updatedBy]
+       RETURNING *`,
+      [id, data.title ?? null, data.content ?? null, data.updatedBy, data.icon !== undefined ? data.icon : null, data.coverImage !== undefined ? data.coverImage : null, data.linkedTaskId !== undefined ? data.linkedTaskId : null, data.linkedFileId !== undefined ? data.linkedFileId : null, data.parentId !== undefined ? data.parentId : null]
     );
     if (!result.rows[0]) {
       throw new Error('Page not found');
@@ -143,5 +151,36 @@ export class WikiService {
       content: version.content,
       updatedBy,
     });
+  }
+
+  // --- Favorites ---
+
+  async toggleFavorite(userId: string, pageId: string) {
+    const existing = await query(
+      `SELECT id FROM wiki_page_favorites WHERE user_id = $1 AND page_id = $2`,
+      [userId, pageId]
+    );
+
+    if (existing.rows.length > 0) {
+      await query(`DELETE FROM wiki_page_favorites WHERE id = $1`, [existing.rows[0].id]);
+      return { favorited: false };
+    } else {
+      await query(
+        `INSERT INTO wiki_page_favorites (user_id, page_id) VALUES ($1, $2)`,
+        [userId, pageId]
+      );
+      return { favorited: true };
+    }
+  }
+
+  async getFavorites(userId: string, projectId: string) {
+    const result = await query(
+      `SELECT wp.id
+       FROM wiki_page_favorites wpf
+       JOIN wiki_pages wp ON wp.id = wpf.page_id
+       WHERE wpf.user_id = $1 AND wp.project_id = $2`,
+      [userId, projectId]
+    );
+    return result.rows.map(r => r.id);
   }
 }

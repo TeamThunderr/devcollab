@@ -33,6 +33,43 @@ const processQueue = (error: any, token: string | null = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const originalRequest = error.config
+
+    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/api/auth/refresh') {
+      if (isRefreshing) {
+        return new Promise(function(resolve, reject) {
+          failedQueue.push({ resolve, reject })
+        }).then(token => {
+          originalRequest.headers['Authorization'] = 'Bearer ' + token
+          return api(originalRequest)
+        }).catch(err => {
+          return Promise.reject(err)
+        })
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      try {
+        // Use raw axios instance to prevent infinite interceptor loops
+        const { data } = await axios.post(`${API_BASE}/api/auth/refresh`, {}, { withCredentials: true })
+        const newToken = data.accessToken
+        
+        useAuthStore.getState().setAuthToken(newToken)
+        
+        processQueue(null, newToken)
+        originalRequest.headers['Authorization'] = 'Bearer ' + newToken
+        
+        return api(originalRequest)
+      } catch (err) {
+        processQueue(err, null)
+        useAuthStore.getState().clearAuth()
+        return Promise.reject(err)
+      } finally {
+        isRefreshing = false
+      }
+    }
+
     if (error.response?.status === 401) {
       useAuthStore.getState().clearAuth()
     }

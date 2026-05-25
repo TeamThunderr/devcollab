@@ -21,6 +21,11 @@ export default async function register(fastify: FastifyInstance): Promise<void> 
     secureFastify.post('/pages/:id/versions', wikiController.createVersionHandler);
     secureFastify.post('/pages/:id/restore/:versionId', wikiController.restoreVersionHandler);
 
+    secureFastify.get('/projects/:projectId/favorites', wikiController.getFavoritesHandler);
+    secureFastify.post('/pages/:id/favorite', wikiController.toggleFavoriteHandler);
+
+    secureFastify.post('/ai/summarize', wikiController.summarizePageHandler);
+
     secureFastify.post('/upload-image', wikiController.uploadImageHandler);
   });
 }

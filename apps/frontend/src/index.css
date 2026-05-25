@@ -91,3 +91,11 @@
   height: 0;
   pointer-events: none;
 }
+
+/* Callouts */
+.callout-info {
+  background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3);
+}
+.callout-warning {
+  background: rgba(234, 179, 8, 0.1); border-color: rgba(234, 179, 8, 0.3);
+}
