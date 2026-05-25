@@ -1,14 +1,23 @@
-/**
- * src/layouts/ProjectLayout.tsx
- *
- * Project-level layout. Workspace data is already hydrated by the parent WorkspaceLayout.
- * The WorkspaceLayout provides the MainSidebar and Topbar shell.
- * This layout just acts as a pass-through (for now) to render the child route.
- */
-
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useParams } from "react-router-dom";
+import ChatPanel from "../components/chat/ChatPanel";
+import useChatStore from "../stores/chatStore";
 
 export default function ProjectLayout(): React.ReactElement {
-  return <Outlet />;
+  const { projectId } = useParams<{ projectId: string }>();
+  const isChatOpen = useChatStore(s => s.isChatOpen);
+  const setChatOpen = useChatStore(s => s.setChatOpen);
+
+  return (
+    <>
+      <Outlet />
+      {projectId && (
+        <ChatPanel
+          projectId={projectId}
+          isOpen={isChatOpen}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
+    </>
+  );
 }
