@@ -40,6 +40,14 @@ export interface Project {
   };
 }
 
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: WorkspaceRole;
+  user: User;
+}
+
 export interface Comment {
   id: string;
   content: string;
@@ -58,6 +66,8 @@ export interface Task {
   priority: TaskPriority;
   dueDate?: string;
   projectId: string;
+  assigneeId?: string | null;
+  assignee?: User;
   createdAt: string;
   updatedAt: string;
   createdBy: User;

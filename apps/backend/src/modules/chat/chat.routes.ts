@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { verifyAuth } from '../../middleware/auth.middleware';
+import { verifyProjectAccess } from '../../middleware/rbac.middleware';
 import {
   getMessages,
   sendMessage,
@@ -13,6 +14,7 @@ import {
 
 export default async function chatRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', verifyAuth);
+  fastify.addHook('preHandler', verifyProjectAccess);
 
   fastify.get('/:projectId/messages', getMessages);
   fastify.post('/:projectId/messages', sendMessage);

@@ -41,12 +41,12 @@ The Wiki module was designed to replicate a Notion-style, block-based rich text 
 - **Slash Commands (`@tiptap/suggestion` + `tippy.js`)**: Engineered a custom floating menu. Typing `/` anywhere in the editor triggers a keyboard-navigable popup to quickly insert Headings, Lists (Bullets, Numbers, Checklists), Tables, Quotes, and Code Blocks.
 - **Advanced Code Blocks (`lowlight`)**: Code blocks feature accurate, multi-language syntax highlighting using `lowlight`, styled with custom dark-mode CSS overrides.
 - **Dynamic Tables (`@tiptap/extension-table`)**: Users can insert tables that come with contextual toolbar buttons. When the cursor is inside a table, tools dynamically appear allowing the user to add/remove columns and rows.
-- **Memoized Extensions**: Wrapped the Tiptap `extensions` array in a `useMemo` hook to satisfy React strict-mode constraints, preventing duplicate extension instantiation warnings and performance degradation on re-renders.
+- **Task & File Linking**: Integrated dropdowns in the sticky header, leveraging `useTaskStore` and `useEditorStore` to allow users to contextually link a wiki page directly to an agile task or a specific project file.
 
 ### Image Uploads & Backend Support
-- **Multipart Parsing (`@fastify/multipart`)**: Upgraded the Fastify backend to support `FormData` parsing for direct image uploads.
-- **Upload Endpoint**: Created the `POST /api/wiki/upload-image` endpoint. It uses `pump` to stream incoming images directly to the local `/uploads` directory, instantly responding with the public URL.
-- **Static File Serving (`@fastify/static`)**: Configured Fastify to serve the uploaded images publicly so they render immediately inside the Wiki editor.
+- **FormData Parsing**: The frontend uses `FormData` to handle image selections from the custom toolbar and POSTs them to the backend.
+- **Database Image Storage**: The `POST /api/wiki/upload-image` endpoint extracts the image buffer and stores it directly into a PostgreSQL `uploaded_images` table, replacing local file system storage for better scalability.
+- **Dynamic Image Serving**: Created a `GET /api/wiki/images/:id` endpoint that retrieves the image buffer and content type from the database, setting public `Cache-Control` headers for fast, direct rendering in the Tiptap editor.
 
 ### State Management & Version History
 - **Historical Snapshots**: Users can explicitly click "Save Snapshot" to create immutable versions of the wiki page in the database.

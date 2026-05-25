@@ -80,7 +80,6 @@ function App(): React.ReactElement {
           <Route index element={<WorkspaceOverview />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="activity" element={<ActivityFeedPage />} />
-          <Route path="ai" element={<AIAssistantView />} />
           <Route path="members" element={<MembersPage />} />
           <Route path="billing" element={<BillingPage />} />
           <Route path="settings" element={<SettingsView />} />
@@ -92,6 +91,7 @@ function App(): React.ReactElement {
             <Route index element={<Navigate to="board" replace />} />
             <Route path="board" element={<TasksView />} />
             <Route path="editor" element={<EditorView />} />
+            <Route path="ai" element={<AIAssistantView />} />
             <Route path="snippets" element={<SnippetsView />} />
             <Route path="snippets/:snippetId" element={<SnippetEditorPage />} />
             <Route path="wiki" element={<WikiView />} />

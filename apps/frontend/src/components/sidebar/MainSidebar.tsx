@@ -147,6 +147,11 @@ export default function MainSidebar(): React.ReactElement {
         icon: <Icon d={ICONS.editor} />,
       },
       {
+        label: "AI Assistant",
+        to: `/w/${workspaceId}/p/${projectId}/ai`,
+        icon: <Icon d={ICONS.ai} />,
+      },
+      {
         label: "Members",
         to: `/w/${workspaceId}/p/${projectId}/members`,
         icon: <Icon d={ICONS.members} />,

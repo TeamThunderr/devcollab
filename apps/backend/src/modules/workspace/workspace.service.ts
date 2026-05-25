@@ -48,7 +48,7 @@ export const workspaceService = {
   async createWorkspace(userId: string, data: CreateWorkspaceInput) {
     const owned = await query<{ plan: string }>('SELECT plan FROM workspaces WHERE owner_id = $1', [userId]);
     const hasPro = owned.rows.some(workspace => workspace.plan === 'pro');
-    if (!hasPro && (owned.rowCount ?? 0) >= 1) {
+    if (process.env.NODE_ENV === 'production' && !hasPro && (owned.rowCount ?? 0) >= 1) {
       throw new AppError(403, 'Free plan limit reached: You can only create 1 workspace. Upgrade an existing workspace to PRO to create more.');
     }
 

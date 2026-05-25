@@ -8,7 +8,12 @@ export const activityController = {
       const filters = getActivityFeedSchema.parse(request.query);
       const { workspaceId } = request.params;
       
-      const feed = await activityService.getActivities(workspaceId, request.user!.userId, filters);
+      const feed = await activityService.getActivities(
+        workspaceId, request.user!.userId,
+        filters,
+        request.user!.userId,
+        request.membership?.role
+      );
       return reply.send(feed);
     } catch (error: any) {
       if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });

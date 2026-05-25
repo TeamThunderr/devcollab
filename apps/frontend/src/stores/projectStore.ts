@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/axios';
-import { Project } from '../types';
+import { Project, ProjectMember, WorkspaceRole } from '../types';
 
 export interface ProjectMember {
   id: string;
@@ -24,11 +24,15 @@ interface CreateProjectPayload {
 
 interface ProjectStore {
   projects: Project[];
+  projectMembers: ProjectMember[];
   loading: boolean;
   error?: string;
   fetchProjects: (workspaceId: string) => Promise<void>;
   createProject: (payload: CreateProjectPayload) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
+  fetchProjectMembers: (projectId: string) => Promise<void>;
+  assignProjectMember: (projectId: string, userId: string, role: WorkspaceRole) => Promise<void>;
+  removeProjectMember: (projectId: string, userId: string) => Promise<void>;
 
   // Members
   projectMembers: Record<string, ProjectMember[]>; // keyed by projectId
@@ -39,6 +43,7 @@ interface ProjectStore {
 
 export const useProjectStore = create<ProjectStore>((set) => ({
   projects: [],
+  projectMembers: [],
   loading: false,
   error: undefined,
   projectMembers: {},
@@ -69,6 +74,39 @@ export const useProjectStore = create<ProjectStore>((set) => ({
     set((state) => ({
       projects: state.projects.filter((project) => project.id !== id),
     }));
+  },
+
+  fetchProjectMembers: async (projectId) => {
+    set({ loading: true, error: undefined });
+    try {
+      const response = await api.get<ProjectMember[]>(`/api/projects/${projectId}/members`);
+      set({ projectMembers: response.data, loading: false });
+    } catch (error: any) {
+      set({ error: error.message, loading: false });
+    }
+  },
+
+  assignProjectMember: async (projectId, userId, role) => {
+    try {
+      await api.post(`/api/projects/${projectId}/members`, { userId, role });
+      const response = await api.get<ProjectMember[]>(`/api/projects/${projectId}/members`);
+      set({ projectMembers: response.data });
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
+  },
+
+  removeProjectMember: async (projectId, userId) => {
+    try {
+      await api.delete(`/api/projects/${projectId}/members/${userId}`);
+      set((state) => ({
+        projectMembers: state.projectMembers.filter((m) => m.userId !== userId),
+      }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   fetchProjectMembers: async (projectId) => {

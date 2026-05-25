@@ -144,7 +144,7 @@ export default function ListView({
               </tr>
             ) : (
               sortedTasks.map(task => {
-                const assignee = localMetadata.assignees[task.id];
+                const assignee = task.assignee || localMetadata.assignees[task.id];
                 const tags = localMetadata.tags[task.id] || [];
                 const attachments = localMetadata.attachments[task.id] || [];
                 const checklist = localMetadata.checklists[task.id] || [];
@@ -202,13 +202,13 @@ export default function ListView({
                     {/* Assignee Column */}
                     <td className="px-4 py-3.5 align-middle">
                       <select
-                        value={assignee?.id || ''}
+                        value={task.assigneeId || assignee?.id || ''}
                         onChange={(e) => {
                           const val = e.target.value;
                           const memberUser = members.find(m => m.userId === val)?.user;
                           onUpdateMetadata(task.id, 'assignees', memberUser || null);
                           // Trigger database update
-                          void onUpdateTask(task.id, { });
+                          void onUpdateTask(task.id, { assigneeId: val || null });
                         }}
                         className="bg-transparent border-0 outline-none text-xs text-slate-400 font-semibold cursor-pointer py-1 pr-4 focus:ring-0 focus:text-white transition"
                       >
