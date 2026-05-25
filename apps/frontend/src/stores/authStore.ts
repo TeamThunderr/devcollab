@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { disconnectSocket, updateSocketToken } from "../lib/socket";
+import { disconnectSocket, connectSocket, updateSocketToken } from "../lib/socket";
 import { authService, AuthUser } from "../services/api/auth.service";
 
 export interface AuthStore {
