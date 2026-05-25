@@ -50,7 +50,7 @@ export class SnippetController {
     try {
       const { id } = snippetIdParamSchema.parse(request.params);
       const data = updateSnippetSchema.parse(request.body);
-      const snippet = await snippetService.updateSnippet(id, request.user!.userId, data, request.user!.userId);
+      const snippet = await snippetService.updateSnippet(id, request.user!.userId, data);
       return reply.send(snippet);
     } catch (error: any) {
       let statusCode = 400;

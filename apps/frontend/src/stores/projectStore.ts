@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/axios';
-import { Project, ProjectMember, WorkspaceRole } from '../types';
+import { Project } from '../types';
 
 export interface ProjectMember {
   id: string;
@@ -24,27 +24,24 @@ interface CreateProjectPayload {
 
 interface ProjectStore {
   projects: Project[];
-  projectMembers: ProjectMember[];
   loading: boolean;
+  membersLoading: boolean;
   error?: string;
   fetchProjects: (workspaceId: string) => Promise<void>;
   createProject: (payload: CreateProjectPayload) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
-  fetchProjectMembers: (projectId: string) => Promise<void>;
-  assignProjectMember: (projectId: string, userId: string, role: WorkspaceRole) => Promise<void>;
-  removeProjectMember: (projectId: string, userId: string) => Promise<void>;
 
   // Members
   projectMembers: Record<string, ProjectMember[]>; // keyed by projectId
   fetchProjectMembers: (projectId: string) => Promise<void>;
-  assignProjectMember: (projectId: string, userId: string) => Promise<void>;
+  assignProjectMember: (projectId: string, userId: string, role?: string) => Promise<void>;
   removeProjectMember: (projectId: string, userId: string) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
   projects: [],
-  projectMembers: [],
   loading: false,
+  membersLoading: false,
   error: undefined,
   projectMembers: {},
 
@@ -77,39 +74,7 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   },
 
   fetchProjectMembers: async (projectId) => {
-    set({ loading: true, error: undefined });
-    try {
-      const response = await api.get<ProjectMember[]>(`/api/projects/${projectId}/members`);
-      set({ projectMembers: response.data, loading: false });
-    } catch (error: any) {
-      set({ error: error.message, loading: false });
-    }
-  },
-
-  assignProjectMember: async (projectId, userId, role) => {
-    try {
-      await api.post(`/api/projects/${projectId}/members`, { userId, role });
-      const response = await api.get<ProjectMember[]>(`/api/projects/${projectId}/members`);
-      set({ projectMembers: response.data });
-    } catch (error: any) {
-      set({ error: error.message });
-      throw error;
-    }
-  },
-
-  removeProjectMember: async (projectId, userId) => {
-    try {
-      await api.delete(`/api/projects/${projectId}/members/${userId}`);
-      set((state) => ({
-        projectMembers: state.projectMembers.filter((m) => m.userId !== userId),
-      }));
-    } catch (error: any) {
-      set({ error: error.message });
-      throw error;
-    }
-  },
-
-  fetchProjectMembers: async (projectId) => {
+    set({ membersLoading: true, error: undefined });
     try {
       const response = await api.get<ProjectMember[]>(`/api/projects/${projectId}/members`);
       set((state) => ({
@@ -117,15 +82,17 @@ export const useProjectStore = create<ProjectStore>((set) => ({
           ...state.projectMembers,
           [projectId]: response.data,
         },
+        membersLoading: false
       }));
     } catch (error: any) {
+      set({ error: error.message, membersLoading: false });
       console.error('Failed to fetch project members', error);
     }
   },
 
-  assignProjectMember: async (projectId, userId) => {
+  assignProjectMember: async (projectId, userId, role) => {
     try {
-      const response = await api.post<ProjectMember>(`/api/projects/${projectId}/members`, { userId });
+      const response = await api.post<ProjectMember>(`/api/projects/${projectId}/members`, { userId, role });
       set((state) => ({
         projectMembers: {
           ...state.projectMembers,
@@ -133,6 +100,7 @@ export const useProjectStore = create<ProjectStore>((set) => ({
         },
       }));
     } catch (error: any) {
+      set({ error: error.message });
       console.error('Failed to assign project member', error);
       throw error;
     }
@@ -144,12 +112,14 @@ export const useProjectStore = create<ProjectStore>((set) => ({
       set((state) => ({
         projectMembers: {
           ...state.projectMembers,
-          [projectId]: (state.projectMembers[projectId] || []).filter(m => m.userId !== userId),
+          [projectId]: (state.projectMembers[projectId] || []).filter((m) => m.userId !== userId),
         },
       }));
     } catch (error: any) {
+      set({ error: error.message });
       console.error('Failed to remove project member', error);
       throw error;
     }
   },
+
 }));

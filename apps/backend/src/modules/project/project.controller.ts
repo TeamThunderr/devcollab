@@ -26,7 +26,7 @@ export class ProjectController {
     try {
       const query = getProjectsQuerySchema.parse(request.query);
       const projects = await projectService.getProjects(
-        query.workspaceId, request.user!.userId,
+        query.workspaceId, 
         request.user!.userId,
         request.membership?.role
       );
@@ -108,34 +108,4 @@ export class ProjectController {
     }
   }
 
-  async getProjectMembers(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const { id } = projectIdParamSchema.parse(request.params);
-      const members = await projectService.listProjectMembers(id);
-      return reply.send(members);
-    } catch (error: any) {
-      return reply.status(400).send({ error: error.message });
-    }
-  }
-
-  async assignProjectMember(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const { id } = projectIdParamSchema.parse(request.params);
-      const { userId, role } = request.body as { userId: string; role: string };
-      const member = await projectService.assignProjectMember(id, userId, role);
-      return reply.status(201).send(member);
-    } catch (error: any) {
-      return reply.status(400).send({ error: error.message });
-    }
-  }
-
-  async removeProjectMember(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const { id, userId } = request.params as { id: string; userId: string };
-      await projectService.removeProjectMember(id, userId);
-      return reply.status(200).send({ message: 'Project member removed successfully' });
-    } catch (error: any) {
-      return reply.status(400).send({ error: error.message });
-    }
-  }
 }

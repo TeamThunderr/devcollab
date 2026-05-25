@@ -7,6 +7,7 @@ import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
 
 import { useSnippetStore } from '../../stores/snippetStore';
+import { useBillingStore } from '../../stores/billingStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';

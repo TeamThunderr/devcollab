@@ -57,12 +57,6 @@ function mapTask(task: any) {
       email: task.creator_email,
       name: task.creator_name,
     } : undefined,
-    assigneeId: task.assignee_id ?? undefined,
-    assignee: task.assignee_id ? {
-      id: task.assignee_id,
-      email: task.assignee_email,
-      name: task.assignee_name,
-    } : undefined,
     assignee: task.assignee_id ? {
       id: task.assignee_id,
       email: task.assignee_email,
@@ -112,7 +106,7 @@ export class TaskService {
         data.assigneeId ?? null,
       ]
     );
-    const createdTask = await this.getTaskById(result.rows[0].id);
+    const createdTask = await this.getTaskById(result.rows[0].id, userId);
     if (!createdTask) throw new Error('Failed to fetch created task');
     return createdTask;
   }
@@ -187,7 +181,6 @@ export class TaskService {
            priority = COALESCE($5::task_priority, priority),
            due_date = CASE WHEN $6::boolean THEN $7 ELSE due_date END,
            assignee_id = CASE WHEN $8::boolean THEN $9 ELSE assignee_id END,
-           assignee_id = CASE WHEN $8::boolean THEN $9 ELSE assignee_id END,
            updated_at = NOW()
        WHERE id = $1
        RETURNING id`,
@@ -201,15 +194,14 @@ export class TaskService {
         data.dueDate ? new Date(data.dueDate) : null,
         data.assigneeId !== undefined,
         data.assigneeId ?? null,
-        data.assigneeId !== undefined,
-        data.assigneeId ?? null,
       ]
     );
     if (!result.rows[0]) {
       throw new Error('Task not found');
     }
-    const commentsByTask = await getCommentsByTaskIds([taskId]);
-    return mapTask({ ...task, comments: commentsByTask.get(taskId) ?? [] });
+    const updatedTask = await this.getTaskById(taskId, userId);
+    if (!updatedTask) throw new Error('Task not found');
+    return updatedTask;
   }
 
   async deleteTask(taskId: string, userId: string) {

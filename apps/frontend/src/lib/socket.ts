@@ -95,6 +95,12 @@ socket.on("notification:new", (data: unknown) => {
  * Call this immediately after a successful login.
  */
 export function connectSocket(token: string, workspaceId: string): void {
+  if (socket.connected) {
+    if ((socket.auth as any).workspaceId === workspaceId) {
+      return; // Already connected to this workspace
+    }
+    socket.disconnect();
+  }
   socket.auth = { token, workspaceId };
   socket.connect();
   console.log("Socket connecting...");

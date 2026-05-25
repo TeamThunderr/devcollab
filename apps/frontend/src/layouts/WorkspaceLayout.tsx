@@ -12,6 +12,7 @@ import useAuthStore from "../stores/authStore";
 import useWorkspaceStore from "../stores/workspaceStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useBillingStore } from "../stores/billingStore";
+import { connectSocket, disconnectSocket } from "../lib/socket";
 import MainSidebar from "../components/sidebar/MainSidebar";
 import Topbar from "../components/topbar/Topbar";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
@@ -28,7 +29,16 @@ export default function WorkspaceLayout(): React.ReactElement {
       fetchWorkspaceDetails(workspaceId).catch(console.error);
       fetchProjects(workspaceId).catch(console.error);
       fetchSubscription(workspaceId).catch(console.error);
+
+      const token = useAuthStore.getState().accessToken;
+      if (token) {
+        connectSocket(token, workspaceId);
+      }
     }
+
+    return () => {
+      disconnectSocket();
+    };
   }, [workspaceId, isInitialized, isAuthenticated, fetchWorkspaceDetails, fetchProjects, fetchSubscription]);
 
   if (!isInitialized) {

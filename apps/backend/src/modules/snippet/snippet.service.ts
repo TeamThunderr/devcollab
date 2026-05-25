@@ -61,7 +61,7 @@ export class SnippetService {
     return mapSnippet(snippet);
   }
 
-  async updateSnippet(snippetId: string, userId: string, data: UpdateSnippetInput, userId: string) {
+  async updateSnippet(snippetId: string, userId: string, data: UpdateSnippetInput) {
     const check = await query('SELECT project_id FROM snippets WHERE id = $1', [snippetId]);
     if (check.rowCount === 0) throw new Error('Snippet not found');
     await requireProjectAccess(userId, check.rows[0].project_id);

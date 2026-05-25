@@ -73,7 +73,7 @@ export class TaskController {
       const data = updateTaskSchema.parse(request.body);
 
       // Get the old task to check if status/assignee has changed
-      const oldTask = await taskService.getTaskById(id);
+      const oldTask = await taskService.getTaskById(id, request.user!.userId);
       if (!oldTask) {
         return reply.status(404).send({ error: 'Task not found' });
       }
@@ -129,7 +129,7 @@ export class TaskController {
   async deleteTask(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = taskIdParamSchema.parse(request.params);
-      const oldTask = await taskService.getTaskById(id);
+      const oldTask = await taskService.getTaskById(id, request.user!.userId);
       if (!oldTask) {
         return reply.status(404).send({ error: 'Task not found' });
       }
@@ -152,7 +152,7 @@ export class TaskController {
       const comment = await taskService.addComment(id, data.content, request.user!.userId);
 
       // Get task to retrieve project_id for project-scoped broadcast
-      const task = await taskService.getTaskById(id);
+      const task = await taskService.getTaskById(id, request.user!.userId);
       if (task) {
         emitToProject(task.projectId, 'comment:new', {
           taskId: id,

@@ -48,7 +48,7 @@ export class ProjectService {
     return mapProject(project);
   }
 
-  async getProjects(workspaceId: string, userId?: string, userRole?: Role, userId: string) {
+  async getProjects(workspaceId: string, userId: string, userRole?: Role) {
     const workspaceRoleCheck = await query<{ role: string }>(
       `SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`,
       [workspaceId, userId]
@@ -190,20 +190,12 @@ export class ProjectService {
       throw new AppError(403, 'Forbidden: Only workspace admins can manage project members');
     }
 
-    const checkExisting = await query(
-      `SELECT 1 FROM project_members WHERE project_id = $1 AND user_id = $2`,
-      [projectId, data.userId]
-    );
-
-    if (checkExisting.rowCount && checkExisting.rowCount > 0) {
-      throw new AppError(400, 'User is already a member of this project');
-    }
-
     const result = await query(
       `INSERT INTO project_members (project_id, user_id, role)
-       VALUES ($1, $2, 'member')
+       VALUES ($1, $2, $3)
+       ON CONFLICT (project_id, user_id) DO UPDATE SET role = EXCLUDED.role
        RETURNING id, project_id, user_id, role`,
-      [projectId, data.userId]
+      [projectId, data.userId, data.role?.toLowerCase() || 'member']
     );
 
     const userResult = await query(
@@ -252,63 +244,4 @@ export class ProjectService {
     }
   }
 
-  async listProjectMembers(projectId: string) {
-    const result = await query(
-      `SELECT pm.id, pm.project_id, pm.user_id, pm.role, u.name, u.email, u.avatar_url
-       FROM project_members pm
-       JOIN users u ON u.id = pm.user_id
-       WHERE pm.project_id = $1`,
-      [projectId]
-    );
-    return result.rows.map(row => ({
-      id: row.id,
-      projectId: row.project_id,
-      userId: row.user_id,
-      role: row.role.toUpperCase(),
-      user: {
-        id: row.user_id,
-        name: row.name,
-        email: row.email,
-        avatar: row.avatar_url
-      }
-    }));
-  }
-
-  async assignProjectMember(projectId: string, userId: string, role: string) {
-    const projRes = await query<{ workspace_id: string }>('SELECT workspace_id FROM projects WHERE id = $1', [projectId]);
-    if (!projRes.rows[0]) {
-      throw new Error('Project not found');
-    }
-    const workspaceId = projRes.rows[0].workspace_id;
-
-    const wsMemberRes = await query(
-      'SELECT id FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-      [workspaceId, userId]
-    );
-    if (!wsMemberRes.rowCount) {
-      throw new Error('User is not a member of the workspace');
-    }
-
-    const result = await query(
-      `INSERT INTO project_members (project_id, user_id, role)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (project_id, user_id) 
-       DO UPDATE SET role = EXCLUDED.role
-       RETURNING id, project_id, user_id, role`,
-      [projectId, userId, role.toLowerCase()]
-    );
-    return result.rows[0];
-  }
-
-  async removeProjectMember(projectId: string, userId: string) {
-    const result = await query(
-      'DELETE FROM project_members WHERE project_id = $1 AND user_id = $2',
-      [projectId, userId]
-    );
-    if (!result.rowCount) {
-      throw new Error('Member not found in project');
-    }
-    return { success: true };
-  }
 }
-

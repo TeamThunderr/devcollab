@@ -37,8 +37,6 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     try {
       const { user, accessToken } = await authService.login({ email, password });
       set({ user, accessToken, isAuthenticated: true, isLoading: false });
-      // Temporary connect pattern, ideally connected per workspace later
-      connectSocket(accessToken, "workspace-test-123");
     } catch (error: any) {
       set({ 
         error: error.response?.data?.error || "Failed to login", 
@@ -55,7 +53,6 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       
       const { user, accessToken } = await authService.login({ email, password });
       set({ user, accessToken, isAuthenticated: true, isLoading: false });
-      connectSocket(accessToken, "workspace-test-123");
     } catch (error: any) {
       const errData = error.response?.data?.error;
       const errMsg = Array.isArray(errData) ? errData[0].message : errData || "Failed to register";
@@ -104,12 +101,6 @@ export const useAuthStore = create<AuthStore>()((set) => ({
 
       const user = await authService.getMe();
       set({ user, isAuthenticated: true, isInitialized: true });
-      
-      // Also connect socket if we have the token
-      const currentToken = useAuthStore.getState().accessToken;
-      if (currentToken) {
-        connectSocket(currentToken, "workspace-test-123");
-      }
     } catch (error) {
       disconnectSocket();
       set({ user: null, accessToken: null, isAuthenticated: false, isInitialized: true });

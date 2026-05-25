@@ -173,7 +173,7 @@ export class WikiService {
     return this.updatePage(pageId, {
       content: version.content,
       updatedBy,
-    });
+    }, userId);
   }
 
   // --- Favorites ---

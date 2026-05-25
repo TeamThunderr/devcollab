@@ -21,6 +21,7 @@ export const getProjectsQuerySchema = z.object({
 
 export const assignMemberSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
+  role: z.string().optional(),
 });
 
 export const projectMemberParamSchema = z.object({
