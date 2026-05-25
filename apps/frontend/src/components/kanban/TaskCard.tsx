@@ -37,40 +37,37 @@ export default function TaskCard({ task, config, onClick }: TaskCardProps): Reac
 
   // Load extensions reactively or from localStorage fallback to prevent stale states
   const localProjectData = React.useMemo(() => {
+    const taskAssignee = task.assignee || (config ? config.assignees?.[task.id] : undefined);
     if (config) {
-      const taskAssignee = config.assignees?.[task.id];
       const taskTags = config.tags?.[task.id] || [];
       const taskAttachments = config.attachments?.[task.id] || [];
       const savedChecklist = config.checklists?.[task.id] || [];
-      const sprint = config.sprints?.find((s: any) => s.taskIds?.includes(task.id));
-      return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist, sprint };
+      return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist };
     }
     try {
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        const taskAssignee = parsed.assignees?.[task.id];
         const taskTags = parsed.tags?.[task.id] || [];
         const taskAttachments = parsed.attachments?.[task.id] || [];
         const savedChecklist = parsed.checklists?.[task.id] || [];
-        const sprint = parsed.sprints?.find((s: any) => s.taskIds?.includes(task.id));
-        return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist, sprint };
+        return { assignee: taskAssignee, tags: taskTags, attachments: taskAttachments, checklist: savedChecklist };
       }
     } catch (e) {
       // Ignore
     }
-    return { assignee: undefined, tags: [], attachments: [], checklist: [], sprint: undefined };
-  }, [task.id, task.projectId, config]);
+    return { assignee: taskAssignee, tags: [], attachments: [], checklist: [] };
+  }, [task, config]);
 
-  const { assignee, tags, attachments, checklist, sprint } = localProjectData;
+  const { assignee, tags, attachments, checklist } = localProjectData;
   const taskViewers = useRealtimeStore(s => s.taskViewers?.[task.id] || []);
   const currentUser = useAuthStore(s => s.user);
   
   const othersViewing = taskViewers.filter(u => u.userId !== currentUser?.id);
 
   const prio = priorityConfig[task.priority] || priorityConfig.P2;
-  const initial = assignee ? (assignee.name || assignee.email || '?').charAt(0).toUpperCase() : (task.createdBy?.name || '?').charAt(0).toUpperCase();
-  const avatarBg = assignee ? 'bg-indigo-650' : 'bg-slate-700';
+  const initial = assignee ? (assignee.name || assignee.email || '?').charAt(0).toUpperCase() : '?';
+  const avatarBg = assignee ? 'bg-indigo-650' : 'bg-amber-500/10 text-amber-500 border border-dashed border-amber-500/30';
 
   // Format Due Date styles
   const getDueDateStyles = () => {
@@ -112,9 +109,16 @@ export default function TaskCard({ task, config, onClick }: TaskCardProps): Reac
       <div className="flex flex-col gap-2" onClick={() => onClick?.(task)}>
         {/* Title & Assignee Row */}
         <div className="flex items-start justify-between gap-2.5">
-          <h3 className="text-xs font-semibold text-white group-hover:text-indigo-400 transition-colors leading-snug break-words">
-            {task.title}
-          </h3>
+          <div className="flex flex-col gap-1 min-w-0">
+            <h3 className="text-xs font-semibold text-white group-hover:text-indigo-400 transition-colors leading-snug break-words">
+              {task.title}
+            </h3>
+            {!assignee && (
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase text-amber-500 tracking-wider">
+                ⚠️ Unassigned
+              </span>
+            )}
+          </div>
           
           {/* Assignee avatar */}
           <div className="relative group/avatar flex-shrink-0 mt-0.5">
@@ -153,12 +157,6 @@ export default function TaskCard({ task, config, onClick }: TaskCardProps): Reac
               </span>
             )}
 
-            {/* Sprint Tag */}
-            {sprint && (
-              <span className="text-[8px] bg-black/20 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/[0.03] font-bold">
-                🏃 {sprint.name}
-              </span>
-            )}
           </div>
 
           {/* Comment & Attachment & Checklist Counts */}

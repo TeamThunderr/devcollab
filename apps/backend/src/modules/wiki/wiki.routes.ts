@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import * as wikiController from './wiki.controller';
 import { verifyAuth } from '../../middleware/auth.middleware';
+import { verifyProjectAccess } from '../../middleware/rbac.middleware';
 
 export default async function register(fastify: FastifyInstance): Promise<void> {
   // Public route to allow <img src="..."> to load without Authorization headers
@@ -9,6 +10,7 @@ export default async function register(fastify: FastifyInstance): Promise<void> 
   // Authenticated routes
   fastify.register(async (secureFastify) => {
     secureFastify.addHook('preHandler', verifyAuth);
+    secureFastify.addHook('preHandler', verifyProjectAccess);
     
     secureFastify.get('/projects/:projectId/pages', wikiController.getPagesHandler);
     secureFastify.post('/projects/:projectId/pages', wikiController.createPageHandler);

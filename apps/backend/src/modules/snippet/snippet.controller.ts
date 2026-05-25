@@ -50,10 +50,12 @@ export class SnippetController {
     try {
       const { id } = snippetIdParamSchema.parse(request.params);
       const data = updateSnippetSchema.parse(request.body);
-      const snippet = await snippetService.updateSnippet(id, data);
+      const snippet = await snippetService.updateSnippet(id, request.user!.userId, data);
       return reply.send(snippet);
     } catch (error: any) {
-      const statusCode = error.message === 'Snippet not found' ? 404 : 400;
+      let statusCode = 400;
+      if (error.message === 'Snippet not found') statusCode = 404;
+      else if (error.message.includes('Unauthorized')) statusCode = 403;
       return reply.status(statusCode).send({ error: error.message });
     }
   }
@@ -61,10 +63,12 @@ export class SnippetController {
   async deleteSnippet(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = snippetIdParamSchema.parse(request.params);
-      await snippetService.deleteSnippet(id);
+      await snippetService.deleteSnippet(id, request.user!.userId);
       return reply.status(204).send();
     } catch (error: any) {
-      const statusCode = error.message === 'Snippet not found' ? 404 : 400;
+      let statusCode = 400;
+      if (error.message === 'Snippet not found') statusCode = 404;
+      else if (error.message.includes('Unauthorized')) statusCode = 403;
       return reply.status(statusCode).send({ error: error.message });
     }
   }

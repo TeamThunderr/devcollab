@@ -18,6 +18,7 @@ interface TaskStore {
     priority: TaskPriority;
     dueDate?: string | null;
     projectId: string;
+    assigneeId?: string | null;
   }) => Promise<Task>;
   updateTask: (id: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'comments' | 'projectId'>>) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
@@ -65,6 +66,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       priority: data.priority,
       dueDate: data.dueDate ?? undefined,
       projectId: data.projectId,
+      assigneeId: data.assigneeId ?? undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy: {

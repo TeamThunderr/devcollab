@@ -61,7 +61,7 @@ export const activityService = {
     endDate?: string;
     page: number;
     limit: number;
-  }) {
+  }, requestingUserId?: string, requestingUserRole?: string) {
     const where: string[] = ['a.workspace_id = $1'];
     const params: any[] = [workspaceId];
 
@@ -80,6 +80,13 @@ export const activityService = {
     if (filters.endDate) {
       params.push(filters.endDate);
       where.push(`a.created_at <= $${params.length}`);
+    }
+
+    if (requestingUserRole !== 'OWNER' && requestingUserRole !== 'ADMIN' && requestingUserId) {
+      params.push(requestingUserId);
+      where.push(`(a.project_id IS NULL OR a.project_id IN (
+        SELECT project_id FROM project_members WHERE user_id = $${params.length}
+      ))`);
     }
 
     const skip = (filters.page - 1) * filters.limit;

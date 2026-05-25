@@ -8,6 +8,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { authenticate } from "../../middleware/authenticate";
+import { verifyProjectAccess } from "../../middleware/rbac.middleware";
+import { query } from "../../db/client";
 import * as aiService from "./ai.service";
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
@@ -61,7 +63,7 @@ export default async function aiRoutes(
   // ── POST /api/ai/summarise-project ─────────────────────────────────────────
   fastify.post(
     "/summarise-project",
-    { preHandler: authenticate },
+    { preHandler: [authenticate, verifyProjectAccess] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const parseResult = projectIdSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -70,8 +72,21 @@ export default async function aiRoutes(
           .send({ success: false, error: parseResult.error.flatten() });
       }
 
-      // TODO: replace with a real DB query using parseResult.data.projectId
-      const realTasks: aiService.ProjectTask[] = []; // Placeholder
+      const tasksResult = await query(
+        `SELECT t.title, t.status, u.name as assignee_name, t.priority, t.updated_at
+         FROM tasks t
+         LEFT JOIN users u ON u.id = t.assignee_id
+         WHERE t.project_id = $1`,
+        [parseResult.data.projectId]
+      );
+      const realTasks = tasksResult.rows.map(row => ({
+        title: row.title,
+        status: row.status,
+        assigneeName: row.assignee_name,
+        priority: row.priority,
+        updatedAt: row.updated_at.toISOString(),
+      }));
+
       await aiService.summariseProject(reply, realTasks);
     }
   );
@@ -79,7 +94,7 @@ export default async function aiRoutes(
   // ── POST /api/ai/standup ────────────────────────────────────────────────────
   fastify.post(
     "/standup",
-    { preHandler: authenticate },
+    { preHandler: [authenticate, verifyProjectAccess] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const parseResult = projectIdSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -88,8 +103,21 @@ export default async function aiRoutes(
           .send({ success: false, error: parseResult.error.flatten() });
       }
 
-      // TODO: replace with a real activity query for parseResult.data.projectId
-      const realActivity: aiService.ActivityItem[] = []; // Placeholder
+      const activityResult = await query(
+        `SELECT u.name as user_name, a.action, t.title as task_title, a.created_at
+         FROM activity_feed a
+         JOIN users u ON u.id = a.user_id
+         LEFT JOIN tasks t ON t.id = a.entity_id AND a.entity_type = 'TASK'
+         WHERE a.project_id = $1 AND a.created_at > NOW() - INTERVAL '24 hours'`,
+        [parseResult.data.projectId]
+      );
+      const realActivity = activityResult.rows.map(row => ({
+        userName: row.user_name,
+        action: row.action,
+        taskTitle: row.task_title || 'Item',
+        timestamp: row.created_at.toISOString(),
+      }));
+
       await aiService.generateStandup(reply, realActivity);
     }
   );
@@ -97,7 +125,7 @@ export default async function aiRoutes(
   // ── POST /api/ai/breakdown ──────────────────────────────────────────────────
   fastify.post(
     "/breakdown",
-    { preHandler: authenticate },
+    { preHandler: [authenticate, verifyProjectAccess] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const parseResult = breakdownSchema.safeParse(request.body);
       if (!parseResult.success) {

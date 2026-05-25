@@ -25,9 +25,6 @@ export default function ProjectsPage(): React.ReactElement {
 
   // Unified Creation State
   const [wizardData, setWizardData] = useState({
-    projectType: 'Internal Product',
-    primaryGoal: 'Workflow Organization',
-    workspaceStyle: 'Minimal',
     name: '',
     summary: ''
   });
@@ -83,9 +80,6 @@ export default function ProjectsPage(): React.ReactElement {
       setShowUpgradeModal(true);
     } else {
       setWizardData({
-        projectType: 'Internal Product',
-        primaryGoal: 'Workflow Organization',
-        workspaceStyle: 'Minimal',
         name: '',
         summary: ''
       });
@@ -135,16 +129,12 @@ export default function ProjectsPage(): React.ReactElement {
           const newConfig = {
             name: projectName,
             description: wizardData.summary.trim() || undefined,
-            projectType: wizardData.projectType,
-            primaryGoal: wizardData.primaryGoal,
-            workspaceStyle: wizardData.workspaceStyle,
             columns: [
               { id: 'TODO', title: 'To Do' },
               { id: 'IN_PROGRESS', title: 'In Progress' },
               { id: 'IN_REVIEW', title: 'In Review' },
               { id: 'DONE', title: 'Completed' }
             ],
-            sprints: [],
             activities: [
               {
                 id: `act-${Date.now()}`,
@@ -499,18 +489,7 @@ export default function ProjectsPage(): React.ReactElement {
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Workspace Style</label>
-                    <select
-                      value={wizardData.workspaceStyle}
-                      onChange={(e) => setWizardData({ ...wizardData, workspaceStyle: e.target.value })}
-                      className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition"
-                    >
-                      <option value="Minimal">Minimal</option>
-                      <option value="Professional">Professional</option>
-                      <option value="Creative">Creative</option>
-                    </select>
-                  </div>
+
                 </div>
               </div>
 

@@ -15,6 +15,7 @@ interface TaskModalProps {
     dueDate?: string | null;
     description?: string;
     title?: string;
+    assigneeId?: string | null;
   }) => Promise<Task>;
   onDelete: (taskId: string) => Promise<void>;
   onAddComment: (taskId: string, content: string) => Promise<Comment>;
@@ -110,7 +111,6 @@ export default function TaskModal({
   const [assigneeId, setAssigneeId] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
-  const [sprintId, setSprintId] = useState<string>('');
   const [checklist, setChecklist] = useState<{ id: string; text: string; completed: boolean }[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState('');
 
@@ -135,8 +135,8 @@ export default function TaskModal({
     setDraft(task);
     
     // Reactively extract metadata from config prop
-    const savedAssignee = config?.assignees?.[task.id];
-    setAssigneeId(savedAssignee?.id || '');
+    const savedAssignee = task.assignee || config?.assignees?.[task.id];
+    setAssigneeId(task.assigneeId || savedAssignee?.id || '');
 
     const savedTags = config?.tags?.[task.id] || [];
     setTags(savedTags);
@@ -144,15 +144,12 @@ export default function TaskModal({
     const savedAttachments = config?.attachments?.[task.id] || [];
     setAttachments(savedAttachments);
 
-    const activeSprint = config?.sprints?.find((s: any) => s.taskIds?.includes(task.id));
-    setSprintId(activeSprint?.id || '');
-
     const savedChecklist = config?.checklists?.[task.id] || [];
     setChecklist(savedChecklist);
   }, [task, config]);
 
   // Save local metadata changes back to parent
-  const saveLocalMetadata = (updates: { assigneeId?: string; tags?: string[]; attachments?: any[]; sprintId?: string; checklist?: any[] }) => {
+  const saveLocalMetadata = (updates: { assigneeId?: string; tags?: string[]; attachments?: any[]; checklist?: any[] }) => {
     try {
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
@@ -192,42 +189,6 @@ export default function TaskModal({
           if (!localConfig.checklists) localConfig.checklists = {};
           localConfig.checklists[task.id] = updates.checklist;
           onUpdateMetadata(task.id, 'checklists', updates.checklist);
-        }
-
-        // Handle Sprint
-        if (updates.sprintId !== undefined) {
-          if (!localConfig.sprints) localConfig.sprints = [];
-          // Remove from previous sprint
-          localConfig.sprints = localConfig.sprints.map((s: any) => ({
-            ...s,
-            taskIds: (s.taskIds || []).filter((id: string) => id !== task.id)
-          }));
-          // Add to new sprint
-          if (updates.sprintId) {
-            localConfig.sprints = localConfig.sprints.map((s: any) => {
-              if (s.id === updates.sprintId) {
-                return { ...s, taskIds: [...(s.taskIds || []), task.id] };
-              }
-              return s;
-            });
-          }
-          
-          // Log an activity for metadata updates
-          if (!localConfig.activities) localConfig.activities = [];
-          localConfig.activities.unshift({
-            id: `act-${Date.now()}`,
-            userId: currentUser?.id || 'unknown',
-            userName: currentUser?.name || 'Workspace Member',
-            action: 'task_update',
-            details: `moved "${task.title}" to a sprint`,
-            timestamp: new Date().toISOString()
-          });
-
-          // Save sprints directly to localStorage
-          localStorage.setItem(`devcollab_project_workspace_${task.projectId}`, JSON.stringify(localConfig));
-          
-          // Force TasksPage to update the config state reactively
-          onUpdateMetadata(task.id, 'checklists', checklist);
         }
       }
     } catch (e) {
@@ -468,16 +429,6 @@ export default function TaskModal({
       }, 50);
     }
   };
-
-  const activeSprintList = React.useMemo(() => {
-    try {
-      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
-      if (stored) {
-        return JSON.parse(stored).sprints || [];
-      }
-    } catch {}
-    return [];
-  }, [task.projectId]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm animate-in fade-in duration-200">
@@ -892,8 +843,12 @@ export default function TaskModal({
                     value={assigneeId}
                     disabled={!canEdit}
                     onChange={(e) => {
-                      setAssigneeId(e.target.value);
-                      saveLocalMetadata({ assigneeId: e.target.value });
+                      const val = e.target.value;
+                      setAssigneeId(val);
+                      saveLocalMetadata({ assigneeId: val });
+                      void onSave({ assigneeId: val || null }).catch((err) => {
+                        alert(`Failed to update task assignee: ${err.message}`);
+                      });
                     }}
                     className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
@@ -906,26 +861,7 @@ export default function TaskModal({
                   </select>
                 </label>
 
-                {/* Sprint Selector */}
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Sprint
-                  <select
-                    value={sprintId}
-                    disabled={!canEdit}
-                    onChange={(e) => {
-                      setSprintId(e.target.value);
-                      saveLocalMetadata({ sprintId: e.target.value });
-                    }}
-                    className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <option value="">No Sprint (Backlog)</option>
-                    {activeSprintList.map((s: any) => (
-                      <option key={s.id} value={s.id}>
-                        🏃 {s.name} ({s.status.toUpperCase()})
-                      </option>
-                    ))}
-                  </select>
-                </label>
+
 
                 {/* Due Date Selector */}
                 <div className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">

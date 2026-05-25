@@ -18,7 +18,7 @@ import CalendarView from './CalendarView';
 import {
   Search, Plus, Clock, Bot, Calendar,
   TrendingUp, ChevronRight, CheckCircle2, Layers,
-  Code, Copy
+  Code, Copy, Users, Trash2, X, CheckSquare
 } from 'lucide-react';
 
 
@@ -38,7 +38,6 @@ interface ProjectWorkspaceConfig {
   tags?: Record<string, string[]>;
   attachments?: Record<string, any[]>;
   checklists?: Record<string, any[]>;
-  sprints?: any[];
 }
 
 export default function TasksPage(): React.ReactElement {
@@ -48,15 +47,19 @@ export default function TasksPage(): React.ReactElement {
   const tabParam = queryParams.get('tab');
 
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
-  const { projects, fetchProjects } = useProjectStore();
+  const { projects, fetchProjects, projectMembers, fetchProjectMembers, assignProjectMember, removeProjectMember } = useProjectStore();
   const { members, fetchWorkspaceDetails } = useWorkspaceStore();
   const { user } = useAuthStore();
   const { fetchSubscription } = useBillingStore();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'activity' | 'ai' | 'snippets'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'mytasks' | 'activity' | 'ai' | 'snippets'>('dashboard');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [selectedWorkspaceMemberId, setSelectedWorkspaceMemberId] = useState('');
+  const [selectedProjectRole, setSelectedProjectRole] = useState<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER');
 
   const { onlineUsers } = usePresence(workspaceId || '', pid);
   const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
@@ -112,6 +115,7 @@ export default function TasksPage(): React.ReactElement {
   const [taskPrio, setTaskPrio] = useState<TaskPriority>('P2');
   const [taskStatus, setTaskStatus] = useState<TaskStatus>('TODO');
   const [taskDue, setTaskDue] = useState<Date | undefined>();
+  const [taskAssigneeId, setTaskAssigneeId] = useState<string>('');
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
 
@@ -141,19 +145,59 @@ export default function TasksPage(): React.ReactElement {
     return projects.find(p => p.id === pid);
   }, [projects, pid]);
 
+  // ─── My Tasks Dashboard Calculations ───────────────────────────
+  const myTasks = useMemo(() => {
+    return tasks.filter(t => t.assigneeId === user?.id);
+  }, [tasks, user]);
+
+  const overdueMyTasks = useMemo(() => {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    return myTasks.filter(t => {
+      const dueStr = t.dueDate ? t.dueDate.substring(0, 10) : '';
+      return dueStr && dueStr < todayStr && t.status !== 'DONE';
+    });
+  }, [myTasks]);
+
+  const completedMyTasks = useMemo(() => {
+    return myTasks.filter(t => t.status === 'DONE');
+  }, [myTasks]);
+
+  const inReviewMyTasks = useMemo(() => {
+    return myTasks.filter(t => t.status === 'IN_REVIEW');
+  }, [myTasks]);
+
+  const todayMyTasks = useMemo(() => {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    return myTasks.filter(t => {
+      const dueStr = t.dueDate ? t.dueDate.substring(0, 10) : '';
+      return (dueStr === todayStr && t.status !== 'DONE') || (t.priority === 'P0' && t.status !== 'DONE');
+    });
+  }, [myTasks]);
+
+  const activeBacklogMyTasks = useMemo(() => {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    return myTasks.filter(t => {
+      const dueStr = t.dueDate ? t.dueDate.substring(0, 10) : '';
+      const isOverdue = dueStr && dueStr < todayStr;
+      const isTodayOrP0 = dueStr === todayStr || t.priority === 'P0';
+      return t.status !== 'DONE' && t.status !== 'IN_REVIEW' && !isOverdue && !isTodayOrP0;
+    });
+  }, [myTasks]);
+
   const getMemberRole = (userId: string): string => {
-    if (config?.ownerId === userId || activeProject?.createdBy?.id === userId) {
-      return 'Owner';
-    }
-    if (config?.projectRoles && config.projectRoles[userId]) {
-      return config.projectRoles[userId];
-    }
     const wsMember = members.find(m => m.userId === userId);
-    if (wsMember) {
-      if (wsMember.role === 'OWNER') return 'Owner';
-      if (wsMember.role === 'ADMIN') return 'Admin';
-      if (wsMember.role === 'VIEWER') return 'Viewer';
+    if (wsMember?.role === 'OWNER') return 'Owner';
+    if (wsMember?.role === 'ADMIN') return 'Admin';
+    if (activeProject?.createdBy?.id === userId) return 'Owner';
+
+    const pm = projectMembers.find(m => m.userId === userId);
+    if (pm) {
+      if (pm.role === 'ADMIN') return 'Admin';
+      if (pm.role === 'VIEWER') return 'Viewer';
+      return 'Developer';
     }
+
+    if (wsMember?.role === 'VIEWER') return 'Viewer';
     return 'Developer';
   };
 
@@ -246,9 +290,10 @@ export default function TasksPage(): React.ReactElement {
   useEffect(() => {
     if (pid) {
       void fetchTasksByProject(pid);
+      void fetchProjectMembers(pid);
       loadConfig();
     }
-  }, [pid, fetchTasksByProject]);
+  }, [pid, fetchTasksByProject, fetchProjectMembers]);
 
 
 
@@ -298,7 +343,8 @@ export default function TasksPage(): React.ReactElement {
         status: taskStatus,
         priority: taskPrio,
         dueDate: taskDue ? taskDue.toISOString() : undefined,
-        projectId: pid
+        projectId: pid,
+        assigneeId: taskAssigneeId || null
       });
       logActivity(`created task: "${taskTitle.trim()}"`);
 
@@ -306,6 +352,7 @@ export default function TasksPage(): React.ReactElement {
       setTaskTitle('');
       setTaskDesc('');
       setTaskDue(undefined);
+      setTaskAssigneeId('');
       setShowTaskForm(false);
     } catch (err: any) {
       alert(`Failed to create task: ${err.message || err}`);
@@ -510,35 +557,49 @@ export default function TasksPage(): React.ReactElement {
           <div className="text-left">
             <div className="flex items-center gap-2">
               <h1 className="text-base font-bold text-white leading-none">{activeProject?.name || 'Your project name'}</h1>
-              <span className="text-[8px] uppercase font-mono tracking-widest px-1.5 py-0.5 border border-white/[0.04] rounded bg-white/[0.02] text-slate-500">
-                {config?.workspaceStyle || 'Minimal'}
-              </span>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1 leading-none font-medium">Deliverables stream control center</p>
           </div>
         </div>
 
-        {/* Minimal Tab Selection Navigation */}
-        <div className="flex items-center gap-1 bg-black/20 border border-white/[0.04] rounded-lg p-0.5 max-w-md self-start sm:self-center">
-          {[
-            { id: 'dashboard', label: 'Overview', icon: <TrendingUp className="h-3.5 w-3.5" /> },
-            { id: 'board', label: 'Board', icon: <Layers className="h-3.5 w-3.5" /> },
-            ...(canManageAuditFeed ? [{ id: 'activity', label: 'Audits', icon: <Clock className="h-3.5 w-3.5" /> }] : []),
-            ...(canAccessAI ? [{ id: 'ai', label: 'AI Copilot', icon: <Bot className="h-3.5 w-3.5" /> }] : []),
-            { id: 'snippets', label: 'Snippets', icon: <Code className="h-3.5 w-3.5" /> }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold border border-transparent transition-all ${activeTab === tab.id
-                  ? 'tab-pill-active font-black'
-                  : 'text-slate-400 hover:text-white'
-                }`}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-            </button>
-          ))}
+        {/* Minimal Tab Selection Navigation and Actions */}
+        <div className="flex items-center gap-4 self-start sm:self-center">
+          <div className="flex items-center gap-1 bg-black/20 border border-white/[0.04] rounded-lg p-0.5">
+            {[
+              { id: 'dashboard', label: 'Overview', icon: <TrendingUp className="h-3.5 w-3.5" /> },
+              { id: 'board', label: 'Board', icon: <Layers className="h-3.5 w-3.5" /> },
+              ...(getMemberRole(user?.id || '') !== 'Owner' ? [{ id: 'mytasks', label: 'My Tasks', icon: <CheckSquare className="h-3.5 w-3.5" /> }] : []),
+              ...(canManageAuditFeed ? [{ id: 'activity', label: 'Audits', icon: <Clock className="h-3.5 w-3.5" /> }] : []),
+              ...(canAccessAI ? [{ id: 'ai', label: 'AI Copilot', icon: <Bot className="h-3.5 w-3.5" /> }] : []),
+              { id: 'snippets', label: 'Snippets', icon: <Code className="h-3.5 w-3.5" /> }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold border border-transparent transition-all ${activeTab === tab.id
+                    ? 'tab-pill-active font-black'
+                    : 'text-slate-400 hover:text-white'
+                  }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <OnlineAvatars workspaceId={workspaceId || ''} projectId={pid} />
+            
+            {(getMemberRole(user?.id || '') === 'Owner' || getMemberRole(user?.id || '') === 'Admin') && (
+              <button
+                type="button"
+                onClick={() => setShowMembersModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] text-slate-300 hover:text-white transition-all text-xs font-semibold leading-none shadow-sm"
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span>Manage Members</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -590,9 +651,11 @@ export default function TasksPage(): React.ReactElement {
                   {tasks.length === 0 ? (
                     <div className="text-center py-8 space-y-2.5">
                       <p className="text-xs text-slate-500 italic">No milestones built yet.</p>
-                      <button type="button" onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }} className="px-3 py-1.5 border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-indigo-400 font-bold rounded-lg text-[10px] transition">
-                        + Create Task
-                      </button>
+                      {canCreateTask && (
+                        <button type="button" onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }} className="px-3 py-1.5 border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-indigo-400 font-bold rounded-lg text-[10px] transition">
+                          + Create Task
+                        </button>
+                      )}
                     </div>
                   ) : (
                     tasks.slice(0, 4).map((task: Task) => (
@@ -627,9 +690,13 @@ export default function TasksPage(): React.ReactElement {
               <div className="glass-panel rounded-2xl p-5 space-y-3.5">
                 <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400">Commands</h3>
                 <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                  <button type="button" onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }} className="p-2.5 bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 text-indigo-300 font-bold rounded-xl transition">
-                    + New Task
-                  </button>
+                  {canCreateTask ? (
+                    <button type="button" onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }} className="p-2.5 bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 text-indigo-300 font-bold rounded-xl transition">
+                      + New Task
+                    </button>
+                  ) : (
+                    <div />
+                  )}
                   <button type="button" onClick={() => setActiveTab('board')} className="p-2.5 bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/10 text-cyan-300 font-bold rounded-xl transition">
                     Open Board
                   </button>
@@ -1168,6 +1235,137 @@ export default function TasksPage(): React.ReactElement {
             )}
           </div>
         )}
+
+        {/* ─── TAB: MY TASKS DAILY DASHBOARD ───────────────────────────────────── */}
+        {activeTab === 'mytasks' && (
+          <div className="space-y-8 animate-in fade-in duration-150 text-left">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Daily Focus</h2>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Coordinate your deliverables and task accountability in real-time.</p>
+              </div>
+            </div>
+
+            {/* Metrics Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="glass-panel rounded-xl p-3 space-y-1 border border-white/[0.04] bg-white/[0.005]">
+                <span className="text-[8px] font-extrabold uppercase tracking-widest text-slate-500 block">Assigned Tasks</span>
+                <span className="text-xl font-black text-white">{myTasks.length}</span>
+              </div>
+              <div className="glass-panel rounded-xl p-3 space-y-1 border border-white/[0.04] bg-white/[0.005]">
+                <span className="text-[8px] font-extrabold uppercase tracking-widest text-rose-500 block">Overdue Count</span>
+                <span className="text-xl font-black text-rose-450">{overdueMyTasks.length}</span>
+              </div>
+              <div className="glass-panel rounded-xl p-3 space-y-1 border border-white/[0.04] bg-white/[0.005]">
+                <span className="text-[8px] font-extrabold uppercase tracking-widest text-purple-400 block">Pending Review</span>
+                <span className="text-xl font-black text-purple-400">{inReviewMyTasks.length}</span>
+              </div>
+              <div className="glass-panel rounded-xl p-3 space-y-1 border border-white/[0.04] bg-white/[0.005]">
+                <span className="text-[8px] font-extrabold uppercase tracking-widest text-emerald-500 block">Completed</span>
+                <span className="text-xl font-black text-emerald-400">{completedMyTasks.length}</span>
+              </div>
+            </div>
+
+            {/* 4 Dashboard Lists Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Column 1: Overdue */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-rose-500/10 pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                    ⚠️ Overdue ({overdueMyTasks.length})
+                  </h3>
+                </div>
+                <div className="space-y-3 max-h-[500px] overflow-y-auto premium-scrollbar pr-1">
+                  {overdueMyTasks.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic py-4 text-center">No overdue tasks.</p>
+                  ) : (
+                    overdueMyTasks.map(t => (
+                      <div key={t.id} onClick={() => setSelectedTask(t)} className="p-2 bg-rose-950/10 border border-rose-950/30 rounded-lg hover:border-rose-500/30 hover:bg-rose-950/20 transition cursor-pointer space-y-1">
+                        <h4 className="text-[11px] font-bold text-slate-200 line-clamp-1">{t.title}</h4>
+                        <div className="flex justify-between items-center text-[8px] text-slate-500">
+                          <span className="bg-rose-500/10 text-rose-400 px-1 py-0.5 rounded font-extrabold">{t.priority}</span>
+                          <span className="text-rose-400 font-bold">{t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: Today & High Priority */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                    🔥 Today / P0 ({todayMyTasks.length})
+                  </h3>
+                </div>
+                <div className="space-y-3 max-h-[500px] overflow-y-auto premium-scrollbar pr-1">
+                  {todayMyTasks.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic py-4 text-center">No high priority tasks today.</p>
+                  ) : (
+                    todayMyTasks.map(t => (
+                      <div key={t.id} onClick={() => setSelectedTask(t)} className="p-2 bg-[#1e2025] border border-white/[0.04] rounded-lg hover:border-indigo-500/20 hover:bg-[#25282e] transition cursor-pointer space-y-1">
+                        <h4 className="text-[11px] font-bold text-slate-200 line-clamp-1">{t.title}</h4>
+                        <div className="flex justify-between items-center text-[8px] text-slate-500">
+                          <span className={`px-1 py-0.5 rounded font-extrabold ${t.priority === 'P0' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'}`}>{t.priority}</span>
+                          <span>{t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No date'}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Column 3: In Review */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                    👀 In Review ({inReviewMyTasks.length})
+                  </h3>
+                </div>
+                <div className="space-y-3 max-h-[500px] overflow-y-auto premium-scrollbar pr-1">
+                  {inReviewMyTasks.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic py-4 text-center">No tasks in review.</p>
+                  ) : (
+                    inReviewMyTasks.map(t => (
+                      <div key={t.id} onClick={() => setSelectedTask(t)} className="p-2 bg-[#1e2025] border border-white/[0.04] rounded-lg hover:border-indigo-500/20 hover:bg-[#25282e] transition cursor-pointer space-y-1">
+                        <h4 className="text-[11px] font-bold text-slate-200 line-clamp-1">{t.title}</h4>
+                        <div className="flex justify-between items-center text-[8px] text-slate-500">
+                          <span className="bg-purple-500/10 text-purple-400 px-1 py-0.5 rounded font-extrabold">{t.priority}</span>
+                          <span>{t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No date'}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Column 4: Active Backlog */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    ⚙️ Active Backlog ({activeBacklogMyTasks.length})
+                  </h3>
+                </div>
+                <div className="space-y-3 max-h-[500px] overflow-y-auto premium-scrollbar pr-1">
+                  {activeBacklogMyTasks.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic py-4 text-center">No active backlog tasks.</p>
+                  ) : (
+                    activeBacklogMyTasks.map(t => (
+                      <div key={t.id} onClick={() => setSelectedTask(t)} className="p-2 bg-[#1e2025] border border-white/[0.04] rounded-lg hover:border-indigo-500/20 hover:bg-[#25282e] transition cursor-pointer space-y-1">
+                        <h4 className="text-[11px] font-bold text-slate-200 line-clamp-1">{t.title}</h4>
+                        <div className="flex justify-between items-center text-[8px] text-slate-500">
+                          <span className="bg-slate-500/10 text-slate-400 px-1 py-0.5 rounded font-extrabold">{t.priority}</span>
+                          <span>{t.dueDate ? new Date(t.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No date'}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── CREATE TASK OVERLAY MODAL ────────────────────────────────── */}
@@ -1210,6 +1408,22 @@ export default function TasksPage(): React.ReactElement {
                   <option value="IN_PROGRESS">In Progress</option>
                   <option value="IN_REVIEW">In Review</option>
                   <option value="DONE">Completed</option>
+                </select>
+              </div>
+
+              <div className="grid gap-1">
+                <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Assignee</label>
+                <select
+                  value={taskAssigneeId}
+                  onChange={(e) => setTaskAssigneeId(e.target.value)}
+                  className="bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition"
+                >
+                  <option value="">👤 Unassigned</option>
+                  {members.map((m) => (
+                    <option key={m.userId} value={m.userId}>
+                      👤 {m.user?.name || m.user?.email || 'Unnamed'} ({m.role})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1301,6 +1515,170 @@ export default function TasksPage(): React.ReactElement {
             return res;
           }}
         />
+      )}
+
+      {/* ─── MANAGE PROJECT MEMBERS MODAL ────────────────────────────────────── */}
+      {showMembersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050607]/80 px-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-[#17191d] border border-white/[0.04] rounded-2xl p-6 text-white shadow-2xl relative animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <button
+              type="button"
+              onClick={() => setShowMembersModal(false)}
+              className="absolute top-4 right-4 text-slate-500 hover:text-white transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="text-left pb-3 border-b border-white/[0.04] mb-4">
+              <h2 className="text-base font-semibold text-white">Manage Project Members</h2>
+              <p className="text-xs text-slate-400 mt-1">Assign workspace collaborators to this project stream.</p>
+            </div>
+
+            {/* List current project members */}
+            <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 premium-scrollbar">
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block text-left font-mono">Current Members ({projectMembers.length})</label>
+              
+              <div className="space-y-2">
+                {projectMembers.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.03] hover:border-white/[0.06] transition duration-150">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-1 ring-white/[0.04] flex-shrink-0">
+                        {member.user.avatar ? (
+                          <img src={member.user.avatar} alt={member.user.name} className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          (member.user.name || member.user.email || '?').charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-xs font-semibold text-white leading-none truncate">{member.user.name || 'Collaborator'}</p>
+                        <p className="text-[10px] text-slate-500 mt-1 leading-none truncate">{member.user.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                        {getMemberRole(member.userId) === 'Owner' ? 'Owner' : member.role === 'ADMIN' ? 'Lead' : member.role === 'VIEWER' ? 'Viewer' : 'Member'}
+                      </span>
+
+                      {/* Role selection dropdown */}
+                      {getMemberRole(member.userId) !== 'Owner' && (
+                        <select
+                          value={member.role}
+                          onChange={async (e) => {
+                            try {
+                              await assignProjectMember(pid!, member.userId, e.target.value as any);
+                            } catch (err: any) {
+                              alert(`Failed to update project role: ${err.message}`);
+                            }
+                          }}
+                          className="bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 text-[10px] text-slate-450 outline-none focus:border-indigo-500/50 transition cursor-pointer font-semibold"
+                        >
+                          <option value="ADMIN">Lead</option>
+                          <option value="MEMBER">Member</option>
+                          <option value="VIEWER">Viewer</option>
+                        </select>
+                      )}
+
+                      {/* Revoke button */}
+                      {member.userId !== user?.id && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (window.confirm(`Remove ${member.user.name || member.user.email} from this project?`)) {
+                              try {
+                                await removeProjectMember(pid!, member.userId);
+                              } catch (err: any) {
+                                alert(`Failed to remove member: ${err.message}`);
+                              }
+                            }
+                          }}
+                          className="p-1 text-slate-500 hover:text-rose-450 transition"
+                          title="Revoke project access"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add workspace member to project section */}
+              <div className="pt-4 border-t border-white/[0.04] space-y-3.5 text-left">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block font-mono">Assign Member</label>
+                
+                {(() => {
+                  const unassignedWorkspaceMembers = members.filter(
+                    (wm) => !projectMembers.some((pm) => pm.userId === wm.userId)
+                  );
+
+                  if (unassignedWorkspaceMembers.length === 0) {
+                    return (
+                      <p className="text-[11px] text-slate-500">No members available in this workspace. If any peoples are joined in the workspace it will display here and allow to assign with specific role.</p>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <select
+                          value={selectedWorkspaceMemberId}
+                          onChange={(e) => setSelectedWorkspaceMemberId(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2.5 text-xs text-slate-350 outline-none focus:border-indigo-500/50 transition font-semibold"
+                        >
+                          <option value="">Select a workspace collaborator...</option>
+                          {unassignedWorkspaceMembers.map((wm) => (
+                            <option key={wm.userId} value={wm.userId}>
+                              {wm.user.name || wm.user.email} ({wm.user.email})
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={selectedProjectRole}
+                          onChange={(e) => setSelectedProjectRole(e.target.value as any)}
+                          className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2.5 text-xs text-slate-350 outline-none focus:border-indigo-500/50 transition font-semibold"
+                        >
+                          <option value="MEMBER">Project Member</option>
+                          <option value="ADMIN">Project Lead / Admin</option>
+                          <option value="VIEWER">Project Viewer</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedWorkspaceMemberId) return;
+                          try {
+                            await assignProjectMember(pid!, selectedWorkspaceMemberId, selectedProjectRole);
+                            setSelectedWorkspaceMemberId('');
+                          } catch (err: any) {
+                            alert(`Failed to assign member: ${err.message}`);
+                          }
+                        }}
+                        disabled={!selectedWorkspaceMemberId}
+                        className="w-full py-2.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 disabled:opacity-40 disabled:pointer-events-none transition text-xs font-bold text-white shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Assign to Project</span>
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="border-t border-white/[0.04] pt-4 mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowMembersModal(false)}
+                className="rounded-xl border border-slate-800 px-4 py-2 text-xs font-bold hover:bg-slate-900 transition text-slate-400"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
