@@ -1,7 +1,4 @@
-import useEditorStore from "../../stores/editorStore";
-
-export default function SourceControlPanel({ projectId }: { projectId: string }) {
-  const { files } = useEditorStore();
+export default function SourceControlPanel({ projectId: _projectId }: { projectId: string }) {
   
   // Since we don't have a real dirty state tracker yet (Monaco handles its own dirty),
   // we'll simulate a UI for Source Control that could be wired up later.

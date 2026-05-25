@@ -16,7 +16,7 @@ export default function GlobalLayout(): React.ReactElement {
 
   if (!isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-[#121316]">
         <LoadingSpinner size="xl" />
       </div>
     );
@@ -27,7 +27,7 @@ export default function GlobalLayout(): React.ReactElement {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#121316]">
       <Topbar />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
