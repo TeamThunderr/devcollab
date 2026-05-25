@@ -1,6 +1,5 @@
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import useAuthStore from "./stores/authStore";
 
 // ─── Layouts ──────────────────────────────────────────────────────────────────
@@ -12,9 +11,11 @@ import ProjectLayout from "./layouts/ProjectLayout";
 // ─── Auth pages ───────────────────────────────────────────────────────────────
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 // ─── Global pages ─────────────────────────────────────────────────────────────
 import WorkspaceList from "./pages/workspace/WorkspaceList";
+import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
 
 // ─── Workspace pages ──────────────────────────────────────────────────────────
 import WorkspaceOverview from "./pages/workspace/WorkspaceOverview";
@@ -27,11 +28,6 @@ import SettingsView from "./pages/settings/SettingsView";
 
 // ─── Project pages ────────────────────────────────────────────────────────────
 import TasksView from "./pages/project/TasksView";
-import WorkspaceDashboardPage from "./pages/workspace/WorkspaceDashboardPage";
-import WorkspaceSettingsPage from "./pages/workspace/WorkspaceSettingsPage";
-import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
-import ProjectView from "./pages/project/ProjectView";
-import TasksView from './pages/project/TasksView';
 import EditorView from "./pages/editor/EditorView";
 import SnippetsView from "./pages/snippets/SnippetsView";
 import WikiView from "./pages/wiki/WikiView";
@@ -46,13 +42,6 @@ function RootRedirect(): React.ReactElement {
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
-import ActivityFeedPage from "./pages/activity/ActivityFeedPage";
-import AIAssistantView from "./pages/ai/AIAssistantView";
-import SettingsView from "./pages/settings/SettingsView";
-import BillingPage from "./pages/settings/BillingPage";
-
-import ProtectedRoute from "./components/auth/ProtectedRoute";
-import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 function App(): React.ReactElement {
   const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
@@ -63,69 +52,47 @@ function App(): React.ReactElement {
 
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <BrowserRouter>
-        <Routes>
-          {/* ── Root: smart redirect ── */}
-          <Route path="/" element={<RootRedirect />} />
+      <Routes>
+        {/* ── Root: smart redirect ── */}
+        <Route path="/" element={<RootRedirect />} />
 
-          {/* ── Public auth routes ── */}
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+        {/* ── Public auth routes ── */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+
+        {/* Public Invite Accept Route */}
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
+
+        {/* ── Global protected shell: /workspaces ── */}
+        <Route element={<GlobalLayout />}>
+          <Route path="/workspaces" element={<WorkspaceList />} />
+          <Route path="/onboarding/create-workspace" element={<CreateWorkspaceOnboardingPage />} />
+        </Route>
+
+        {/* ── Workspace-level routes: /w/:workspaceId/* ── */}
+        <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+          <Route index element={<WorkspaceOverview />} />
+          <Route path="projects" element={<ProjectsPage />} />
+          <Route path="activity" element={<ActivityFeedPage />} />
+          <Route path="ai" element={<AIAssistantView />} />
+          <Route path="members" element={<MembersPage />} />
+          <Route path="billing" element={<BillingPage />} />
+          <Route path="settings" element={<SettingsView />} />
+
+          {/* ── Project-level routes: /w/:workspaceId/p/:projectId/* ── */}
+          <Route path="p/:projectId" element={<ProjectLayout />}>
+            <Route index element={<Navigate to="board" replace />} />
+            <Route path="board" element={<TasksView />} />
+            <Route path="editor" element={<EditorView />} />
+            <Route path="snippets" element={<SnippetsView />} />
+            <Route path="wiki" element={<WikiView />} />
           </Route>
-
-          {/* Public Invite Accept Route */}
-          <Route path="/invite/:token" element={<InviteAcceptPage />} />
-
-          {/* ── Global protected shell: /workspaces ── */}
-          <Route element={<GlobalLayout />}>
-            <Route path="/workspaces" element={<WorkspaceList />} />
-          </Route>
-
-          {/* ── Workspace-level routes: /w/:workspaceId/* ── */}
-          <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
-            <Route index element={<WorkspaceOverview />} />
-            <Route path="projects" element={<ProjectsPage />} />
-            <Route path="activity" element={<ActivityFeedPage />} />
-            <Route path="ai" element={<AIAssistantView />} />
-            <Route path="members" element={<MembersPage />} />
-            <Route path="billing" element={<BillingPage />} />
-            <Route path="settings" element={<SettingsView />} />
-
-            {/* ── Project-level routes: /w/:workspaceId/p/:projectId/* ── */}
-            <Route path="p/:projectId" element={<ProjectLayout />}>
-              <Route index element={<Navigate to="board" replace />} />
-              <Route path="board" element={<TasksView />} />
-              <Route path="editor" element={<EditorView />} />
-              <Route path="snippets" element={<SnippetsView />} />
-              <Route path="wiki" element={<WikiView />} />
-            </Route>
-            {/* Protected app routes — AppLayout handles its own guard too */}
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<WorkspaceList />} />
-              <Route path="/onboarding/create-workspace" element={<CreateWorkspaceOnboardingPage />} />
-              <Route path="/:workspaceId" element={<Navigate to="dashboard" replace />} />
-              <Route path="/:workspaceId/dashboard" element={<WorkspaceDashboardPage />} />
-              <Route path="/:workspaceId/settings" element={<WorkspaceSettingsPage />} />
-              <Route path="/:workspaceId/projects" element={<ProjectView />} />
-              <Route path="/:workspaceId/projects/:pid" element={<TasksView />} />
-              <Route path="/:workspaceId/editor/:pid" element={<EditorView />} />
-              <Route path="/:workspaceId/snippets/:pid" element={<SnippetsView />} />
-              <Route path="/:workspaceId/wiki/:pid" element={<WikiView />} />
-              <Route path="/:workspaceId/activity" element={<ActivityFeedPage />} />
-              <Route path="/:workspaceId/ai" element={<AIAssistantView />} />
-              <Route path="/:workspaceId/settings/billing" element={<BillingPage />} />
-              <Route path="/settings" element={<SettingsView />} />
-            </Route>
-        </Routes>
-      </BrowserRouter>
-      );
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-      export default App;
+export default App;
