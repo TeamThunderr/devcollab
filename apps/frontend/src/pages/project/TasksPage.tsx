@@ -58,6 +58,23 @@ export default function TasksPage(): React.ReactElement {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Highlight tasks freshly added from AI (passed via navigation state)
+  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    return new Set(ids);
+  });
+
+  // If we arrived with aiAddedTaskIds → auto-switch to Board and clear after 4 s
+  useEffect(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    if (ids.length > 0) {
+      setActiveTab('board');
+      setHighlightedTaskIds(new Set(ids));
+      const t = setTimeout(() => setHighlightedTaskIds(new Set()), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [location.state]);
+
   const { onlineUsers } = usePresence(workspaceId || '', pid);
   const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
 
@@ -844,6 +861,7 @@ export default function TasksPage(): React.ReactElement {
                         status={col.id}
                         tasks={colTasks}
                         config={config}
+                        highlightedTaskIds={highlightedTaskIds}
                         onTaskClick={setSelectedTask}
                         onAddTask={canCreateTask ? (colId) => { setTaskStatus(colId as TaskStatus); setTaskDue(undefined); setShowTaskForm(true); } : undefined}
                       />
