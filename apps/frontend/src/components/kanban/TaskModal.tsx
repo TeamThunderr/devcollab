@@ -4,7 +4,6 @@ import { DatePicker } from '../ui/DatePicker';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { notificationService } from '../../services/api/notification.service';
 
 interface TaskModalProps {
   task: Task;
@@ -130,10 +129,13 @@ export default function TaskModal({
   const [attachments, setAttachments] = useState<{ id: string; name: string; size: number; type?: string; data?: string; uploadedAt: string }[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadingName, setUploadingName] = useState<string>('');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // @ Mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [selectedMentionedUser, setSelectedMentionedUser] = useState<User | null>(null);
+  const [mentionedUserRole, setMentionedUserRole] = useState('Developer');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load project configuration from localStorage
