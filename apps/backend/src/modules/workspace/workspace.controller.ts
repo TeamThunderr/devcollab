@@ -41,6 +41,7 @@ export const workspaceController = {
       const invite = await workspaceService.inviteMember(request.params.workspaceId, request.user!.userId, data);
       return reply.status(201).send({ message: 'Invite sent', invite });
     } catch (error: any) {
+      console.error('INVITE ERROR:', error);
       if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
       if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });
       return reply.status(500).send({ error: 'Internal Server Error' });

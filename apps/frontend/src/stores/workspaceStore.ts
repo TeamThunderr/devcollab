@@ -37,7 +37,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       set({ workspaces, isLoading: false, hasFetchedWorkspaces: true });
     } catch (error: any) {
       set({ 
-        error: error.response?.data?.message || error.message || 'Failed to fetch workspaces', 
+        error: error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to fetch workspaces', 
         isLoading: false,
         hasFetchedWorkspaces: true
       });
@@ -56,7 +56,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       set({ activeWorkspace: workspace, members, isLoading: false });
     } catch (error: any) {
       set({ 
-        error: error.response?.data?.message || error.message || 'Failed to fetch workspace details', 
+        error: error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to fetch workspace details', 
         isLoading: false,
         activeWorkspace: null,
         members: []
@@ -77,7 +77,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       return newWorkspace;
     } catch (error: any) {
       set({ 
-        error: error.response?.data?.message || error.message || 'Failed to create workspace', 
+        error: error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to create workspace', 
         isLoading: false 
       });
       throw error;
@@ -93,7 +93,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       set({ members, isLoading: false });
     } catch (error: any) {
       set({ 
-        error: error.response?.data?.message || error.message || 'Failed to invite member', 
+        error: error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to invite member', 
         isLoading: false 
       });
       throw error;
@@ -110,7 +110,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       }));
     } catch (error: any) {
       set({ 
-        error: error.response?.data?.message || error.message || 'Failed to update member role', 
+        error: error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update member role', 
         isLoading: false 
       });
       throw error;
@@ -127,7 +127,7 @@ const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       }));
     } catch (error: any) {
       set({ 
-        error: error.response?.data?.message || error.message || 'Failed to remove member', 
+        error: error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to remove member', 
         isLoading: false 
       });
       throw error;

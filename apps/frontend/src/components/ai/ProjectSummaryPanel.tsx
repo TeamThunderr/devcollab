@@ -8,7 +8,11 @@ import React from "react";
 import { useAIStream } from "../../hooks/useAIStream";
 import StreamingText from "./StreamingText";
 
-const TEST_PROJECT_ID = "project-test-456";
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface ProjectSummaryPanelProps {
+  projectId: string;
+}
 
 // ─── Spinner ─────────────────────────────────────────────────────────────────
 
@@ -39,17 +43,12 @@ function Spinner(): React.ReactElement {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-interface ProjectSummaryPanelProps {
-  projectId: string;
-}
 
 export default function ProjectSummaryPanel({ projectId }: ProjectSummaryPanelProps): React.ReactElement {
   const { content, isStreaming, error, startStream, reset } = useAIStream();
 
   function handleSummarise(): void {
-    void startStream("/api/ai/summarise-project", {
-      projectId,
-    });
+    void startStream("/api/ai/summarise-project", { projectId });
   }
 
   return (

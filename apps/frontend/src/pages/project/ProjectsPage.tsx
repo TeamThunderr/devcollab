@@ -16,7 +16,7 @@ export default function ProjectsPage(): React.ReactElement {
   const { projects, loading, fetchProjects, createProject, deleteProject, assignProjectMember } = useProjectStore();
   const { activeWorkspace, fetchWorkspaceDetails, members } = useWorkspaceStore();
   const { user } = useAuthStore();
-  const { subscription, fetchSubscription, upgradeToPro } = useBillingStore();
+  const { subscription, upgradeToPro } = useBillingStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [starredProjects, setStarredProjects] = useState<string[]>([]);
@@ -38,16 +38,12 @@ export default function ProjectsPage(): React.ReactElement {
   // Fetch initial data
   useEffect(() => {
     if (workspaceId) {
-      void fetchProjects(workspaceId);
-      void fetchWorkspaceDetails(workspaceId);
-      void fetchSubscription(workspaceId);
-
       const starred = localStorage.getItem(`devcollab_starred_projects_${workspaceId}`);
       if (starred) {
         setStarredProjects(JSON.parse(starred));
       }
     }
-  }, [workspaceId, fetchProjects, fetchWorkspaceDetails, fetchSubscription]);
+  }, [workspaceId]);
 
   // Star / Favorite toggle
   const toggleStar = (projectId: string, e: React.MouseEvent) => {

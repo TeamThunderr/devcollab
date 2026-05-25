@@ -2,6 +2,11 @@ import api from '../../lib/axios';
 import { Notification, PaginatedResponse } from '../../types';
 
 export const notificationService = {
+  createNotification: async (payload: { userId: string; type: string; message: string; metadata?: any }) => {
+    const response = await api.post<Notification>('/api/notifications', payload);
+    return response.data;
+  },
+
   getNotifications: async (params?: { page?: number; limit?: number; isRead?: 'true' | 'false'; type?: string }) => {
     const query = new URLSearchParams();
     if (params?.page) query.append('page', params.page.toString());

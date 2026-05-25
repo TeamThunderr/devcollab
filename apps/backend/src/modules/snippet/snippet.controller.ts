@@ -24,7 +24,7 @@ export class SnippetController {
   async getSnippetsByProject(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { projectId } = snippetProjectParamSchema.parse(request.params);
-      const snippets = await snippetService.getSnippetsByProject(projectId);
+      const snippets = await snippetService.getSnippetsByProject(projectId, request.user!.userId);
       return reply.send(snippets);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });
@@ -34,7 +34,7 @@ export class SnippetController {
   async getSnippetById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = snippetIdParamSchema.parse(request.params);
-      const snippet = await snippetService.getSnippetById(id);
+      const snippet = await snippetService.getSnippetById(id, request.user!.userId);
 
       if (!snippet) {
         return reply.status(404).send({ error: 'Snippet not found' });
@@ -77,7 +77,7 @@ export class SnippetController {
     try {
       const { projectId } = snippetProjectParamSchema.parse(request.params);
       const { q } = searchSnippetsQuerySchema.parse(request.query);
-      const snippets = await snippetService.searchSnippets(projectId, q);
+      const snippets = await snippetService.searchSnippets(projectId, q, request.user!.userId);
       return reply.send(snippets);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });

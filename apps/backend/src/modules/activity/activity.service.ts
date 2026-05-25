@@ -54,7 +54,7 @@ export const activityService = {
     }
   },
 
-  async getActivities(workspaceId: string, filters: {
+  async getActivities(workspaceId: string, userId: string, filters: {
     userId?: string;
     action?: string;
     startDate?: string;
@@ -62,8 +62,22 @@ export const activityService = {
     page: number;
     limit: number;
   }, requestingUserId?: string, requestingUserRole?: string) {
+    // Check if the user is OWNER/ADMIN in this workspace
+    const roleCheck = await query<{ role: string }>(
+      'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+      [workspaceId, userId]
+    );
+    const role = roleCheck.rows[0]?.role;
+    const isOwnerOrAdmin = role === 'owner' || role === 'admin';
+
     const where: string[] = ['a.workspace_id = $1'];
     const params: any[] = [workspaceId];
+
+    if (!isOwnerOrAdmin) {
+      // For MEMBER/VIEWER, filter out activities belonging to projects they aren't part of
+      params.push(userId);
+      where.push(`(a.project_id IS NULL OR a.project_id IN (SELECT project_id FROM project_members WHERE user_id = $${params.length}))`);
+    }
 
     if (filters.userId) {
       params.push(filters.userId);

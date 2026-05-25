@@ -1,8 +1,20 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { notificationService } from './notification.service';
-import { getNotificationsSchema } from './notification.schema';
+import { getNotificationsSchema, createNotificationSchema } from './notification.schema';
 
 export const notificationController = {
+  async createNotification(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const payload = createNotificationSchema.parse(request.body);
+      const notification = await notificationService.createNotification(payload);
+      if (!notification) return reply.status(500).send({ error: 'Failed to create notification' });
+      return reply.status(201).send(notification);
+    } catch (error: any) {
+      if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  },
+
   async getNotifications(request: FastifyRequest<{ Querystring: any }>, reply: FastifyReply) {
     try {
       const filters = getNotificationsSchema.parse(request.query);

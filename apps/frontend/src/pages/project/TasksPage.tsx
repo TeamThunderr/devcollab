@@ -122,6 +122,23 @@ export default function TasksPage(): React.ReactElement {
   const [hasActiveDraft, setHasActiveDraft] = useState(false);
   const [draftRecoveryKey, setDraftRecoveryKey] = useState<string | null>(null);
 
+  // Highlight tasks freshly added from AI (passed via navigation state)
+  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    return new Set(ids);
+  });
+
+  // If we arrived with aiAddedTaskIds → auto-switch to Board and clear after 4 s
+  useEffect(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    if (ids.length > 0) {
+      setActiveTab('board');
+      setHighlightedTaskIds(new Set(ids));
+      const t = setTimeout(() => setHighlightedTaskIds(new Set()), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [location.state]);
+
   // AI assistant states
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiSuggestions, setAiSuggestions] = useState<{ title: string; description: string; priority: TaskPriority }[]>([]);
@@ -1017,6 +1034,7 @@ export default function TasksPage(): React.ReactElement {
                         status={col.id}
                         tasks={colTasks}
                         config={config}
+                        highlightedTaskIds={highlightedTaskIds}
                         onTaskClick={setSelectedTask}
                         onAddTask={canCreateTask ? (colId) => void handleInstantTaskCreate(colId as TaskStatus) : undefined}
                       />

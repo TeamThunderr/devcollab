@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { summarizePage } from '../ai/ai.service';
 import { WikiService } from './wiki.service';
 
 const wikiService = new WikiService();
@@ -9,7 +10,7 @@ export async function getPagesHandler(
 ) {
   try {
     const { projectId } = request.params;
-    const pages = await wikiService.getPages(projectId);
+    const pages = await wikiService.getPages(projectId, request.user!.userId);
     return reply.send(pages);
   } catch (error) {
     request.log.error(error);
@@ -23,7 +24,7 @@ export async function getPageHandler(
 ) {
   try {
     const { id } = request.params;
-    const page = await wikiService.getPage(id);
+    const page = await wikiService.getPage(id, request.user!.userId);
     if (!page) {
       return reply.status(404).send({ message: 'Page not found' });
     }
@@ -37,7 +38,7 @@ export async function getPageHandler(
 export async function createPageHandler(
   request: FastifyRequest<{
     Params: { projectId: string };
-    Body: { workspaceId: string; title: string; content?: string };
+    Body: { workspaceId: string; title: string; content?: string; parentId?: string; icon?: string; coverImage?: string };
   }>,
   reply: FastifyReply
 ) {
@@ -45,7 +46,7 @@ export async function createPageHandler(
     const { projectId } = request.params;
     const userId = request.user!.userId;
     const data = { ...request.body, projectId, createdBy: userId };
-    const newPage = await wikiService.createPage(data);
+    const newPage = await wikiService.createPage(data, userId);
     return reply.status(201).send(newPage);
   } catch (error) {
     request.log.error(error);
@@ -56,14 +57,14 @@ export async function createPageHandler(
 export async function updatePageHandler(
   request: FastifyRequest<{
     Params: { id: string };
-    Body: { title?: string; content?: string };
+    Body: { title?: string; content?: string; icon?: string | null; coverImage?: string | null; linkedTaskId?: string | null; linkedFileId?: string | null; parentId?: string | null };
   }>,
   reply: FastifyReply
 ) {
   try {
     const { id } = request.params;
     const userId = request.user!.userId;
-    const updatedPage = await wikiService.updatePage(id, { ...request.body, updatedBy: userId });
+    const updatedPage = await wikiService.updatePage(id, { ...request.body, updatedBy: userId }, userId);
     return reply.send(updatedPage);
   } catch (error) {
     request.log.error(error);
@@ -77,8 +78,40 @@ export async function deletePageHandler(
 ) {
   try {
     const { id } = request.params;
-    await wikiService.deletePage(id);
+    await wikiService.deletePage(id, request.user!.userId);
     return reply.status(204).send();
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ message: 'Internal server error' });
+  }
+}
+
+// Favorites
+
+export async function toggleFavoriteHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { id } = request.params;
+    const userId = request.user!.userId;
+    const result = await wikiService.toggleFavorite(userId, id);
+    return reply.send(result);
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ message: 'Internal server error' });
+  }
+}
+
+export async function getFavoritesHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { projectId } = request.params;
+    const userId = request.user!.userId;
+    const favorites = await wikiService.getFavorites(userId, projectId);
+    return reply.send(favorites);
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ message: 'Internal server error' });
@@ -93,7 +126,7 @@ export async function getVersionsHandler(
 ) {
   try {
     const { id } = request.params;
-    const versions = await wikiService.getVersions(id);
+    const versions = await wikiService.getVersions(id, request.user!.userId);
     return reply.send(versions);
   } catch (error) {
     request.log.error(error);
@@ -108,7 +141,7 @@ export async function createVersionHandler(
   try {
     const { id } = request.params;
     const userId = request.user!.userId;
-    const version = await wikiService.createVersion(id, userId);
+    const version = await wikiService.createVersion(id, userId, userId);
     return reply.status(201).send(version);
   } catch (error) {
     request.log.error(error);
@@ -123,7 +156,7 @@ export async function restoreVersionHandler(
   try {
     const { id, versionId } = request.params;
     const userId = request.user!.userId;
-    const restoredPage = await wikiService.restoreVersion(id, versionId, userId);
+    const restoredPage = await wikiService.restoreVersion(id, versionId, userId, userId);
     return reply.send(restoredPage);
   } catch (error) {
     request.log.error(error);
@@ -176,6 +209,20 @@ export async function getImageHandler(
     reply.header('Content-Type', content_type);
     reply.header('Cache-Control', 'public, max-age=31536000');
     return reply.send(data);
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ message: 'Internal server error' });
+  }
+}
+
+export async function summarizePageHandler(
+  request: FastifyRequest<{ Body: { content: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { content } = request.body;
+    const summary = await summarizePage(content);
+    return reply.send({ summary });
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ message: 'Internal server error' });

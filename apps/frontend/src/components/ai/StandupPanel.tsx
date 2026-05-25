@@ -8,7 +8,11 @@ import React, { useState } from "react";
 import { useAIStream } from "../../hooks/useAIStream";
 import StreamingText from "./StreamingText";
 
-const TEST_PROJECT_ID = "project-test-456";
+// ─── Props ──────────────────────────────────────────────────────────────────────────────
+
+interface StandupPanelProps {
+  projectId: string;
+}
 
 // ─── Spinner ─────────────────────────────────────────────────────────────────
 
@@ -39,9 +43,6 @@ function Spinner(): React.ReactElement {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-interface StandupPanelProps {
-  projectId: string;
-}
 
 export default function StandupPanel({ projectId }: StandupPanelProps): React.ReactElement {
   const { content, isStreaming, error, startStream } = useAIStream();

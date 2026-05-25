@@ -6,8 +6,9 @@
  */
 
 import React from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useParams, Link } from "react-router-dom";
 import useWorkspaceStore from "../../stores/workspaceStore";
+import useAuthStore from "../../stores/authStore";
 import OnlineAvatars from "../presence/OnlineAvatars";
 import NotificationBell from "../notifications/NotificationBell";
 
@@ -47,6 +48,7 @@ export default function Topbar(): React.ReactElement {
   }>();
 
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
+  const user = useAuthStore((s) => s.user);
   const pageTitle = usePageTitle();
 
   return (
@@ -75,6 +77,17 @@ export default function Topbar(): React.ReactElement {
           <OnlineAvatars workspaceId={workspaceId} projectId={projectId} showCount={true} />
         )}
         <NotificationBell />
+        <Link 
+          to="/profile" 
+          className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold hover:bg-blue-700 transition-colors ml-1 overflow-hidden"
+          title="Your Profile"
+        >
+          {user?.avatar ? (
+            <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'
+          )}
+        </Link>
       </div>
     </header>
   );

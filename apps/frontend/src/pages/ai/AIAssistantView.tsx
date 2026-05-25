@@ -1,147 +1,216 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { useProjectStore } from "../../stores/projectStore";
-import ProGate from "../../components/common/ProGate";
+import React, { useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import CodeReviewPanel from "../../components/ai/CodeReviewPanel";
 import ProjectSummaryPanel from "../../components/ai/ProjectSummaryPanel";
 import StandupPanel from "../../components/ai/StandupPanel";
 import TaskBreakdownPanel from "../../components/ai/TaskBreakdownPanel";
+import { useTaskStore } from "../../stores/taskStore";
 
-// ─── Panel wrapper ────────────────────────────────────────────────────────────
+// ─── Project health snapshot ─────────────────────────────────────────────────
 
-function PanelCard({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.ReactElement {
+function HealthSnapshot({ projectId }: { projectId: string }): React.ReactElement | null {
+  const tasks = useTaskStore((s) => s.tasks).filter(
+    (t) => t.projectId === projectId
+  );
+
+  const now = Date.now();
+
+  const stats = useMemo(() => {
+    const overdue = tasks.filter(
+      (t) => t.dueDate && new Date(t.dueDate).getTime() < now && t.status !== "DONE"
+    ).length;
+    const inReview = tasks.filter((t) => t.status === "IN_REVIEW").length;
+    const total = tasks.length;
+    const done = tasks.filter((t) => t.status === "DONE").length;
+    const inProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;
+    return { overdue, inReview, total, done, inProgress };
+  }, [tasks, now]);
+
+  if (stats.total === 0) return null;
+
+  const pct = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+
+  const signals = [
+    {
+      label: "Overdue",
+      value: stats.overdue,
+      icon: "⚠️",
+      color: stats.overdue > 0
+        ? "border-red-500/30 bg-red-500/10 text-red-400"
+        : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      pulse: stats.overdue > 0,
+    },
+    {
+      label: "In Review",
+      value: stats.inReview,
+      icon: "👁️",
+      color: stats.inReview > 0
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+        : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      pulse: false,
+    },
+    {
+      label: "In Progress",
+      value: stats.inProgress,
+      icon: "⚡",
+      color: stats.inProgress > 0
+        ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+        : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      pulse: false,
+    },
+    {
+      label: "Completed",
+      value: stats.done,
+      icon: "✅",
+      color: stats.done > 0
+        ? "border-green-500/30 bg-green-500/10 text-green-400"
+        : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      pulse: false,
+    },
+  ];
+
   return (
-    <div
-      className="bg-white dark:bg-gray-900
-                 border border-gray-200 dark:border-gray-800
-                 rounded-2xl p-5 shadow-sm transition-all duration-200 hover:shadow-md"
-    >
-      {children}
+    <div className="mb-5">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">
+          Project Health
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="h-1 w-24 rounded-full bg-white/[0.05] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-400 transition-all duration-700"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="text-[10px] font-bold text-slate-400">{pct}% done</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {signals.map((s) => (
+          <div
+            key={s.label}
+            className={`relative rounded-xl border px-3 py-2.5 flex flex-col gap-1 transition-all duration-200 ${s.color}`}
+          >
+            {s.pulse && s.value > 0 && (
+              <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
+            )}
+            <span className="text-base leading-none">{s.icon}</span>
+            <span className="text-xl font-black leading-none">{s.value}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wider opacity-60">
+              {s.label}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
+// ─── Tab definitions ──────────────────────────────────────────────────────────
+
+type TabId = "review" | "summary" | "standup" | "breakdown";
+
+interface Tab {
+  id: TabId;
+  label: string;
+  emoji: string;
+  desc: string;
+}
+
+const TABS: Tab[] = [
+  { id: "review",    label: "Code Review",      emoji: "⭐", desc: "Audit your code instantly" },
+  { id: "summary",   label: "Project Summary",   emoji: "📊", desc: "AI health report" },
+  { id: "standup",   label: "Standup",           emoji: "☀️", desc: "Generate from activity" },
+  { id: "breakdown", label: "Eng Plan",          emoji: "⚡", desc: "Feature → tasks" },
+];
+
 // ─── Page component ───────────────────────────────────────────────────────────
 
 export default function AIAssistantView(): React.ReactElement {
-  const { workspaceId } = useParams<{ workspaceId: string }>();
-  const { projects, fetchProjects, loading } = useProjectStore();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const { projectId, workspaceId } = useParams<{ projectId: string; workspaceId: string }>();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = React.useState<TabId>("review");
 
-  useEffect(() => {
-    if (workspaceId) {
-      void fetchProjects(workspaceId);
-    }
-  }, [workspaceId, fetchProjects]);
+  if (!projectId) {
+    return (
+      <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+        No project selected.
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) {
-      // Try to read last selected project from sessionStorage
-      const saved = sessionStorage.getItem(`devcollab_ai_project_${workspaceId}`);
-      if (saved && projects.some(p => p.id === saved)) {
-        setSelectedProjectId(saved);
-      } else {
-        setSelectedProjectId(projects[0].id);
-      }
-    }
-  }, [projects, selectedProjectId, workspaceId]);
-
-  const handleProjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setSelectedProjectId(val);
-    if (workspaceId) {
-      sessionStorage.setItem(`devcollab_ai_project_${workspaceId}`, val);
-    }
-  };
+  function handleTasksAdded(taskIds: string[]) {
+    // Redirect to board with highlight state
+    navigate(`/w/${workspaceId}/p/${projectId}/board`, {
+      state: { aiAddedTaskIds: taskIds },
+    });
+  }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-5">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <span>🤖</span> AI Assistant
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Powered by Gemini — your intelligent project companion
-          </p>
-        </div>
-
-        {/* Project Selector Dropdown */}
-        {projects.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label htmlFor="ai-project-select" className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              Active Project:
-            </label>
-            <select
-              id="ai-project-select"
-              value={selectedProjectId}
-              onChange={handleProjectChange}
-              className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700
-                         rounded-xl px-3 py-1.5 text-sm font-medium text-gray-800 dark:text-gray-200
-                         focus:outline-none focus:ring-2 focus:ring-green-500 transition-all cursor-pointer"
-            >
-              {projects.map((proj) => (
-                <option key={proj.id} value={proj.id} className="bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-200">
-                  {proj.name}
-                </option>
-              ))}
-            </select>
+    <div className="h-full flex flex-col bg-[#121316] overflow-hidden">
+      {/* ── Hero header ───────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-white/[0.04]">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-violet-500/25 flex-shrink-0">
+            <span className="text-lg leading-none">✨</span>
           </div>
-        )}
+          <div>
+            <h1 className="text-sm font-bold text-white leading-none">
+              Team Intelligence Center
+            </h1>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Powered by Gemini 2.0 · Real project context
+            </p>
+          </div>
+        </div>
       </div>
 
-      {loading && projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-2"></div>
-          <span className="text-sm">Fetching projects...</span>
-        </div>
-      ) : projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-2xl mb-4">
-            📂
-          </div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">No Projects Found</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            You need at least one project in this workspace to use the AI features. Please create a project first!
-          </p>
-        </div>
-      ) : !selectedProjectId ? (
-        <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-          <span className="text-sm">Please select a project to load AI tools.</span>
-        </div>
-      ) : (
-        /* 2×2 feature grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <PanelCard>
-            <ProGate feature="Code Reviewer">
-              <CodeReviewPanel />
-            </ProGate>
-          </PanelCard>
+      {/* ── Scrollable body ───────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-6 py-5">
+        {/* Health snapshot */}
+        <HealthSnapshot projectId={projectId} />
 
-          <PanelCard>
-            <ProGate feature="Project Summary">
-              <ProjectSummaryPanel projectId={selectedProjectId} />
-            </ProGate>
-          </PanelCard>
-
-          <PanelCard>
-            <ProGate feature="Standup Generator">
-              <StandupPanel projectId={selectedProjectId} />
-            </ProGate>
-          </PanelCard>
-
-          <PanelCard>
-            <ProGate feature="Task Breakdown">
-              <TaskBreakdownPanel projectId={selectedProjectId} />
-            </ProGate>
-          </PanelCard>
+        {/* Tab bar — with active glow */}
+        <div className="flex gap-1 mb-5 bg-black/20 rounded-xl p-1 border border-white/[0.04]">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                activeTab === tab.id
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
+              }`}
+            >
+              {/* Active background glow */}
+              {activeTab === tab.id && (
+                <span className="absolute inset-0 rounded-lg bg-gradient-to-b from-violet-500/20 to-indigo-500/10 border border-violet-500/20 shadow-sm shadow-violet-500/10" />
+              )}
+              <span className="relative z-10 text-base leading-none">{tab.emoji}</span>
+              <span className="relative z-10 hidden sm:block text-[10px] font-bold">{tab.label}</span>
+              {/* Active underline */}
+              {activeTab === tab.id && (
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-violet-400" />
+              )}
+            </button>
+          ))}
         </div>
-      )}
+
+        {/* Active panel */}
+        <div className="bg-[#17191d] border border-white/[0.04] rounded-2xl p-5 min-h-[320px]">
+          {activeTab === "review"    && <CodeReviewPanel />}
+          {activeTab === "summary"   && <ProjectSummaryPanel projectId={projectId} />}
+          {activeTab === "standup"   && <StandupPanel projectId={projectId} />}
+          {activeTab === "breakdown" && (
+            <TaskBreakdownPanel
+              projectId={projectId}
+              onTasksAdded={handleTasksAdded}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

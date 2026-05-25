@@ -5,6 +5,9 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatar: string | null;
+  bio?: string | null;
+  skills?: string[];
+  githubLink?: string | null;
   platformRole?: 'USER' | 'SUPER_ADMIN';
 }
 
@@ -30,6 +33,11 @@ export const authService = {
 
   async getMe(): Promise<AuthUser> {
     const response = await api.get<{ user: AuthUser }>('/api/auth/me');
+    return response.data.user;
+  },
+
+  async updateProfile(data: Partial<AuthUser>): Promise<AuthUser> {
+    const response = await api.patch<{ user: AuthUser }>('/api/auth/me', data);
     return response.data.user;
   }
 };

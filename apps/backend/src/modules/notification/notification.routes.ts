@@ -6,6 +6,7 @@ const notificationRoutes: FastifyPluginAsync = async (fastify) => {
   // All notification routes require authentication
   fastify.addHook('preHandler', verifyAuth);
 
+  fastify.post('/', notificationController.createNotification as any);
   fastify.get('/', notificationController.getNotifications as any);
   fastify.get('/unread-count', notificationController.getUnreadCount as any);
   fastify.patch('/:id/read', notificationController.markAsRead as any);

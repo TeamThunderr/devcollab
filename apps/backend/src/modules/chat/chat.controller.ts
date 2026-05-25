@@ -18,8 +18,12 @@ export const getMessages = async (
   const userId = request.user!.userId;
 
   // Update last seen
-  if (redis) {
-    await redis.set(`chat:seen:${projectId}:${userId}`, new Date().toISOString());
+  try {
+    if (redis) {
+      await redis.set(`chat:seen:${projectId}:${userId}`, new Date().toISOString());
+    }
+  } catch (err) {
+    console.warn('Redis set failed', err);
   }
 
   const result = await query(
@@ -302,18 +306,19 @@ export const getUnreadCount = async (
   const userId = request.user!.userId;
 
   let count = 0;
-  if (redis) {
-    const lastSeen = await redis.get(`chat:seen:${projectId}:${userId}`);
-    if (lastSeen) {
-      const result = await query(
-        `SELECT COUNT(*) as count FROM messages WHERE project_id = $1 AND created_at > $2::timestamptz`,
-        [projectId, lastSeen]
-      );
-      count = parseInt(result.rows[0].count, 10);
-    } else {
-      // First time? Or hasn't joined.
-      count = 0;
+  try {
+    if (redis) {
+      const lastSeen = await redis.get(`chat:seen:${projectId}:${userId}`);
+      if (lastSeen) {
+        const result = await query(
+          `SELECT COUNT(*) as count FROM messages WHERE project_id = $1 AND created_at > $2::timestamptz`,
+          [projectId, lastSeen]
+        );
+        count = parseInt(result.rows[0].count, 10);
+      }
     }
+  } catch (err) {
+    console.warn('Redis get failed', err);
   }
 
   return reply.send({ count });
@@ -328,8 +333,12 @@ export const markSeen = async (
   const { projectId } = request.params;
   const userId = request.user!.userId;
 
-  if (redis) {
-    await redis.set(`chat:seen:${projectId}:${userId}`, new Date().toISOString());
+  try {
+    if (redis) {
+      await redis.set(`chat:seen:${projectId}:${userId}`, new Date().toISOString());
+    }
+  } catch (err) {
+    console.warn('Redis set failed', err);
   }
   return reply.send({ success: true });
 };

@@ -14,7 +14,7 @@ export default function SnippetsPage(): React.ReactElement {
   const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const projectParam = queryParams.get('project');
 
-  const { projects, fetchProjects } = useProjectStore();
+  const { projects } = useProjectStore();
 
   const [projectSnippets, setProjectSnippets] = useState<Record<string, any[]>>({});
   const [globalLoading, setGlobalLoading] = useState(false);
@@ -22,12 +22,10 @@ export default function SnippetsPage(): React.ReactElement {
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
 
-  // 1. Hydrate Workspace Projects
+  // 1. Removed redundant fetchProjects since WorkspaceLayout handles it.
   useEffect(() => {
-    if (workspaceId) {
-      void fetchProjects(workspaceId);
-    }
-  }, [workspaceId, fetchProjects]);
+    // keeping empty for any future workspace-level init
+  }, [workspaceId]);
 
   // Handle optional query pre-filter parameters from project navigation
   useEffect(() => {

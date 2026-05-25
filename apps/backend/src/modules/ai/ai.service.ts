@@ -260,3 +260,48 @@ export async function breakdownTask(
     throw err;
   }
 }
+
+/**
+ * Service 5 — Wiki Summary
+ * Returns a markdown string — does NOT stream.
+ */
+export async function summarizePage(
+  content: string
+): Promise<string> {
+  const systemPrompt = "You are an expert technical writer. Summarize the following wiki documentation page. Provide a concise, highly readable summary highlighting the main points, purpose, and key takeaways. Use semantic HTML formatting (e.g., <ul>, <li>, <p>, <strong>) instead of Markdown. Do not wrap your response in markdown code blocks (like ```html), return ONLY the raw HTML string.";
+  const userPrompt = `Summarize this page:\n\n${content}`;
+
+  const tryGenerate = async (modelName: string): Promise<string> => {
+    const model = geminiClient.getGenerativeModel({
+      model: modelName,
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        temperature: aiConfig.generationConfig.temperature,
+        maxOutputTokens: aiConfig.generationConfig.maxOutputTokens,
+      },
+    });
+
+    const result = await model.generateContent(userPrompt);
+    return result.response.text();
+  };
+
+  try {
+    return await tryGenerate(aiConfig.model);
+  } catch (err: any) {
+    if (err?.message?.includes("API key not valid") || err?.status === 400) {
+      return "⚠️ **AI Summary Unavailable**: Your Gemini API Key is missing or invalid. Please update `GEMINI_API_KEY` in your `.env` file to enable AI features.";
+    }
+    
+    // If rate limited or 503 Service Unavailable, try fallback model
+    if (err?.status === 429 || err?.status === 503 || err?.message?.includes("503") || err?.message?.includes("quota")) {
+      try {
+        return await tryGenerate(aiConfig.fallbackModel);
+      } catch (fallbackErr: any) {
+        return "⚠️ **AI Summary Unavailable**: The AI service is currently experiencing high demand. Please try again later.";
+      }
+    }
+    
+    return "⚠️ **AI Summary Unavailable**: An unexpected error occurred while communicating with the AI service. Please try again later.";
+  }
+}
+
