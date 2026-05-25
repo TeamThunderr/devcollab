@@ -13,9 +13,10 @@ interface UserRow {
   bio: string | null;
   skills: string[];
   github_url: string | null;
+  platform_role: 'USER' | 'SUPER_ADMIN';
 }
 
-function publicUser(user: Pick<UserRow, 'id' | 'email' | 'name' | 'avatar_url' | 'bio' | 'skills' | 'github_url'>) {
+function publicUser(user: Pick<UserRow, 'id' | 'email' | 'name' | 'avatar_url' | 'bio' | 'skills' | 'github_url' | 'platform_role'>) {
   return {
     id: user.id,
     email: user.email,
@@ -24,14 +25,16 @@ function publicUser(user: Pick<UserRow, 'id' | 'email' | 'name' | 'avatar_url' |
     bio: user.bio,
     skills: user.skills ?? [],
     githubLink: user.github_url,
+    platformRole: user.platform_role,
   };
 }
 
-const generateTokens = (user: Pick<UserRow, 'id' | 'email' | 'name'>) => {
+const generateTokens = (user: Pick<UserRow, 'id' | 'email' | 'name' | 'platform_role'>) => {
   const payload = {
     userId: user.id,
     email: user.email,
     name: user.name,
+    platformRole: user.platform_role,
   };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: '15m' });
   const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, { expiresIn: '7d' });
@@ -50,7 +53,7 @@ export const authService = {
     const result = await query<UserRow>(
       `INSERT INTO users (email, password_hash, name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, password_hash, name, avatar_url, bio, skills, github_url`,
+       RETURNING id, email, password_hash, name, avatar_url, bio, skills, github_url, platform_role`,
       [data.email, passwordHash, name]
     );
     const user = result.rows[0];
@@ -104,7 +107,7 @@ export const authService = {
 
   async getMe(userId: string) {
     const result = await query<UserRow>(
-      `SELECT id, email, password_hash, name, avatar_url, bio, skills, github_url
+      `SELECT id, email, password_hash, name, avatar_url, bio, skills, github_url, platform_role
        FROM users
        WHERE id = $1`,
       [userId]

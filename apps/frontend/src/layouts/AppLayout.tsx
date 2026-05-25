@@ -7,17 +7,28 @@ import Topbar from "../components/topbar/Topbar";
 import WorkspaceSwitcher from "../components/workspace/WorkspaceSwitcher";
 import { useBillingStore } from "../stores/billingStore";
 import SubscriptionBadge from "../components/billing/SubscriptionBadge";
+import useWorkspaceStore from "../stores/workspaceStore";
+import { canManageBilling, canAccessSettings } from "../lib/permissions";
+import { WorkspaceRole } from "../types";
 
-const NAV_ITEMS = [
-  { emoji: "🏠", label: "Dashboard", getTo: (wid: string) => `/${wid}` },
+type NavItem = {
+  emoji: string;
+  label: string;
+  getTo: (wid: string) => string;
+  permission?: (role?: WorkspaceRole | null) => boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { emoji: "🏠", label: "Dashboard", getTo: (wid: string) => `/${wid}/dashboard` },
   { emoji: "📋", label: "Project", getTo: (wid: string) => `/${wid}/projects/project-test-456` },
   { emoji: "✏️", label: "Editor", getTo: (wid: string) => `/${wid}/editor/project-test-456` },
   { emoji: "📝", label: "Wiki", getTo: (wid: string) => `/${wid}/wiki/project-test-456` },
   { emoji: "💾", label: "Snippets", getTo: (wid: string) => `/${wid}/snippets/project-test-456` },
   { emoji: "📊", label: "Activity", getTo: (wid: string) => `/${wid}/activity` },
   { emoji: "🤖", label: "AI Assistant", getTo: (wid: string) => `/${wid}/ai` },
-  { emoji: "💳", label: "Billing", getTo: (wid: string) => `/${wid}/settings/billing` },
-] as const;
+  { emoji: "⚙️", label: "Settings", getTo: (wid: string) => `/${wid}/settings`, permission: canAccessSettings },
+  { emoji: "💳", label: "Billing", getTo: (wid: string) => `/${wid}/settings/billing`, permission: canManageBilling },
+];
 
 export default function AppLayout(): React.ReactElement {
   const navigate = useNavigate();
@@ -25,6 +36,10 @@ export default function AppLayout(): React.ReactElement {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { fetchSubscription, subscription } = useBillingStore();
+  const { members } = useWorkspaceStore();
+
+  const currentUserMember = members.find((m) => m.userId === user?.id);
+  const userRole = currentUserMember?.role || 'VIEWER';
 
   // Fetch subscription whenever workspace changes
   React.useEffect(() => {
@@ -70,8 +85,11 @@ export default function AppLayout(): React.ReactElement {
           {workspaceId ? (
             <ul className="space-y-0.5 px-2">
               {NAV_ITEMS.map((item) => {
+                if (item.permission && !item.permission(userRole)) {
+                  return null;
+                }
                 const to = item.getTo(workspaceId);
-                const isActive = location.pathname === to || (item.label !== 'Dashboard' && location.pathname.startsWith(to.split('/project-test-456')[0]));
+                const isActive = location.pathname === to || (item.label !== 'Dashboard' && item.label !== 'Settings' && location.pathname.startsWith(to.split('/project-test-456')[0]));
                 return (
                   <li key={item.label}>
                     <Link

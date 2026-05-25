@@ -1,7 +1,7 @@
 // TEMP — replace with real implementation (route guards, lazy loading, error boundaries)
 
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import useAuthStore from "./stores/authStore";
 
 import AppLayout from "./layouts/AppLayout";
@@ -10,7 +10,9 @@ import AuthLayout from "./layouts/AuthLayout";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import WorkspaceList from "./pages/workspace/WorkspaceList";
-import WorkspaceDashboard from "./pages/workspace/WorkspaceDashboard";
+import WorkspaceDashboardPage from "./pages/workspace/WorkspaceDashboardPage";
+import WorkspaceSettingsPage from "./pages/workspace/WorkspaceSettingsPage";
+import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
 import ProjectView from "./pages/project/ProjectView";
 import TasksView from './pages/project/TasksView';
 import EditorView from "./pages/editor/EditorView";
@@ -22,6 +24,7 @@ import SettingsView from "./pages/settings/SettingsView";
 import BillingPage from "./pages/settings/BillingPage";
 
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 function App(): React.ReactElement {
   const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
@@ -31,15 +34,16 @@ function App(): React.ReactElement {
   }, [fetchCurrentUser]);
 
   return (
-    <BrowserRouter
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-    >
+    <BrowserRouter>
       <Routes>
         {/* Public auth routes */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
+
+        {/* Public Invite Accept Route */}
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
 
         {/* Protected app routes — AppLayout handles its own guard too */}
         <Route
@@ -50,7 +54,10 @@ function App(): React.ReactElement {
           }
         >
           <Route path="/" element={<WorkspaceList />} />
-          <Route path="/:workspaceId" element={<WorkspaceDashboard />} />
+          <Route path="/onboarding/create-workspace" element={<CreateWorkspaceOnboardingPage />} />
+          <Route path="/:workspaceId" element={<Navigate to="dashboard" replace />} />
+          <Route path="/:workspaceId/dashboard" element={<WorkspaceDashboardPage />} />
+          <Route path="/:workspaceId/settings" element={<WorkspaceSettingsPage />} />
           <Route path="/:workspaceId/projects" element={<ProjectView />} />
           <Route path="/:workspaceId/projects/:pid" element={<TasksView />} />
           <Route path="/:workspaceId/editor/:pid" element={<EditorView />} />

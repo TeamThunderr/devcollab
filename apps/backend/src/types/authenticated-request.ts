@@ -5,5 +5,6 @@ export type AuthenticatedRequest = FastifyRequest & {
     userId: string;
     email: string;
     name: string;
+    platformRole: 'USER' | 'SUPER_ADMIN';
   };
 };

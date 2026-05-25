@@ -3,7 +3,10 @@ export interface User {
   email: string;
   name?: string;
   avatar?: string;
+  platformRole?: PlatformRole;
 }
+
+export type PlatformRole = 'USER' | 'SUPER_ADMIN';
 
 export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
 
