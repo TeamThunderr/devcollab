@@ -968,7 +968,7 @@ export default function TaskModal({
                     className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">Unassigned</option>
-                    {members.map((m) => (
+                    {members.filter(m => getMemberRole(m.userId).toLowerCase() !== 'viewer' && m.role?.toLowerCase() !== 'viewer').map((m) => (
                       <option key={m.userId} value={m.userId} className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">
                         👤 {m.user?.name || m.user?.email || 'Unnamed'} ({m.role})
                       </option>

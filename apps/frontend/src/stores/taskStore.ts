@@ -44,6 +44,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   addTask: (task) =>
     set((state) => {
       if (state.tasks.some((t) => t.id === task.id)) return state;
+      const tempIndex = state.tasks.findIndex((t) => t.id.startsWith('temp-') && t.title === task.title && t.projectId === task.projectId);
+      if (tempIndex !== -1) {
+        const copy = [...state.tasks];
+        copy[tempIndex] = task;
+        return { tasks: copy };
+      }
       return { tasks: [task, ...state.tasks] };
     }),
 
@@ -158,6 +164,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   addTaskState: (task) =>
     set((state) => {
       if (state.tasks.some((t) => t.id === task.id)) return state;
+      const tempIndex = state.tasks.findIndex((t) => t.id.startsWith('temp-') && t.title === task.title && t.projectId === task.projectId);
+      if (tempIndex !== -1) {
+        const copy = [...state.tasks];
+        copy[tempIndex] = task;
+        return { tasks: copy };
+      }
       return { tasks: [task, ...state.tasks] };
     }),
 

@@ -9,6 +9,7 @@
 
 import { io, Socket } from "socket.io-client";
 import useRealtimeStore, { Notification } from "../stores/realtimeStore";
+import { useNotificationStore } from "../stores/notificationStore";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || "";
 
@@ -94,6 +95,7 @@ socket.on("connect_error", (err: Error) => {
 
 socket.on("notification:new", (data: unknown) => {
   useRealtimeStore.getState().addNotification(data as Notification);
+  useNotificationStore.getState().appendNotification(data as any);
 });
 
 // ─── Exported helpers ────────────────────────────────────────────────────────
