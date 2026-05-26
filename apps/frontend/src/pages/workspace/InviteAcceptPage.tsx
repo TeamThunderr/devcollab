@@ -15,9 +15,12 @@ export default function InviteAcceptPage(): React.ReactElement {
 
   useEffect(() => {
     if (isInitialized && !isAuthenticated) {
-      navigate('/login', { state: { from: location.pathname }, replace: true });
+      if (token) {
+        localStorage.setItem('inviteToken', token);
+      }
+      navigate('/register', { state: { from: location.pathname }, replace: true });
     }
-  }, [isInitialized, isAuthenticated, navigate, location.pathname]);
+  }, [isInitialized, isAuthenticated, navigate, location.pathname, token]);
 
   useEffect(() => {
     if (!isInitialized || !isAuthenticated || !token) return;

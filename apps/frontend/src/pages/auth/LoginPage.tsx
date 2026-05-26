@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import useAuthStore from "../../stores/authStore";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import { workspaceService } from "../../services/api/workspace.service";
 
 export default function LoginPage(): React.ReactElement {
   const navigate = useNavigate();
@@ -17,6 +18,20 @@ export default function LoginPage(): React.ReactElement {
     e.preventDefault();
     try {
       await login(email, password);
+      
+      const inviteToken = localStorage.getItem("inviteToken");
+      if (inviteToken) {
+        try {
+          const result = await workspaceService.acceptInvite(inviteToken);
+          localStorage.removeItem("inviteToken");
+          navigate(`/w/${result.membership.workspaceId}`, { replace: true });
+          return;
+        } catch (inviteError) {
+          console.error("Failed to accept invite after login:", inviteError);
+          localStorage.removeItem("inviteToken");
+        }
+      }
+
       navigate(from, { replace: true });
     } catch (err) {
       // Error is handled by the store

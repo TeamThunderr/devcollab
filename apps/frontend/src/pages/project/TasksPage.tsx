@@ -7,7 +7,6 @@ import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
 
 import { useSnippetStore } from '../../stores/snippetStore';
-import { useBillingStore } from '../../stores/billingStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';
@@ -49,9 +48,9 @@ export default function TasksPage(): React.ReactElement {
 
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
   const { projects, projectMembers, fetchProjectMembers, assignProjectMember, removeProjectMember } = useProjectStore();
+  const currentProjectMembers = pid ? (projectMembers[pid] || []) : [];
   const { members } = useWorkspaceStore();
   const { user } = useAuthStore();
- const { fetchSubscription } = useBillingStore();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'mytasks' | 'activity' | 'ai' | 'snippets'>('dashboard');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -208,7 +207,7 @@ export default function TasksPage(): React.ReactElement {
     if (wsMember?.role === 'ADMIN') return 'Admin';
     if (activeProject?.createdBy?.id === userId) return 'Owner';
 
-    const pm = projectMembers.find(m => m.userId === userId);
+    const pm = currentProjectMembers.find(m => m.userId === userId);
     if (pm) {
       if (pm.role === 'ADMIN') return 'Admin';
       if (pm.role === 'VIEWER') return 'Viewer';
@@ -1549,10 +1548,10 @@ export default function TasksPage(): React.ReactElement {
 
             {/* List current project members */}
             <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 premium-scrollbar">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block text-left font-mono">Current Members ({projectMembers.length})</label>
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block text-left font-mono">Current Members ({currentProjectMembers.length})</label>
               
               <div className="space-y-2">
-                {projectMembers.map((member) => (
+                {currentProjectMembers.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.03] hover:border-white/[0.06] transition duration-150">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-1 ring-white/[0.04] flex-shrink-0">
@@ -1622,7 +1621,7 @@ export default function TasksPage(): React.ReactElement {
                 
                 {(() => {
                   const unassignedWorkspaceMembers = members.filter(
-                    (wm) => !projectMembers.some((pm) => pm.userId === wm.userId)
+                    (wm) => !currentProjectMembers.some((pm) => pm.userId === wm.userId)
                   );
 
                   if (unassignedWorkspaceMembers.length === 0) {
