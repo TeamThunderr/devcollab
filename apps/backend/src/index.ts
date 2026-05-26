@@ -39,8 +39,12 @@ async function bootstrap() {
   // In production FRONTEND_URL is the only allowed origin.
   // In development we also allow the two Vite dev-server ports.
   const isProd = process.env.NODE_ENV === 'production';
+  const rawOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, '')); // Strip trailing slashes
+
   const allowedOrigins = [
-    process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    ...rawOrigins,
     ...(!isProd ? ['http://localhost:5173', 'http://localhost:5174'] : []),
   ].filter(Boolean);
 
