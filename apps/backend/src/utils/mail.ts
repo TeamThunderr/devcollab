@@ -1,28 +1,20 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-  console.warn('⚠️ SMTP_USER and SMTP_PASS must be set for email delivery to work.');
+if (!process.env.RESEND_API_KEY) {
+  console.warn('⚠️ RESEND_API_KEY must be set for email delivery to work.');
 }
 
-export const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: parseInt(process.env.SMTP_PORT || '587') === 465, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+export const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendTestEmail = async (to: string) => {
   try {
-    const info = await transporter.sendMail({
-      from: `"DevCollab" <${process.env.SMTP_USER}>`,
+    const info = await resend.emails.send({
+      from: 'DevCollab <onboarding@resend.dev>',
       to,
       subject: 'DevCollab Email Test',
-      html: '<h1>DevCollab email system working!</h1>',
+      html: '<h1>DevCollab email system working with Resend!</h1>',
     });
-    console.log('Test email sent: %s', info.messageId);
+    console.log('Test email sent:', info.data?.id);
     return info;
   } catch (error) {
     console.error('Error sending test email:', error);
@@ -61,20 +53,20 @@ export const sendInviteEmail = async (options: SendInviteEmailOptions) => {
       </p>
       <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
       <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-        Sent securely by the DevCollab platform.<br/>
+        Sent securely by the DevCollab platform via Resend.<br/>
         Please do not reply to this automated email.
       </p>
     </div>
   `;
 
   try {
-    const info = await transporter.sendMail({
-      from: `"DevCollab" <${process.env.SMTP_USER}>`,
+    const info = await resend.emails.send({
+      from: 'DevCollab <onboarding@resend.dev>', // Resend's default test sender
       to,
       subject: `Invitation to join ${workspaceName} on DevCollab`,
       html,
     });
-    console.log('Invite email sent to %s: %s', to, info.messageId);
+    console.log('Invite email sent to %s (Resend ID: %s)', to, info.data?.id);
     return info;
   } catch (error) {
     console.error('Error sending invite email:', error);
