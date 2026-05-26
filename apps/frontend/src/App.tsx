@@ -16,6 +16,7 @@ import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 // ─── Global pages ─────────────────────────────────────────────────────────────
 import WorkspaceList from "./pages/workspace/WorkspaceList";
 import CreateWorkspaceOnboardingPage from "./pages/onboarding/CreateWorkspaceOnboardingPage";
+import WelcomeOnboardingPage from "./pages/onboarding/WelcomeOnboardingPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 
 // ─── Workspace pages ──────────────────────────────────────────────────────────
@@ -67,6 +68,9 @@ function App(): React.ReactElement {
 
         {/* Public Invite Accept Route */}
         <Route path="/invite/:token" element={<InviteAcceptPage />} />
+
+        {/* ── Onboarding Welcome (Standalone) ── */}
+        <Route path="/onboarding/welcome" element={<WelcomeOnboardingPage />} />
 
         {/* ── Global protected shell: /workspaces ── */}
         <Route element={<GlobalLayout />}>
