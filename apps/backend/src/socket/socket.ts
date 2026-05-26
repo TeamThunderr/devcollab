@@ -264,5 +264,23 @@ export function emitToWorkspace(workspaceId: string, event: string, data: unknow
   io.to(`workspace:${workspaceId}`).emit(event, data);
 }
 
+export function kickUserFromProject(userId: string, projectId: string): void {
+  if (!io) return;
+  const sockets = io.sockets.sockets;
+  for (const [_, socket] of sockets) {
+    if (socket.data.user?.userId === userId) {
+      // Force leave all relevant rooms
+      socket.leave(`project:${projectId}`);
+      socket.leave(`chat:${projectId}`);
+      for (const taskRoom of socket.data.activeTasks || []) {
+        socket.leave(taskRoom);
+        socket.data.activeTasks.delete(taskRoom);
+      }
+      // Notify client to clear caches and redirect away
+      socket.emit('project:access:revoked', { projectId });
+    }
+  }
+}
+
 export { io };
 export default initSocket;

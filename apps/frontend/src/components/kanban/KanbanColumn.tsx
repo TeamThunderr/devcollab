@@ -20,6 +20,7 @@ interface KanbanColumnProps {
   onRenameColumn?: (status: string, newTitle: string) => void;
   onDeleteColumn?: (status: string) => void;
   onMoveColumn?: (status: string, direction: 'left' | 'right') => void;
+  isDraggable?: boolean;
 }
 
 const columnHeaderColors: Record<string, string> = {
@@ -41,10 +42,12 @@ export default function KanbanColumn({
   onRenameColumn,
   onDeleteColumn,
   onMoveColumn,
+  isDraggable = true,
 }: KanbanColumnProps): React.ReactElement {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
     data: { status },
+    disabled: !isDraggable,
   });
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -76,7 +79,7 @@ export default function KanbanColumn({
     <section
       ref={setNodeRef}
       className={`min-w-[310px] w-[310px] flex-shrink-0 flex flex-col rounded-2xl border border-white/[0.04] bg-[#17191d] p-4 shadow-sm transition-all duration-200 relative ${
-        isOver ? 'ring-1 ring-indigo-500/30 bg-[#1e2025] shadow-md scale-[1.01]' : ''
+        isOver && isDraggable ? 'ring-1 ring-indigo-500/30 bg-[#1e2025] shadow-md scale-[1.01]' : ''
       }`}
     >
       {/* Column Header - Sticky */}
@@ -85,7 +88,7 @@ export default function KanbanColumn({
           {/* Status Indicator Dot */}
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${badgeColor} shadow-sm`}></span>
 
-          {isEditing ? (
+          {isEditing && isDraggable ? (
             <input
               type="text"
               value={editTitle}
@@ -97,9 +100,11 @@ export default function KanbanColumn({
             />
           ) : (
             <h2
-              onDoubleClick={() => onRenameColumn && setIsEditing(true)}
-              className="text-xs font-extrabold uppercase tracking-wider text-slate-300 truncate cursor-pointer hover:text-indigo-400 transition"
-              title="Double click to rename"
+              onDoubleClick={() => onRenameColumn && isDraggable && setIsEditing(true)}
+              className={`text-xs font-extrabold uppercase tracking-wider text-slate-300 truncate transition ${
+                isDraggable && onRenameColumn ? 'cursor-pointer hover:text-indigo-400' : 'cursor-default'
+              }`}
+              title={isDraggable && onRenameColumn ? 'Double click to rename' : undefined}
             >
               {title}
             </h2>
@@ -111,7 +116,7 @@ export default function KanbanColumn({
 
         <div className="flex items-center gap-0.5">
           {/* Quick Add Task */}
-          {onAddTask && (
+          {onAddTask && isDraggable && (
             <button
               type="button"
               onClick={() => onAddTask(status)}
@@ -124,69 +129,71 @@ export default function KanbanColumn({
           )}
 
           {/* Column Actions Dropdown */}
-          <div ref={menuRef} className="relative flex items-center">
-            <button
-              type="button"
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.02] transition"
-              aria-label="Column options"
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            </button>
+          {isDraggable && (onRenameColumn || onMoveColumn || onDeleteColumn) && (
+            <div ref={menuRef} className="relative flex items-center">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.02] transition"
+                aria-label="Column options"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
 
-            {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-white/[0.04] bg-[#1e2025] py-1.5 shadow-2xl z-30 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
-                {onRenameColumn && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(true);
-                      setMenuOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
-                  >
-                    <Edit2 className="h-3.5 w-3.5 text-slate-400" /> Rename Column
-                  </button>
-                )}
-                {onMoveColumn && (
-                  <>
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-white/[0.04] bg-[#1e2025] py-1.5 shadow-2xl z-30 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
+                  {onRenameColumn && (
                     <button
                       type="button"
                       onClick={() => {
-                        onMoveColumn(status, 'left');
+                        setIsEditing(true);
                         setMenuOpen(false);
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
                     >
-                      <MoveLeft className="h-3.5 w-3.5 text-slate-400" /> Move Left
+                      <Edit2 className="h-3.5 w-3.5 text-slate-400" /> Rename Column
                     </button>
+                  )}
+                  {onMoveColumn && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onMoveColumn(status, 'left');
+                          setMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
+                      >
+                        <MoveLeft className="h-3.5 w-3.5 text-slate-400" /> Move Left
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onMoveColumn(status, 'right');
+                          setMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
+                      >
+                        <MoveRight className="h-3.5 w-3.5 text-slate-400" /> Move Right
+                      </button>
+                    </>
+                  )}
+                  {onDeleteColumn && !['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'].includes(status) && (
                     <button
                       type="button"
                       onClick={() => {
-                        onMoveColumn(status, 'right');
+                        setConfirmDeleteOpen(true);
                         setMenuOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.02] font-semibold"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-950/20 font-bold border-t border-white/[0.04] mt-1 pt-1.5"
                     >
-                      <MoveRight className="h-3.5 w-3.5 text-slate-400" /> Move Right
+                      <Trash2 className="h-3.5 w-3.5 text-rose-500" /> Delete Column
                     </button>
-                  </>
-                )}
-                {onDeleteColumn && !['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'].includes(status) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirmDeleteOpen(true);
-                      setMenuOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-950/20 font-bold border-t border-white/[0.04] mt-1 pt-1.5"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-rose-500" /> Delete Column
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -209,6 +216,7 @@ export default function KanbanColumn({
                   config={config}
                   onClick={onTaskClick}
                   isHighlighted={highlightedTaskIds?.has(task.id)}
+                  isDraggable={isDraggable}
                 />
               ))}
               {tasks.length === 0 && (
@@ -225,7 +233,7 @@ export default function KanbanColumn({
       </SortableContext>
 
       {/* Add task at bottom — only when tasks exist */}
-      {!isLoading && tasks.length > 0 && onAddTask && (
+      {!isLoading && tasks.length > 0 && onAddTask && isDraggable && (
         <button
           type="button"
           onClick={() => onAddTask(status)}

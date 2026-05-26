@@ -10,7 +10,7 @@ interface CalendarViewProps {
   onUpdateMetadata: (taskId: string, category: 'assignees' | 'tags' | 'attachments' | 'checklists', data: any) => void;
   onTaskClick: (task: Task) => void;
   onUpdateTask: (taskId: string, updates: any) => Promise<any>;
-  onDayClick: (date: Date) => void;
+  onDayClick?: (date: Date) => void;
 }
 
 const formatLocalDateToUTCNoon = (date: Date): string => {
@@ -68,11 +68,16 @@ export default function CalendarView({
 
   // Rescheduling Drag & Drop handlers
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    if (!onDayClick) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('text/plain', taskId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent, dateStr: string) => {
+    if (!onDayClick) return;
     e.preventDefault();
     setDragOverDate(dateStr);
   };
@@ -82,6 +87,7 @@ export default function CalendarView({
   };
 
   const handleDrop = async (e: React.DragEvent, targetDate: Date) => {
+    if (!onDayClick) return;
     e.preventDefault();
     setDragOverDate(null);
     const taskId = e.dataTransfer.getData('text/plain');
@@ -172,7 +178,7 @@ export default function CalendarView({
                     {format(day, 'd')}
                   </span>
                   
-                  {isCurrentMonth && (
+                  {isCurrentMonth && onDayClick && (
                     <button
                       type="button"
                       onClick={() => onDayClick(day)}
@@ -191,11 +197,12 @@ export default function CalendarView({
                     return (
                       <div
                         key={task.id}
-                        draggable={true}
+                        draggable={!!onDayClick}
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         onClick={() => onTaskClick(task)}
                         className={cn(
-                          'text-[9px] px-2 py-1 rounded-md border border-white/[0.03] font-bold text-slate-200 cursor-grab active:cursor-grabbing truncate flex items-center gap-1.5 select-none hover:text-indigo-300 hover:border-indigo-500/10 transition',
+                          'text-[9px] px-2 py-1 rounded-md border border-white/[0.03] font-bold text-slate-200 truncate flex items-center gap-1.5 select-none hover:text-indigo-300 hover:border-indigo-500/10 transition',
+                          onDayClick ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
                           statusBorder[task.status]
                         )}
                         title={`${task.title} (${task.status.replace('_', ' ')})`}

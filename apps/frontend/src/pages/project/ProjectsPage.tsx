@@ -28,6 +28,7 @@ export default function ProjectsPage(): React.ReactElement {
   const [wizardData, setWizardData] = useState({
     name: '',
     summary: '',
+    visibility: 'public' as 'public' | 'private',
     assignedMembers: [] as Array<{ userId: string; role: 'ADMIN' | 'MEMBER' | 'VIEWER' }>
   });
 
@@ -81,6 +82,7 @@ export default function ProjectsPage(): React.ReactElement {
       setWizardData({
         name: '',
         summary: '',
+        visibility: 'public',
         assignedMembers: []
       });
       setShowCreateModal(true);
@@ -122,7 +124,8 @@ export default function ProjectsPage(): React.ReactElement {
           const created = await createProject({
             name: projectName,
             description: wizardData.summary.trim() || undefined,
-            workspaceId
+            workspaceId,
+            visibility: wizardData.visibility
           });
 
           // Assign selected members
@@ -502,6 +505,18 @@ export default function ProjectsPage(): React.ReactElement {
                       rows={2}
                       className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition resize-none"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Visibility</label>
+                    <select
+                      value={wizardData.visibility}
+                      onChange={(e) => setWizardData({ ...wizardData, visibility: e.target.value as 'public' | 'private' })}
+                      className="w-full bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-white placeholder-slate-650 transition cursor-pointer font-medium"
+                    >
+                      <option value="public">🌐 Public (accessible to workspace viewers)</option>
+                      <option value="private">🔒 Private (hidden from workspace viewers)</option>
+                    </select>
                   </div>
 
                   <div className="space-y-2 mt-1">

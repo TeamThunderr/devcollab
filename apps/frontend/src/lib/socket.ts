@@ -53,6 +53,9 @@ interface ServerToClientEvents {
   "snippet:created": (data: unknown) => void;
   "snippet:updated": (data: unknown) => void;
   "snippet:deleted": (data: { snippetId: string }) => void;
+  "project:member:assigned": (data: any) => void;
+  "project:member:removed": (data: any) => void;
+  "project:access:revoked": (data: any) => void;
   error: (data: { message: string }) => void;
 }
 

@@ -124,6 +124,28 @@ export default function MainSidebar(): React.ReactElement {
   const projectOnlineUsers = onlineUsers.filter(u => u.userId !== user?.id && u.projectId === projectId);
   const isOwnerOrAdmin = activeWorkspaceMember?.role === "OWNER" || activeWorkspaceMember?.role === "ADMIN";
 
+  const projectMembers = useProjectStore((s) => s.projectMembers);
+  const activeProjMembers = projectId ? (projectMembers[projectId] || []) : [];
+
+  const getMemberRole = (userId: string): string => {
+    const wsMember = useWorkspaceStore.getState().members.find(m => m.userId === userId);
+    if (wsMember?.role === 'OWNER') return 'Owner';
+    if (wsMember?.role === 'ADMIN') return 'Admin';
+    if (activeProject?.createdBy?.id === userId) return 'Owner';
+
+    const pm = activeProjMembers.find(m => m.userId === userId);
+    if (pm) {
+      if (pm.role === 'ADMIN') return 'Admin';
+      if (pm.role === 'VIEWER') return 'Viewer';
+      return 'Developer';
+    }
+
+    if (wsMember?.role === 'VIEWER') return 'Viewer';
+    return 'Developer';
+  };
+
+  const isViewer = user ? getMemberRole(user.id) === 'Viewer' : false;
+
   // ── Condition B: Project-level navigation ────────────────────────────────
   if (workspaceId && projectId) {
     const projectNav: NavItem[] = [
@@ -157,7 +179,12 @@ export default function MainSidebar(): React.ReactElement {
         to: `/w/${workspaceId}/p/${projectId}/members`,
         icon: <Icon d={ICONS.members} />,
       },
-    ];
+    ].filter(item => {
+      if (isViewer) {
+        return item.label === "Board";
+      }
+      return true;
+    });
 
     return (
       <aside className="flex flex-col w-52 flex-shrink-0 bg-[#17191d] border-r border-white/[0.04] h-full">
@@ -189,22 +216,24 @@ export default function MainSidebar(): React.ReactElement {
             <SidebarNavLink key={item.label} item={item} />
           ))}
           
-          <button
-            onClick={() => setChatOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 group border border-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-              </span>
-              Chat
-            </div>
-            {unreadCount > 0 && (
-              <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+          {!isViewer && (
+            <button
+              onClick={() => setChatOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 group border border-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                </span>
+                Chat
+              </div>
+              {unreadCount > 0 && (
+                <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          )}
         </nav>
 
         {/* Active Now section */}

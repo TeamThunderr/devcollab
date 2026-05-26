@@ -11,6 +11,7 @@ interface TaskCardProps {
   config?: any;
   onClick?: (task: Task) => void;
   isHighlighted?: boolean;
+  isDraggable?: boolean;
 }
 
 const priorityConfig: Record<Task['priority'], { label: string; text: string; bg: string; dot: string }> = {
@@ -26,9 +27,10 @@ const tagColors = [
   'bg-pink-500/10 text-pink-400 border-pink-500/15',
 ];
 
-export default function TaskCard({ task, config, onClick, isHighlighted }: TaskCardProps): React.ReactElement {
+export default function TaskCard({ task, config, onClick, isHighlighted, isDraggable = true }: TaskCardProps): React.ReactElement {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
+    disabled: !isDraggable,
     data: {
       type: 'task',
       task,
@@ -111,15 +113,17 @@ export default function TaskCard({ task, config, onClick, isHighlighted }: TaskC
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`group w-full rounded-lg border bg-[#1e2025] p-3 text-left shadow-sm hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] hover:-translate-y-0.5 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing ${
+      className={`group w-full rounded-lg border bg-[#1e2025] p-3 text-left shadow-sm hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] hover:-translate-y-0.5 transition-all duration-150 ease-out ${
+        isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+      } ${
         isDragging ? 'opacity-30 border-dashed border-indigo-500/40 scale-[0.98]' : ''
       } ${
         showHighlight
           ? 'border-violet-500/50 shadow-[0_0_0_2px_rgba(139,92,246,0.25),0_8px_24px_-6px_rgba(139,92,246,0.3)] animate-pulse'
           : 'border-white/[0.04] hover:border-indigo-500/20'
       }`}
-      {...attributes}
-      {...listeners}
+      {...(isDraggable ? attributes : {})}
+      {...(isDraggable ? listeners : {})}
     >
       <div className="flex flex-col gap-2" onClick={() => onClick?.(task)}>
         {/* Title & Assignee Row */}
