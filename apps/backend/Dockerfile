@@ -59,6 +59,9 @@ RUN npm ci --workspace=apps/backend --omit=dev
 # Copy the compiled JavaScript output from the build stage
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
 
+# Copy the raw SQL migrations (tsc ignores them, so they must be copied manually)
+COPY --from=build /app/apps/backend/src/db/migrations ./apps/backend/dist/db/migrations
+
 # Switch to non-root user
 USER nodeapp
 
