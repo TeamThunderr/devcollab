@@ -24,7 +24,7 @@ export const sendTestEmail = async (to: string) => {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (!response.ok) throw new Error(JSON.stringify(data));
 
     console.log('Test email sent:', data.messageId);
@@ -86,15 +86,15 @@ export const sendInviteEmail = async (options: SendInviteEmailOptions) => {
           email: process.env.BREVO_SENDER_EMAIL || "smithc.cse2024@citchennai.net"
         },
         to: [{ email: to }],
-        subject: \`Invitation to join \${workspaceName} on DevCollab\`,
+        subject: `Invitation to join ${workspaceName} on DevCollab`,
         htmlContent: html
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     
     if (!response.ok) {
-      throw new Error(\`Brevo API Error: \${JSON.stringify(data)}\`);
+      throw new Error(`Brevo API Error: ${JSON.stringify(data)}`);
     }
 
     console.log('Invite email sent to %s (Brevo ID: %s)', to, data.messageId);
