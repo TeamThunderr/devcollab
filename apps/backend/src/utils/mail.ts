@@ -1,21 +1,34 @@
-import { Resend } from 'resend';
-
-if (!process.env.RESEND_API_KEY) {
-  console.warn('⚠️ RESEND_API_KEY must be set for email delivery to work.');
+if (!process.env.BREVO_API_KEY) {
+  console.warn('⚠️ BREVO_API_KEY must be set for email delivery to work.');
 }
 
-export const resend = new Resend(process.env.RESEND_API_KEY);
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 export const sendTestEmail = async (to: string) => {
   try {
-    const info = await resend.emails.send({
-      from: 'DevCollab <onboarding@resend.dev>',
-      to,
-      subject: 'DevCollab Email Test',
-      html: '<h1>DevCollab email system working with Resend!</h1>',
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': process.env.BREVO_API_KEY || '',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: {
+          name: "DevCollab",
+          email: process.env.BREVO_SENDER_EMAIL || "smithc.cse2024@citchennai.net"
+        },
+        to: [{ email: to }],
+        subject: 'DevCollab Email Test',
+        htmlContent: '<h1>DevCollab email system working with Brevo!</h1>'
+      })
     });
-    console.log('Test email sent:', info.data?.id);
-    return info;
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(JSON.stringify(data));
+
+    console.log('Test email sent:', data.messageId);
+    return data;
   } catch (error) {
     console.error('Error sending test email:', error);
     throw error;
@@ -53,21 +66,39 @@ export const sendInviteEmail = async (options: SendInviteEmailOptions) => {
       </p>
       <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
       <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-        Sent securely by the DevCollab platform via Resend.<br/>
+        Sent securely by the DevCollab platform via Brevo.<br/>
         Please do not reply to this automated email.
       </p>
     </div>
   `;
 
   try {
-    const info = await resend.emails.send({
-      from: 'DevCollab <onboarding@resend.dev>', // Resend's default test sender
-      to,
-      subject: `Invitation to join ${workspaceName} on DevCollab`,
-      html,
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': process.env.BREVO_API_KEY || '',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: {
+          name: "DevCollab",
+          email: process.env.BREVO_SENDER_EMAIL || "smithc.cse2024@citchennai.net"
+        },
+        to: [{ email: to }],
+        subject: \`Invitation to join \${workspaceName} on DevCollab\`,
+        htmlContent: html
+      })
     });
-    console.log('Invite email sent to %s (Resend ID: %s)', to, info.data?.id);
-    return info;
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(\`Brevo API Error: \${JSON.stringify(data)}\`);
+    }
+
+    console.log('Invite email sent to %s (Brevo ID: %s)', to, data.messageId);
+    return data;
   } catch (error) {
     console.error('Error sending invite email:', error);
     throw error;
