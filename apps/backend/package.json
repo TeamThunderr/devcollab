@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "nodemon src/index.ts",
-    "build": "tsc -p tsconfig.json"
+    "dev":        "nodemon src/index.ts",
+    "build":      "tsc -p tsconfig.json",
+    "start":      "node dist/index.js"
   },
   "dependencies": {
     "@fastify/cookie": "^9.3.1",

@@ -1,7 +1,63 @@
-node_modules
-**/node_modules
-**/dist
-**/.env
-**/*.log
+# ─────────────────────────────────────────────────────────────────────────────
+# .dockerignore — What to EXCLUDE from the Docker build context
+#
+# A lean build context = faster builds + smaller images.
+# Rules apply from the MONOREPO ROOT (where docker-compose runs).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Version control ───────────────────────────────────────────────────────────
 .git
 .gitignore
+
+# ── Node modules (always reinstalled inside Docker) ───────────────────────────
+node_modules
+**/node_modules
+
+# ── Build artifacts ───────────────────────────────────────────────────────────
+**/dist
+**/.next
+**/.vite
+
+# ── Environment files ─────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+**/logs
+**/backend_logs*.txt
+
+# ── OS/Editor junk ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+**/.vscode
+**/.idea
+
+# ── Test files ────────────────────────────────────────────────────────────────
+**/*.test.ts
+**/*.spec.ts
+**/__tests__
+**/test-*.js
+test.js
+
+# ── CI config ────────────────────────────────────────────────────────────────
+.github
+.gitlab-ci.yml
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+*.md
+!README.md
+
+# ── Docker files (no need to nest these in the image) ─────────────────────────
+docker-compose*.yml
+Dockerfile*
+
+# ── Postman / misc project files ─────────────────────────────────────────────
+*.postman_collection.json
+code.md
+QUICKSTART.md
+IMPLEMENTATION_*.md
+PROJECT_ANALYSIS*.md
+FRONTEND_DOCUMENTATION.md
+API_DOCUMENTATION.md
