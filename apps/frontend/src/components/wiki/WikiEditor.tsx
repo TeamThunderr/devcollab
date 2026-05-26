@@ -89,6 +89,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch tasks and files to populate the link dropdowns
   useEffect(() => {
@@ -155,7 +156,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
     formData.append('file', file);
 
     try {
-      const response = await api.post('/api/wiki/upload-image', formData, {
+      const response = await api.post(`/api/wiki/upload-image?projectId=${projectId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const data = response.data;
@@ -167,6 +168,29 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activePage) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await api.post(`/api/wiki/upload-image?projectId=${projectId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const data = response.data;
+      if (data.url) {
+        updatePage(activePage.id, { coverImage: `http://localhost:3000${data.url}` });
+      }
+    } catch (err) {
+      console.error('Cover upload failed', err);
+      toast.error('Failed to upload cover image.');
+    } finally {
+      if (coverInputRef.current) coverInputRef.current.value = '';
     }
   };
 
@@ -337,12 +361,27 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
         {activePage.coverImage && (
           <div className="w-full h-48 sm:h-64 relative group/cover">
             <img src={activePage.coverImage} className="w-full h-full object-cover" alt="Cover" />
-            <button
-              onClick={() => updatePage(activePage.id, { coverImage: null })}
-              className="absolute top-4 right-4 bg-black/50 hover:bg-black/80 text-white px-3 py-1.5 rounded text-xs opacity-0 group-hover/cover:opacity-100 transition-opacity"
-            >
-              Remove Cover
-            </button>
+            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/cover:opacity-100 transition-opacity">
+              <button
+                onClick={() => coverInputRef.current?.click()}
+                className="bg-black/50 hover:bg-black/80 text-white px-3 py-1.5 rounded text-xs"
+              >
+                Change Cover
+              </button>
+              <button
+                onClick={() => updatePage(activePage.id, { coverImage: null })}
+                className="bg-black/50 hover:bg-black/80 text-white px-3 py-1.5 rounded text-xs"
+              >
+                Remove Cover
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={coverInputRef}
+              onChange={handleCoverUpload}
+              accept="image/*"
+              className="hidden"
+            />
           </div>
         )}
 
