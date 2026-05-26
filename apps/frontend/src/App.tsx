@@ -10,9 +10,7 @@ import GlobalLayout from "./layouts/GlobalLayout";
 import WorkspaceLayout from "./layouts/WorkspaceLayout";
 import ProjectLayout from "./layouts/ProjectLayout";
 
-// ─── Auth pages ───────────────────────────────────────────────────────────────
-import LoginPage from "./pages/auth/LoginPage";
-import RegisterPage from "./pages/auth/RegisterPage";
+import AuthPage from "./pages/auth/AuthPage";
 import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 // ─── Global pages ─────────────────────────────────────────────────────────────
@@ -79,8 +77,8 @@ function App(): React.ReactElement {
 
         {/* ── Public auth routes ── */}
         <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/register" element={<AuthPage />} />
         </Route>
 
         {/* Public Invite Accept Route */}

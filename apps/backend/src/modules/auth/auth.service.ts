@@ -51,10 +51,10 @@ export const authService = {
     const passwordHash = await bcrypt.hash(data.password, 10);
     const name = data.name?.trim() || data.email.split('@')[0];
     const result = await query<UserRow>(
-      `INSERT INTO users (email, password_hash, name)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (email, password_hash, name, github_url)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, email, password_hash, name, avatar_url, bio, skills, github_url, platform_role`,
-      [data.email, passwordHash, name]
+      [data.email, passwordHash, name, data.githubLink ?? null]
     );
     const user = result.rows[0];
     const { accessToken, refreshToken } = generateTokens(user);
