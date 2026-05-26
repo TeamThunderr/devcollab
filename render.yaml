@@ -1,29 +1,26 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # DevCollab — render.yaml  (Render Blueprint)
 #
-# This file defines ALL Render services as code.
-# Commit it to your repo root — Render reads it automatically.
+# This file deploys ONLY the backend web service on Render (free tier).
+# PostgreSQL and Redis are hosted externally for free — no credit card needed:
 #
-# Usage:
-#   Render dashboard → New → Blueprint → connect repo
-#   Render reads this file and creates all services automatically.
+#   PostgreSQL → Supabase free tier  (supabase.com — no card required)
+#   Redis      → Upstash free tier   (upstash.com  — no card required)
 #
-# Variables marked  sync: false  must be set manually in the Render dashboard
-# after the Blueprint is applied (Render will prompt you for them).
+# After setting up Supabase and Upstash, paste their connection URLs
+# into the Render dashboard → Service → Environment tab.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  # ── Backend Web Service ─────────────────────────────────────────────────────
   - type: web
     name: devcollab-backend
     runtime: docker
-    # Build context = monorepo root; Render sets this as the build root
     dockerfilePath: apps/backend/Dockerfile
     dockerContext: .
-    plan: starter          # Free tier available; upgrade to Standard for no cold starts
-    region: singapore      # Closest to India — change to: oregon, ohio, frankfurt
+    plan: free             # Free tier — no credit card required
+    region: singapore      # Closest to India — options: oregon, ohio, frankfurt
     branch: main
-    autoDeploy: true       # Auto-redeploy on push to main
+    autoDeploy: true
     healthCheckPath: /api/health
 
     envVars:
@@ -31,29 +28,27 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: "3000"
+        value: "10000"     # Render free tier assigns port 10000
 
-      # ── Database — auto-linked from the postgres service below ────────────
+      # ── Database (Supabase) ───────────────────────────────────────────────
+      # Get from: supabase.com → Project → Settings → Database → Connection string
+      # Use the "URI" format: postgresql://postgres:[PASSWORD]@db.[ref].supabase.co:5432/postgres
       - key: DATABASE_URL
-        fromDatabase:
-          name: devcollab-postgres
-          property: connectionString
+        sync: false
 
-      # ── Redis — auto-linked from the redis service below ──────────────────
+      # ── Redis (Upstash) ───────────────────────────────────────────────────
+      # Get from: upstash.com → Database → Details → REDIS_URL
+      # Format: rediss://:[PASSWORD]@[host].upstash.io:6379
       - key: REDIS_URL
-        fromService:
-          name: devcollab-redis
-          type: redis
-          property: connectionString
+        sync: false
 
-      # ── Secrets — sync:false means you set these in the Render dashboard ──
-      # Render will prompt you for these when you apply the Blueprint.
+      # ── Auth secrets ──────────────────────────────────────────────────────
       - key: JWT_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
         sync: false
 
-      # ── CORS — set to your Vercel URL after deploying frontend ────────────
+      # ── CORS ──────────────────────────────────────────────────────────────
       - key: FRONTEND_URL
         sync: false
 
@@ -82,19 +77,3 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
-
-  # ── Redis ───────────────────────────────────────────────────────────────────
-  - type: redis
-    name: devcollab-redis
-    plan: starter          # 25MB — upgrade to Standard for 100MB + persistence
-    region: singapore
-    maxmemoryPolicy: allkeys-lru   # Evict least recently used keys when full
-     # Empty list = private only (no public internet access — only your Render services can connect)
-    ipAllowList: []
-# ── PostgreSQL ─────────────────────────────────────────────────────────────────
-databases:
-  - name: devcollab-postgres
-    databaseName: devcollab
-    user: devcollab
-    plan: starter          # 256MB RAM, 1GB storage — free 90 days, then $7/mo
-    region: singapore
