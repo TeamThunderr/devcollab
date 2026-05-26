@@ -103,7 +103,7 @@ function ThinkingSkeleton(): React.ReactElement {
       ))}
       <div className="flex items-center gap-2 mt-2 px-1">
         <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
-        <span className="text-[11px] text-slate-500 animate-pulse">Gemini is generating your engineering plan…</span>
+        <span className="text-[11px] text-slate-500 animate-pulse">Devcollab is generating your engineering plan…</span>
       </div>
     </div>
   );

@@ -35,7 +35,13 @@ export function useChat(projectId: string) {
 
     fetchInitial();
 
-    socket.emit('chat:join', { projectId });
+    // Join the chat room. Emit immediately if the socket is already connected;
+    // otherwise re-emit once the socket handshake completes.
+    const joinRoom = () => socket.emit('chat:join', { projectId });
+    if (socket.connected) {
+      joinRoom();
+    }
+    socket.on('connect', joinRoom);
 
     const onNewMessage = (msg: any) => {
       store.addMessage(msg);
@@ -76,6 +82,7 @@ export function useChat(projectId: string) {
     socket.on('chat:stop-typing', onChatStopTyping);
 
     return () => {
+      socket.off('connect', joinRoom);
       socket.emit('chat:leave', { projectId });
       socket.off('message:new', onNewMessage);
       socket.off('message:edited', onMessageEdited);

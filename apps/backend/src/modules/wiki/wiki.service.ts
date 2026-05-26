@@ -82,20 +82,48 @@ export class WikiService {
     if (check.rowCount === 0) throw new Error('Page not found');
     await requireProjectAccess(userId, check.rows[0].project_id);
 
+    const updates: string[] = [];
+    const values: any[] = [id, data.updatedBy];
+    let paramIndex = 3;
+
+    if (data.title !== undefined) {
+      updates.push(`title = $${paramIndex++}`);
+      values.push(data.title);
+    }
+    if (data.content !== undefined) {
+      updates.push(`content = $${paramIndex++}`);
+      values.push(data.content);
+    }
+    if (data.icon !== undefined) {
+      updates.push(`icon = $${paramIndex++}`);
+      values.push(data.icon);
+    }
+    if (data.coverImage !== undefined) {
+      updates.push(`cover_image = $${paramIndex++}`);
+      values.push(data.coverImage);
+    }
+    if (data.linkedTaskId !== undefined) {
+      updates.push(`linked_task_id = $${paramIndex++}`);
+      values.push(data.linkedTaskId);
+    }
+    if (data.linkedFileId !== undefined) {
+      updates.push(`linked_file_id = $${paramIndex++}`);
+      values.push(data.linkedFileId);
+    }
+    if (data.parentId !== undefined) {
+      updates.push(`parent_page_id = $${paramIndex++}`);
+      values.push(data.parentId);
+    }
+
+    updates.push('updated_by = $2');
+    updates.push('updated_at = NOW()');
+
     const result = await query(
       `UPDATE wiki_pages
-       SET title = COALESCE($2, title),
-           content = COALESCE($3, content),
-           icon = COALESCE($5, icon),
-           cover_image = COALESCE($6, cover_image),
-           linked_task_id = COALESCE($7, linked_task_id),
-           linked_file_id = COALESCE($8, linked_file_id),
-           parent_page_id = COALESCE($9, parent_page_id),
-           updated_by = $4,
-           updated_at = NOW()
+       SET ${updates.join(', ')}
        WHERE id = $1
        RETURNING *`,
-      [id, data.title ?? null, data.content ?? null, data.updatedBy, data.icon !== undefined ? data.icon : null, data.coverImage !== undefined ? data.coverImage : null, data.linkedTaskId !== undefined ? data.linkedTaskId : null, data.linkedFileId !== undefined ? data.linkedFileId : null, data.parentId !== undefined ? data.parentId : null]
+      values
     );
     if (!result.rows[0]) {
       throw new Error('Page not found');

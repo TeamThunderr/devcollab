@@ -11,7 +11,7 @@ export interface AuthStore {
   error: string | null;
 
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
+  register: (email: string, password: string, name?: string, githubLink?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     set({ isLoading: true, error: null });
     try {
       const { user, accessToken } = await authService.login({ email, password });
-      set({ user, accessToken, isAuthenticated: true, isLoading: false });
+      set({ user, accessToken, isAuthenticated: true, isInitialized: true, isLoading: false });
     } catch (error: any) {
       set({ 
         error: error.response?.data?.error || "Failed to login", 
@@ -46,13 +46,13 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     }
   },
 
-  register: async (email, password, name) => {
+  register: async (email, password, name, githubLink) => {
     set({ isLoading: true, error: null });
     try {
-      await authService.register({ email, password, name });
+      await authService.register({ email, password, name, githubLink });
       
       const { user, accessToken } = await authService.login({ email, password });
-      set({ user, accessToken, isAuthenticated: true, isLoading: false });
+      set({ user, accessToken, isAuthenticated: true, isInitialized: true, isLoading: false });
     } catch (error: any) {
       const errData = error.response?.data?.error;
       const errMsg = Array.isArray(errData) ? errData[0].message : errData || "Failed to register";
@@ -79,7 +79,9 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       const updatedUser = await authService.updateProfile(data);
       set({ user: updatedUser, isLoading: false });
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Failed to update profile", isLoading: false });
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to update profile");
+      set({ error: errMsg, isLoading: false });
       throw error;
     }
   },
@@ -87,22 +89,15 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   fetchCurrentUser: async () => {
     set({ isInitialized: false, error: null });
     try {
-      let token = useAuthStore.getState().accessToken;
-      
-      // If we don't have an access token in memory (e.g. after a page reload),
-      // attempting to call getMe() will result in a 401 which logs to the console natively.
-      // To avoid this error spam, we proactively try to refresh the token first!
-      if (!token) {
-        const { api } = await import('../lib/axios');
-        const res = await api.post('/api/auth/refresh', {}, { _retry: true } as any);
-        token = res.data.accessToken;
-        set({ accessToken: token });
-      }
-
+      // We don't need a manual refresh here. If the token is missing or expired,
+      // authService.getMe() will get a 401, and the global axios interceptor 
+      // in lib/axios.ts will automatically pause, refresh the token, update 
+      // the socket via setAuthToken, and retry the request.
       const user = await authService.getMe();
       set({ user, isAuthenticated: true, isInitialized: true });
-    } catch (error) {
-      disconnectSocket();
+    } catch {
+      // If getMe() ultimately fails (e.g. refresh token expired/missing), 
+      // the user must log in again.
       set({ user: null, accessToken: null, isAuthenticated: false, isInitialized: true });
     }
   },

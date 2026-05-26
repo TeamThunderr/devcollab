@@ -77,9 +77,13 @@ type DevCollabSocket = Socket<
 let io: DevCollabServer;
 
 export async function initSocket(httpServer: http.Server): Promise<void> {
+  const rawOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''));
+
   io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, DevCollabSocketData>(httpServer, {
     cors: {
-      origin: [process.env.FRONTEND_URL ?? 'http://localhost:5173', 'http://localhost:5174'],
+      origin: [...rawOrigins, 'http://localhost:5173', 'http://localhost:5174'],
       credentials: true,
     },
     transports: ['websocket'],

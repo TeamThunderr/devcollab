@@ -11,8 +11,8 @@ export const authController = {
       reply.setCookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/auth',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60
       });
       return reply.status(201).send({ message: 'User registered successfully', user, accessToken });
@@ -31,8 +31,8 @@ export const authController = {
       reply.setCookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/auth',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60 // 7 days
       });
 
@@ -49,7 +49,7 @@ export const authController = {
     if (refreshToken) {
       await authService.logout(refreshToken);
     }
-    reply.clearCookie('refreshToken', { path: '/api/auth' });
+    reply.clearCookie('refreshToken', { path: '/' });
     return reply.send({ message: 'Logged out successfully' });
   },
 
@@ -65,8 +65,8 @@ export const authController = {
       reply.setCookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/auth',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60
       });
 

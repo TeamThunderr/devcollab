@@ -78,8 +78,15 @@ export function useTaskSync(projectId: string): void {
   useEffect(() => {
     if (!projectId) return;
 
-    // Join the project room so the server starts sending task events
-    socket.emit("join:project", { projectId });
+    // Join the project room so the server starts sending task events.
+    // Emit immediately if already connected; otherwise wait for the connect
+    // event (handles the race where the hook mounts before the handshake).
+    const joinRoom = () => socket.emit("join:project", { projectId });
+
+    if (socket.connected) {
+      joinRoom();
+    }
+    socket.on("connect", joinRoom);
 
     // ── Task CRUD ─────────────────────────────────────────────────────────
 
@@ -156,6 +163,7 @@ export function useTaskSync(projectId: string): void {
     // ── Cleanup ───────────────────────────────────────────────────────────
 
     return () => {
+      socket.off("connect", joinRoom);
       socket.emit("leave:project", { projectId });
 
       socket.off("task:created", onTaskCreated);

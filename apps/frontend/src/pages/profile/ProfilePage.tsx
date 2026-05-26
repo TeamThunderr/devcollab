@@ -66,10 +66,10 @@ export default function ProfilePage(): React.ReactElement {
     try {
       await updateProfile({
         name: formData.name,
-        avatar: formData.avatar_url,
+        avatar: formData.avatar_url || null,
         bio: formData.bio,
         skills,
-        githubLink: formData.github_url,
+        githubLink: formData.github_url || null,
       });
       setIsEditing(false);
       setSuccessMsg('Profile updated successfully!');

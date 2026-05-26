@@ -94,7 +94,7 @@ export default function SnippetExplainModal({
 
           {/* Footer */}
           <div className="px-5 py-3 border-t border-white/[0.04] flex items-center justify-between flex-shrink-0">
-            <span className="text-[10px] text-slate-600">Powered by Gemini</span>
+            <span className="text-[10px] text-slate-600">Powered by Devcollab</span>
             {!isStreaming && content && (
               <button
                 type="button"

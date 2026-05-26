@@ -17,7 +17,7 @@ export interface AuthResponse {
 }
 
 export const authService = {
-  async register(data: { email: string; password: string; name?: string }): Promise<AuthResponse> {
+  async register(data: { email: string; password: string; name?: string; githubLink?: string }): Promise<AuthResponse> {
     const response = await api.post<AuthResponse>('/api/auth/register', data);
     return response.data;
   },

@@ -10,6 +10,7 @@ import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';
 import { usePresence } from '../../hooks/usePresence';
+import { useTaskSync } from '../../hooks/useTaskSync';
 import { Task, TaskStatus } from '../../types';
 import ListView from './ListView';
 import CalendarView from './CalendarView';
@@ -63,6 +64,7 @@ export default function TasksPage(): React.ReactElement {
 
   const { onlineUsers } = usePresence(workspaceId || '', pid);
   const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
+  useTaskSync(pid || '');
 
   // Switcher & Filters States
   const [taskView, setTaskView] = useState<'board' | 'list' | 'calendar'>(() => {
@@ -1169,7 +1171,7 @@ export default function TasksPage(): React.ReactElement {
             <div className="text-center space-y-2">
               <h2 className="text-lg font-bold text-white">Team Intelligence Center</h2>
               <p className="text-sm text-slate-400 max-w-sm">
-                Code review, project summaries, standup generation, wiki planning, and task breakdown — all powered by Gemini.
+                Code review, project summaries, standup generation, wiki planning, and task breakdown — all powered by Devcollab.
               </p>
             </div>
             <button
