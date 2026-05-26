@@ -32,13 +32,18 @@ export function usePresence(workspaceId: string, projectId?: string) {
   useEffect(() => {
     if (!workspaceId) return;
 
-    // Emit immediately on mount so we appear online right away
-    socket.emit("presence:ping", { workspaceId, projectId });
+    const ping = () => socket.emit("presence:ping", { workspaceId, projectId });
+
+    // Emit immediately on mount so we appear online right away.
+    // If the socket isn't connected yet, the 'connect' handler below
+    // will fire it once the handshake completes.
+    if (socket.connected) {
+      ping();
+    }
+    socket.on("connect", ping);
 
     // Keep the heartbeat alive every 30 seconds
-    const intervalId = window.setInterval(() => {
-      socket.emit("presence:ping", { workspaceId, projectId });
-    }, PING_INTERVAL_MS);
+    const intervalId = window.setInterval(ping, PING_INTERVAL_MS);
 
     // Receive the authoritative list of online users from the server
     const handlePresenceUpdate = (payload: unknown) => {
@@ -50,16 +55,14 @@ export function usePresence(workspaceId: string, projectId?: string) {
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        socket.emit("presence:ping", { workspaceId, projectId });
+        ping();
       }
     };
 
     let idleTimer: ReturnType<typeof setTimeout>;
     const handleMouseMove = () => {
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        socket.emit("presence:ping", { workspaceId, projectId });
-      }, 60000);
+      idleTimer = setTimeout(ping, 60000);
     };
 
     socket.on("presence:update", handlePresenceUpdate);
@@ -69,6 +72,7 @@ export function usePresence(workspaceId: string, projectId?: string) {
     return () => {
       clearInterval(intervalId);
       clearTimeout(idleTimer);
+      socket.off("connect", ping);
       socket.off("presence:update", handlePresenceUpdate);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("mousemove", handleMouseMove);

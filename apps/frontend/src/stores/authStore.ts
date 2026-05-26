@@ -96,7 +96,10 @@ export const useAuthStore = create<AuthStore>()((set) => ({
         const { api } = await import('../lib/axios');
         const res = await api.post('/api/auth/refresh', {}, { _retry: true } as any);
         token = res.data.accessToken;
+        // Persist the refreshed token into the store AND update the socket
+        // so that WorkspaceLayout.connectSocket() has a token ready when it fires.
         set({ accessToken: token });
+        updateSocketToken(token!);
       }
 
       const user = await authService.getMe();

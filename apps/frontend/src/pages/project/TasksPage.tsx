@@ -10,6 +10,7 @@ import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';
 import { usePresence } from '../../hooks/usePresence';
+import { useTaskSync } from '../../hooks/useTaskSync';
 import { Task, TaskStatus } from '../../types';
 import ListView from './ListView';
 import CalendarView from './CalendarView';
@@ -63,6 +64,7 @@ export default function TasksPage(): React.ReactElement {
 
   const { onlineUsers } = usePresence(workspaceId || '', pid);
   const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
+  useTaskSync(pid || '');
 
   // Switcher & Filters States
   const [taskView, setTaskView] = useState<'board' | 'list' | 'calendar'>(() => {

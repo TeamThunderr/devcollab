@@ -10,8 +10,13 @@ export function useSnippetSync(projectId: string | undefined): void {
   useEffect(() => {
     if (!projectId) return;
 
-    // Join the project room so the server starts sending snippet events
-    socket.emit("join:project", { projectId });
+    // Join the project room so the server starts sending snippet events.
+    // Emit immediately if connected; otherwise wait for the handshake.
+    const joinRoom = () => socket.emit("join:project", { projectId });
+    if (socket.connected) {
+      joinRoom();
+    }
+    socket.on("connect", joinRoom);
 
     const onSnippetCreated = (data: unknown) => {
       addSnippet(data as Snippet);
@@ -32,6 +37,7 @@ export function useSnippetSync(projectId: string | undefined): void {
     socket.on("snippet:deleted", onSnippetDeleted);
 
     return () => {
+      socket.off("connect", joinRoom);
       socket.off("snippet:created", onSnippetCreated);
       socket.off("snippet:updated", onSnippetUpdated);
       socket.off("snippet:deleted", onSnippetDeleted);
