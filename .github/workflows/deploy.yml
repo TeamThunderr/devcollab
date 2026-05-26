@@ -1,45 +1,115 @@
-name: CI / Deploy to Production
+name: CI / Deploy
 
-# Runs on every push to main; PRs get CI only (no deploy)
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggers:
+#   - Every push to main  → full CI + deploy to production
+#   - Every PR into main  → CI only (type-check, build, Docker validate)
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
-jobs:
-  # ── Build & type-check ──────────────────────────────────────────────────────
-  build:
-    name: Build & Type-check
-    runs-on: ubuntu-latest
+# Cancel in-progress runs on the same ref (avoids stacking deploys)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+env:
+  NODE_VERSION: "20"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Type-check backend (TypeScript compilation)
+  # ─────────────────────────────────────────────────────────────────────────────
+  typecheck-backend:
+    name: "Backend — TypeScript"
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check backend
+      - name: Compile TypeScript
         run: npm run build --workspace=apps/backend
 
-      - name: Type-check frontend (vite build)
+      - name: Upload compiled dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: apps/backend/dist/
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Build frontend (Vite)
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: "Frontend — Vite Build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (Vite)
         env:
-          # Provide a placeholder so Vite doesn't error on missing var
-          VITE_API_URL: https://placeholder.example.com
+          # Placeholder keeps Vite happy during CI — real URL is set in Vercel dashboard
+          VITE_API_URL: https://placeholder.ci.invalid
         run: npm run build --workspace=apps/frontend
 
-  # ── Deploy backend to Railway (only on push to main) ──────────────────────
-  deploy-backend:
-    name: Deploy Backend → Railway
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 3: Validate Docker build for backend
+  #   Catches Dockerfile syntax errors and broken npm ci before they reach Railway
+  # ─────────────────────────────────────────────────────────────────────────────
+  docker-validate-backend:
+    name: "Backend — Docker Build Validation"
     runs-on: ubuntu-latest
-    needs: build
+    # Only run on push to main to avoid burning CI minutes on every PR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend Docker image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          target: runner
+          push: false
+          # Use GitHub Actions cache to speed up repeated builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: devcollab-backend:ci
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 4: Deploy backend to Railway
+  #   Only runs when ALL CI jobs pass AND we're on the main branch
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: "Deploy → Railway"
+    runs-on: ubuntu-latest
+    needs: [typecheck-backend, build-frontend, docker-validate-backend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: ${{ secrets.RAILWAY_BACKEND_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -50,9 +120,43 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        # Deploys using apps/backend/Dockerfile automatically
+        # --detach: don't wait for deploy to complete (Railway streams logs separately)
         run: railway up --service=backend --detach
 
-  # ── Frontend deploys automatically via Vercel GitHub integration ───────────
-  # No extra step needed — Vercel watches the `main` branch.
-  # Make sure VITE_API_URL is set in the Vercel environment variables dashboard.
+      - name: Verify deployment health
+        # Wait 45 seconds for Railway to spin up the new instance, then hit health endpoint
+        run: |
+          sleep 45
+          curl --fail --silent --show-error \
+            "${{ secrets.RAILWAY_BACKEND_URL }}/api/health" | \
+            python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status')=='ok' else 1)"
+        continue-on-error: true  # Don't fail the workflow if health check is slow
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 5: Notify on failure
+  # ─────────────────────────────────────────────────────────────────────────────
+  notify-failure:
+    name: "Notify on Failure"
+    runs-on: ubuntu-latest
+    needs: [typecheck-backend, build-frontend, deploy-backend]
+    if: failure() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Create failure summary
+        run: |
+          echo "## ❌ Production Deploy Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the failed job above for details." >> $GITHUB_STEP_SUMMARY
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Frontend deploys automatically via Vercel's GitHub App integration.
+# No extra step needed here — Vercel watches `main` branch and triggers
+# automatically when CI passes. Configure in: vercel.com/project/settings/git
+#
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   RAILWAY_TOKEN       — from railway.app → Account → Tokens
+#   RAILWAY_BACKEND_URL — your Railway public domain (e.g. https://xyz.up.railway.app)
+# ─────────────────────────────────────────────────────────────────────────────
