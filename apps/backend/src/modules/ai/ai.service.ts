@@ -30,7 +30,7 @@ export interface ActivityItem {
 export interface BreakdownTask {
   title: string;
   description: string;
-  priority: "p0" | "p1" | "p2";
+  priority: "P0" | "P1" | "P2";
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -223,42 +223,77 @@ export async function generateStandup(
 /**
  * Service 4 — Task Breakdown
  * Returns a JSON array of subtasks — does NOT stream.
+ * Retries with fallback model on 429. Returns safe fallback on JSON parse error.
  */
 export async function breakdownTask(
   featureDescription: string
 ): Promise<BreakdownTask[]> {
-
-
   const systemPrompt =
     "You are a senior software engineer. Break down the given feature into " +
     "specific, actionable development subtasks. Return ONLY a valid JSON array, " +
     "no markdown, no explanation, just the raw JSON array. " +
-    "Each object must have: title (string), description (string), priority (p0/p1/p2). " +
+    "Each object must have: title (string), description (string), priority (P0/P1/P2). " +
+    "Priority MUST be uppercase P0, P1, or P2. " +
     "Maximum 8 tasks. Order by logical implementation sequence.";
 
   const userPrompt = `Break down this feature into subtasks: ${featureDescription}`;
 
-  try {
-    const model = geminiClient.getGenerativeModel({
-      model: aiConfig.model,
-      systemInstruction: systemPrompt,
-      generationConfig: {
-        temperature: aiConfig.generationConfig.temperature,
-        maxOutputTokens: aiConfig.generationConfig.maxOutputTokens,
-      },
-    });
+  const models = [aiConfig.model, aiConfig.fallbackModel];
 
-    const result = await model.generateContent(userPrompt);
-    let raw = result.response.text();
+  for (let i = 0; i < models.length; i++) {
+    const modelName = models[i];
+    try {
+      const model = geminiClient.getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemPrompt,
+        generationConfig: {
+          temperature: aiConfig.generationConfig.temperature,
+          maxOutputTokens: aiConfig.generationConfig.maxOutputTokens,
+        },
+      });
 
-    // Strip markdown code fences if the model wrapped the JSON in them
-    raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+      const result = await model.generateContent(userPrompt);
+      let raw = result.response.text().trim();
 
-    return JSON.parse(raw) as BreakdownTask[];
-  } catch (err) {
-    // Parse failure or API error
-    throw err;
+      // Strip markdown code fences if the model wrapped the JSON in them
+      raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+
+      const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+
+      // Normalize priority to uppercase and ensure required fields
+      return parsed.map((task) => ({
+        title: String(task.title ?? "Untitled task"),
+        description: String(task.description ?? ""),
+        priority: ((String(task.priority ?? "P1")).toUpperCase()) as BreakdownTask["priority"],
+      }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const is429 = message.includes("429") || message.toLowerCase().includes("quota");
+
+      // On rate-limit, try the next model in the list
+      if (is429 && i < models.length - 1) {
+        console.warn(`[AI] breakdownTask: rate-limited on ${modelName}, retrying with fallback`);
+        continue;
+      }
+
+      // JSON parse failure — return safe fallback tasks so the UI still works
+      if (err instanceof SyntaxError) {
+        console.error("[AI] breakdownTask: Gemini returned invalid JSON, using fallback tasks");
+        return [
+          { title: "Define requirements and acceptance criteria", description: "Document all requirements and define done criteria for this feature.", priority: "P0" },
+          { title: "Design technical architecture", description: "Plan the technical approach, data models, and API contracts.", priority: "P0" },
+          { title: "Implement core business logic", description: "Build the main feature logic and data layer.", priority: "P1" },
+          { title: "Build UI components", description: "Create the frontend interface for this feature.", priority: "P1" },
+          { title: "Write automated tests", description: "Unit and integration tests covering critical paths.", priority: "P1" },
+          { title: "Documentation and cleanup", description: "Write developer docs and clean up code.", priority: "P2" },
+        ];
+      }
+
+      throw err;
+    }
   }
+
+  throw new Error("All models failed for task breakdown");
 }
 
 /**

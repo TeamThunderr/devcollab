@@ -1,6 +1,8 @@
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import useAuthStore from "./stores/authStore";
+import { ToastContainer } from "./components/common/Toast";
+import GlobalSearch from "./components/common/GlobalSearch";
 
 // ─── Layouts ──────────────────────────────────────────────────────────────────
 import AuthLayout from "./layouts/AuthLayout";
@@ -48,13 +50,28 @@ function RootRedirect(): React.ReactElement {
 
 function App(): React.ReactElement {
   const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
+  const [searchOpen, setSearchOpen] = React.useState(false);
 
   React.useEffect(() => {
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
+  // Global Cmd+K / Ctrl+K → open search
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <ToastContainer />
+      <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
       <Routes>
         {/* ── Root: smart redirect ── */}
         <Route path="/" element={<RootRedirect />} />

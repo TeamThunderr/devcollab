@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { codeToHtml } from 'shiki';
 import { Snippet } from '../../types';
+import SnippetExplainModal from '../snippets/SnippetExplainModal';
 
 interface SnippetCardProps {
   snippet: Snippet;
@@ -17,6 +18,7 @@ export default function SnippetCard({
 }: SnippetCardProps): React.ReactElement {
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [showExplain, setShowExplain] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +105,13 @@ export default function SnippetCard({
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowExplain(true); }}
+          className="rounded-full bg-violet-900/60 border border-violet-500/30 px-4 py-2 text-xs font-semibold text-violet-300 transition hover:bg-violet-800/80 hover:text-white"
+        >
+          🤖 Explain
+        </button>
         {onDelete ? (
           <button
             type="button"
@@ -113,6 +122,15 @@ export default function SnippetCard({
           </button>
         ) : null}
       </div>
+
+      {/* AI Explain Modal */}
+      {showExplain && (
+        <SnippetExplainModal
+          snippet={snippet}
+          isOpen={showExplain}
+          onClose={() => setShowExplain(false)}
+        />
+      )}
     </article>
   );
 }

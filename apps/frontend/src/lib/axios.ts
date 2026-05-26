@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/authStore';
+import { toast } from '../stores/toastStore';
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -19,6 +20,8 @@ api.interceptors.request.use((config) => {
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  /** Set to true to suppress the global error toast for this request */
+  _silentError?: boolean;
 }
 
 let isRefreshing = false;
@@ -43,6 +46,7 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
 
+    // ── 401: Try token refresh first ─────────────────────────────────────────
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry && originalRequest.url !== '/api/auth/refresh') {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -69,9 +73,9 @@ api.interceptors.response.use(
 
         useAuthStore.getState().setAuthToken(data.accessToken);
         originalRequest.headers.Authorization = 'Bearer ' + data.accessToken;
-        
+
         processQueue(null, data.accessToken);
-        
+
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
@@ -79,6 +83,31 @@ api.interceptors.response.use(
         return Promise.reject(err);
       } finally {
         isRefreshing = false;
+      }
+    }
+
+    // ── Global HTTP error toasts ─────────────────────────────────────────────
+    // Skip if the caller opted out of global error handling
+    if (!originalRequest?._silentError) {
+      const status = error.response?.status;
+      const data = error.response?.data as Record<string, string> | undefined;
+      const serverMessage = data?.message || data?.error || error.message;
+
+      if (!navigator.onLine) {
+        toast.error('No internet connection', 'Check your connection and try again');
+      } else if (status === 401) {
+        // Let auth flow handle this — no toast needed
+      } else if (status === 403) {
+        toast.error("Access denied", "You don't have permission to do this");
+      } else if (status === 404) {
+        // 404s are often expected — only toast for explicit user actions
+        // (individual callers can override with _silentError)
+      } else if (status === 429) {
+        toast.warning('Rate limited', 'Too many requests. Please wait a moment.');
+      } else if (status && status >= 500) {
+        toast.error('Server error', 'Something went wrong on our end. Please try again.');
+      } else if (status && status >= 400 && status !== 401 && status !== 404) {
+        toast.error('Error', serverMessage || 'An unexpected error occurred');
       }
     }
 

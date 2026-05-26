@@ -74,77 +74,80 @@ export default function AIReviewBar({
   if (!isVisible) return null;
 
   function handleReview(): void {
-    const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    console.log('Review clicked, code length:', code?.length);
+    if (!code || code.trim().length < 5) return;
+    const lang = (!language || language === 'plaintext') ? 'javascript' : language;
     reset();
     setScore(null);
     setIsExpanded(true);
-    void startStream(apiBase + "/api/ai/review-code", { code, language });
+    void startStream('/api/ai/review-code', { code, language: lang });
   }
 
-  // ── Render content lines ─────────────────────────────────────────────────
   function renderContent(): React.ReactNode {
     const lines = content.split("\n");
-    let inCode = false;
+    let inCodeBlock = false;
+    let codeLines: string[] = [];
     const elements: React.ReactNode[] = [];
 
-    lines.forEach((line, i) => {
+    lines.forEach((line, idx) => {
+      // Skip the SCORE line (shown in badge instead)
       if (line.startsWith("SCORE:")) return;
 
       if (line.startsWith("```")) {
-        if (!inCode) {
-          inCode = true;
+        if (inCodeBlock) {
+          // Close code block
           elements.push(
-            <div
-              key={`code-open-${i}`}
-              className="font-mono text-xs bg-gray-800 rounded p-2 my-1 text-green-400"
-            />
+            <pre
+              key={"code-" + idx}
+              className="font-mono text-xs bg-gray-800 rounded-lg p-3 my-2 overflow-x-auto text-green-400 whitespace-pre-wrap"
+            >
+              <code>{codeLines.join("\n")}</code>
+            </pre>
           );
+          codeLines = [];
+          inCodeBlock = false;
         } else {
-          inCode = false;
+          inCodeBlock = true;
         }
         return;
       }
 
-      if (inCode) {
-        // Append to last code block
-        const last = elements[elements.length - 1] as React.ReactElement;
-        elements[elements.length - 1] = React.cloneElement(last, {
-          children: (last.props.children ?? "") + line + "\n",
-        });
+      if (inCodeBlock) {
+        codeLines.push(line);
         return;
       }
 
       if (line.startsWith("## ")) {
         elements.push(
-          <h3 key={i} className="text-sm font-semibold text-white mt-3 mb-1">
+          <h3 key={idx} className="text-sm font-semibold text-white mt-3 mb-1">
             {line.slice(3)}
           </h3>
         );
       } else if (line.startsWith("### ")) {
         elements.push(
-          <h4 key={i} className="text-xs font-semibold text-gray-300 mt-2 mb-1">
+          <h4 key={idx} className="text-xs font-semibold text-gray-300 mt-2 mb-1">
             {line.slice(4)}
           </h4>
         );
       } else if (line.startsWith("- ") || line.startsWith("* ")) {
         elements.push(
-          <div key={i} className="flex items-start gap-1.5 my-0.5">
-            <span className="w-1 h-1 rounded-full bg-gray-500 mt-1.5 flex-shrink-0" />
-            <p className="text-xs text-gray-400">{line.slice(2)}</p>
+          <div key={idx} className="flex gap-2 text-xs text-gray-400 leading-relaxed my-0.5">
+            <span className="text-blue-400 mt-0.5 flex-shrink-0">•</span>
+            <span>{line.slice(2)}</span>
           </div>
         );
-      } else if (line.trim() === "") {
-        elements.push(<div key={i} className="h-1" />);
-      } else {
+      } else if (line.trim()) {
         elements.push(
-          <p key={i} className="text-xs text-gray-400 leading-relaxed">
+          <p key={idx} className="text-xs text-gray-400 leading-relaxed">
             {line}
           </p>
         );
+      } else {
+        elements.push(<div key={idx} className="h-1" />);
       }
     });
 
-    return elements;
+    return <div className="flex flex-col gap-1">{elements}</div>;
   }
 
   return (
@@ -228,19 +231,24 @@ export default function AIReviewBar({
           <button
             type="button"
             onClick={handleReview}
-            disabled={isStreaming || !code.trim()}
-            className="flex items-center gap-1.5 text-xs px-3 py-1
-                       bg-blue-600 hover:bg-blue-700 text-white rounded-md
+            disabled={isStreaming || !code || code.trim().length < 5}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1 rounded-md
                        transition-colors duration-150
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+                       ${
+                         isStreaming || !code || code.trim().length < 5
+                           ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                           : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+                       }`}
           >
             {isStreaming ? (
               <>
                 <Spinner />
                 Reviewing…
               </>
+            ) : !code || code.trim().length < 5 ? (
+              'No file'
             ) : (
-              "Review"
+              'Review'
             )}
           </button>
 

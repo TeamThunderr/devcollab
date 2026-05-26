@@ -216,11 +216,16 @@ export async function getImageHandler(
 }
 
 export async function summarizePageHandler(
-  request: FastifyRequest<{ Body: { content: string } }>,
+  request: FastifyRequest<{ Body: { content: string; projectId?: string } }>,
   reply: FastifyReply
 ) {
   try {
     const { content } = request.body;
+
+    if (!content || content.trim().length < 10) {
+      return reply.status(400).send({ message: 'Page content is too short to summarize. Add more text to the wiki page first.' });
+    }
+
     const summary = await summarizePage(content);
     return reply.send({ summary });
   } catch (error) {

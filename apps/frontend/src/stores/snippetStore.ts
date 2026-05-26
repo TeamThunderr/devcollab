@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/axios';
+import { toast } from './toastStore';
 
 interface User {
   id: string;
@@ -71,6 +72,7 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
       set((state) => ({
         snippets: [response.data, ...state.snippets],
       }));
+      toast.success('Snippet saved', `"${title}" added to your snippets`);
       return response.data;
     } catch (error: any) {
       throw new Error(error.message);
@@ -95,6 +97,7 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
       set((state) => ({
         snippets: state.snippets.filter((s) => s.id !== id),
       }));
+      toast.success('Snippet deleted');
     } catch (error: any) {
       throw new Error(error.message);
     }
