@@ -11,7 +11,7 @@ export interface AuthStore {
   error: string | null;
 
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
+  register: (email: string, password: string, name?: string, githubLink?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
@@ -46,10 +46,10 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     }
   },
 
-  register: async (email, password, name) => {
+  register: async (email, password, name, githubLink) => {
     set({ isLoading: true, error: null });
     try {
-      await authService.register({ email, password, name });
+      await authService.register({ email, password, name, githubLink });
       
       const { user, accessToken } = await authService.login({ email, password });
       set({ user, accessToken, isAuthenticated: true, isLoading: false });
@@ -79,7 +79,9 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       const updatedUser = await authService.updateProfile(data);
       set({ user: updatedUser, isLoading: false });
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Failed to update profile", isLoading: false });
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to update profile");
+      set({ error: errMsg, isLoading: false });
       throw error;
     }
   },
