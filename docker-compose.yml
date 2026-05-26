@@ -1,23 +1,87 @@
-version: "3.9"
-
 services:
   postgres:
-    image: postgres:16
-    restart: unless-stopped
-    ports:
-      - "5432:5432"
+    image: postgres:16-alpine
+    container_name: devcollab-postgres
     environment:
       POSTGRES_USER: devcollab
       POSTGRES_PASSWORD: devcollab123
       POSTGRES_DB: devcollab
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U devcollab" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
-    restart: unless-stopped
+    container_name: devcollab-redis
     ports:
       - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: devcollab-backend
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://devcollab:devcollab123@postgres:5432/devcollab
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      FRONTEND_URL: http://localhost
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_FALLBACK_MODEL: ${GEMINI_FALLBACK_MODEL}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/backend/src:/app/apps/backend/src
+      - ./apps/backend/package.json:/app/apps/backend/package.json
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      target: development
+    container_name: devcollab-frontend
+    ports:
+      - "80:5173"
+    environment:
+      BACKEND_URL: http://backend:3000
+    depends_on:
+      - backend
+    volumes:
+      - ./apps/frontend/src:/app/apps/frontend/src
+      - ./apps/frontend/index.html:/app/apps/frontend/index.html
+      - ./apps/frontend/package.json:/app/apps/frontend/package.json
+      - ./apps/frontend/vite.config.ts:/app/apps/frontend/vite.config.ts
+      - ./apps/frontend/tailwind.config.js:/app/apps/frontend/tailwind.config.js
+      - ./apps/frontend/postcss.config.js:/app/apps/frontend/postcss.config.js
 
 volumes:
   pgdata:
+  redisdata:

@@ -1,0 +1,100 @@
+{
+  "info": {
+    "name": "DevCollab API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "http://localhost:3000/api/projects", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "projects" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"E-Commerce App\",\n  \"description\": \"Build new e-commerce platform\"\n}" }
+          }
+        },
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3000/api/projects", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "projects" ] }
+          }
+        },
+        {
+          "name": "Get Project",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3000/api/projects/{{projectId}}", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "projects", "{{projectId}}" ] }
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "http://localhost:3000/api/projects/{{projectId}}", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "projects", "{{projectId}}" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated description\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Create Task",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "http://localhost:3000/api/tasks", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "tasks" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Design database schema\",\n  \"projectId\": \"{{projectId}}\",\n  \"status\": \"TODO\",\n  \"priority\": \"P0\",\n  \"description\": \"Create database schema\"\n}" }
+          }
+        },
+        {
+          "name": "List Tasks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3000/api/tasks/project/{{projectId}}", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "tasks", "project", "{{projectId}}" ] }
+          }
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "http://localhost:3000/api/tasks/{{taskId}}", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "tasks", "{{taskId}}" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Snippets",
+      "item": [
+        {
+          "name": "Create Snippet",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "http://localhost:3000/api/snippets", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "snippets" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"React useEffect Hook\",\n  \"language\": \"typescript\",\n  \"code\": \"useEffect(() => { }, []);\",\n  \"projectId\": \"{{projectId}}\",\n  \"tags\": [\"react\"]\n}" }
+          }
+        },
+        {
+          "name": "List Snippets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:3000/api/snippets/project/{{projectId}}", "protocol": "http", "host": [ "localhost" ], "port": "3000", "path": [ "api", "snippets", "project", "{{projectId}}" ] }
+          }
+        }
+      ]
+    }
+  ]
+}

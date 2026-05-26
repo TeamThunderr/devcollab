@@ -1,12 +1,138 @@
-import { io, Socket } from 'socket.io-client';
+/**
+ * apps/frontend/src/lib/socket.ts
+ *
+ * Socket.IO client singleton.
+ * - Created once at module load with autoConnect: false
+ * - connectSocket() is called after login with the JWT + workspaceId
+ * - disconnectSocket() is called on logout
+ */
 
-export let socket: Socket | null = null;
+import { io, Socket } from "socket.io-client";
+import useRealtimeStore, { Notification } from "../stores/realtimeStore";
 
-export function connect(): void {
-  // TODO: initialise socket connection to backend, attach auth token
-  void io;
+const SOCKET_URL = import.meta.env.VITE_API_URL || "";
+
+// ─── Typed event maps (mirrors backend) ─────────────────────────────────────
+
+// Events we send to the server
+interface ClientToServerEvents {
+  "join:project": (payload: { projectId: string }) => void;
+  "leave:project": (payload: { projectId: string }) => void;
+  "join:task": (payload: { taskId: string }) => void;
+  "leave:task": (payload: { taskId: string }) => void;
+  "presence:ping": (payload: {
+    workspaceId: string;
+    projectId?: string;
+  }) => void;
+  "chat:join": (payload: { projectId: string }) => void;
+  "chat:leave": (payload: { projectId: string }) => void;
+  "chat:typing": (payload: { projectId: string }) => void;
+  "chat:stop-typing": (payload: { projectId: string }) => void;
 }
 
-export function disconnect(): void {
-  // TODO: disconnect socket and clean up listeners
+// Events we receive from the server
+interface ServerToClientEvents {
+  "joined:project": (data: { projectId: string }) => void;
+  "joined:task": (data: { taskId: string }) => void;
+  "task:created": (data: unknown) => void;
+  "task:updated": (data: unknown) => void;
+  "task:moved": (data: unknown) => void;
+  "task:deleted": (data: unknown) => void;
+  "comment:new": (data: unknown) => void;
+  "presence:update": (data: unknown) => void;
+  "notification:new": (data: unknown) => void;
+  "task:viewing": (data: unknown) => void;
+  "task:stopped-viewing": (data: unknown) => void;
+  "chat:joined": (data: { projectId: string }) => void;
+  "message:new": (data: any) => void;
+  "message:edited": (data: any) => void;
+  "message:deleted": (data: any) => void;
+  "message:reaction": (data: any) => void;
+  "chat:typing": (data: any) => void;
+  "chat:stop-typing": (data: any) => void;
+  error: (data: { message: string }) => void;
+}
+
+// ─── Singleton ───────────────────────────────────────────────────────────────
+
+export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
+  SOCKET_URL,
+  {
+    autoConnect: false,          // Connect manually after login
+    auth: { token: "" },         // Populated by connectSocket()
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,     // Wait 2s before first retry
+    reconnectionDelayMax: 10000, // Max 10s between retries
+    timeout: 10000,
+    transports: ["websocket"],
+  }
+);
+
+// ─── Lifecycle logs ──────────────────────────────────────────────────────────
+
+socket.on("connect", () => {
+  console.log(`✅ Socket connected: ${socket.id}`);
+});
+
+socket.on("disconnect", () => {
+  console.log("❌ Socket disconnected");
+});
+
+socket.on("connect_error", (err: Error) => {
+  console.log(`Socket error: ${err.message}`);
+});
+
+// ─── Global notification listener ────────────────────────────────────────────
+// Set up once at module load. Zustand's getState() is safe outside React.
+
+socket.on("notification:new", (data: unknown) => {
+  useRealtimeStore.getState().addNotification(data as Notification);
+});
+
+// ─── Exported helpers ────────────────────────────────────────────────────────
+
+/**
+ * Inject the JWT and workspaceId into the socket auth object, then connect.
+ * Call this immediately after a successful login.
+ */
+export function connectSocket(token: string, workspaceId: string): void {
+  if (socket.connected) {
+    if ((socket.auth as any).workspaceId === workspaceId) {
+      return; // Already connected to this workspace
+    }
+    socket.disconnect();
+  }
+  socket.auth = { token, workspaceId };
+  socket.connect();
+  console.log("Socket connecting...");
+}
+
+/**
+ * Update the token for an existing socket, e.g. after silent refresh.
+ * If the socket is disconnected due to a 401, this will trigger a reconnect.
+ */
+export function updateSocketToken(token: string): void {
+  if (socket.auth) {
+    (socket.auth as any).token = token;
+  }
+  if (!socket.connected && (socket.auth as any).workspaceId) {
+    socket.connect();
+  }
+}
+
+/**
+ * Gracefully disconnect the socket.
+ * Call this on logout or when the user leaves a workspace.
+ */
+export function disconnectSocket(): void {
+  socket.disconnect();
+  console.log("Socket disconnected");
+}
+
+/**
+ * Returns true when the socket has an active connection.
+ */
+export function isConnected(): boolean {
+  return socket.connected;
 }
