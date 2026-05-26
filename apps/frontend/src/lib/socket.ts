@@ -50,6 +50,9 @@ interface ServerToClientEvents {
   "message:reaction": (data: any) => void;
   "chat:typing": (data: any) => void;
   "chat:stop-typing": (data: any) => void;
+  "snippet:created": (data: unknown) => void;
+  "snippet:updated": (data: unknown) => void;
+  "snippet:deleted": (data: { snippetId: string }) => void;
   error: (data: { message: string }) => void;
 }
 

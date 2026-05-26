@@ -43,6 +43,7 @@ export default function EditorView() {
     const initial = activeFile?.content ?? "";
     currentContentRef.current = initial;
     setCurrentContent(initial);
+    (window as any).currentLiveEditorContent = initial;
   }, [activeFileId, activeFile?.content]);
 
   async function handleSave(content: string) {
@@ -57,6 +58,7 @@ export default function EditorView() {
   function handleContentChange(content: string) {
     currentContentRef.current = content;
     setCurrentContent(content);
+    (window as any).currentLiveEditorContent = content;
   }
 
   useEffect(() => {

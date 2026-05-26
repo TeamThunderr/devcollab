@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { SnippetService } from './snippet.service';
+import { emitToProject } from '../../socket/socket';
 import {
   createSnippetSchema,
   searchSnippetsQuerySchema,
@@ -15,6 +16,7 @@ export class SnippetController {
     try {
       const data = createSnippetSchema.parse(request.body);
       const snippet = await snippetService.createSnippet(data, request.user!.userId);
+      emitToProject(snippet.projectId, 'snippet:created', snippet);
       return reply.status(201).send(snippet);
     } catch (error: any) {
       return reply.status(400).send({ error: error.message });
@@ -51,6 +53,7 @@ export class SnippetController {
       const { id } = snippetIdParamSchema.parse(request.params);
       const data = updateSnippetSchema.parse(request.body);
       const snippet = await snippetService.updateSnippet(id, request.user!.userId, data);
+      emitToProject(snippet.projectId, 'snippet:updated', snippet);
       return reply.send(snippet);
     } catch (error: any) {
       let statusCode = 400;
@@ -63,7 +66,13 @@ export class SnippetController {
   async deleteSnippet(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = snippetIdParamSchema.parse(request.params);
-      await snippetService.deleteSnippet(id, request.user!.userId);
+      const snippet = await snippetService.getSnippetById(id, request.user!.userId);
+      if (snippet) {
+        await snippetService.deleteSnippet(id, request.user!.userId);
+        emitToProject(snippet.projectId, 'snippet:deleted', { snippetId: id });
+      } else {
+        throw new Error('Snippet not found');
+      }
       return reply.status(204).send();
     } catch (error: any) {
       let statusCode = 400;

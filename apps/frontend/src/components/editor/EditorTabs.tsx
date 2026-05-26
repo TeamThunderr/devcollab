@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import useEditorStore from "../../stores/editorStore";
 import { useSnippetStore } from "../../stores/snippetStore";
+import useAuthStore from "../../stores/authStore";
+import useWorkspaceStore from "../../stores/workspaceStore";
 import { X } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -17,9 +19,23 @@ export default function EditorTabs() {
   const { files, openTabs, activeFileId, openTab, closeTab } = useEditorStore();
   const { createSnippet } = useSnippetStore();
   const { projectId } = useParams();
+  const { user: currentUser } = useAuthStore();
+  const { members } = useWorkspaceStore();
+
   const [showSnippetModal, setShowSnippetModal] = useState(false);
   const [snippetTitle, setSnippetTitle] = useState("");
   const [snippetDesc, setSnippetDesc] = useState("");
+
+  // Frozen snapshot state to prevent race conditions during file swaps
+  const [snapshotCode, setSnapshotCode] = useState("");
+  const [snapshotLanguage, setSnapshotLanguage] = useState("");
+  const [snapshotProjectId, setSnapshotProjectId] = useState("");
+
+  const isViewer = useMemo(() => {
+    if (!currentUser) return true;
+    const wsMember = members.find(m => m.userId === currentUser.id);
+    return wsMember?.role === 'VIEWER';
+  }, [currentUser, members]);
   
   const openFiles = openTabs.map(id => files.find(f => f.id === id)).filter(Boolean) as typeof files;
 
@@ -86,19 +102,28 @@ export default function EditorTabs() {
             <path d="M8 5v14l11-7z" />
           </svg>
         </button>
-        <button 
-          title="Save as Snippet"
-          className="text-gray-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2"
-          onClick={() => {
-            const activeFile = files.find(f => f.id === activeFileId);
-            if (activeFile && activeFile.content) {
-              setSnippetTitle(activeFile.name);
-              setShowSnippetModal(true);
-            }
-          }}
-        >
-          <svg className="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-        </button>
+
+        {!isViewer && (
+          <button 
+            title="Save as Snippet"
+            className="text-gray-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2"
+            onClick={() => {
+              const activeFile = files.find(f => f.id === activeFileId);
+              if (activeFile) {
+                // Freeze snapshot immediately when clicked!
+                const liveCode = (window as any).currentLiveEditorContent ?? activeFile.content ?? "";
+                setSnapshotCode(liveCode);
+                setSnapshotLanguage(activeFile.language || 'plaintext');
+                setSnapshotProjectId(projectId || "");
+                
+                setSnippetTitle(activeFile.name);
+                setShowSnippetModal(true);
+              }
+            }}
+          >
+            <svg className="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+          </button>
+        )}
       </div>
 
       {/* Snippet Modal */}
@@ -135,9 +160,8 @@ export default function EditorTabs() {
               </button>
               <button 
                 onClick={async () => {
-                  const activeFile = files.find(f => f.id === activeFileId);
-                  if (activeFile && projectId) {
-                    await createSnippet(snippetTitle, activeFile.language || 'plaintext', activeFile.content || '', snippetDesc, [], projectId);
+                  if (snapshotProjectId) {
+                    await createSnippet(snippetTitle, snapshotLanguage, snapshotCode, snippetDesc, [], snapshotProjectId);
                     setShowSnippetModal(false);
                     setSnippetDesc("");
                   }

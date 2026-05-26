@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSnippetSync } from '../../hooks/useSnippetSync';
 import api from '../../lib/axios';
 import {
   Search, Plus, Code, Copy, CheckCircle2, Folder, Clock, ListFilter, PlayCircle, Eye
@@ -21,6 +22,9 @@ export default function SnippetsPage(): React.ReactElement {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
+
+  // Synchronize snippet changes reactively
+  useSnippetSync(selectedProjectFilter === 'all' ? undefined : selectedProjectFilter);
 
   // 1. Removed redundant fetchProjects since WorkspaceLayout handles it.
   useEffect(() => {
