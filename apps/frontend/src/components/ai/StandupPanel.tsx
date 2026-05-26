@@ -43,6 +43,7 @@ function Spinner(): React.ReactElement {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+
 export default function StandupPanel({ projectId }: StandupPanelProps): React.ReactElement {
   const { content, isStreaming, error, startStream } = useAIStream();
   const [copied, setCopied] = useState(false);

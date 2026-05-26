@@ -71,8 +71,6 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   createdBy: User;
-  assigneeId?: string | null;
-  assignee?: User;
   comments: Comment[];
 }
 

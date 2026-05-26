@@ -43,6 +43,7 @@ function Spinner(): React.ReactElement {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+
 export default function ProjectSummaryPanel({ projectId }: ProjectSummaryPanelProps): React.ReactElement {
   const { content, isStreaming, error, startStream, reset } = useAIStream();
 

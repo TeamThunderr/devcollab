@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Task, TaskStatus, TaskPriority, WorkspaceMember } from '../../types';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { MessageSquare, Paperclip, ArrowUpDown, ChevronUp, ChevronDown, CheckSquare } from 'lucide-react';
+import useAuthStore from '../../stores/authStore';
 
 interface ListViewProps {
   tasks: Task[];
@@ -59,6 +60,41 @@ export default function ListView({
 }: ListViewProps): React.ReactElement {
   const [sortField, setSortField] = useState<'title' | 'status' | 'priority' | 'dueDate' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const { user: currentUser } = useAuthStore();
+
+  const getMemberRole = (userId: string): string => {
+    if (config?.ownerId === userId) return 'Owner';
+    if (config?.projectRoles && config.projectRoles[userId]) {
+      return config.projectRoles[userId];
+    }
+    const wsMember = members.find(m => m.userId === userId);
+    if (wsMember) {
+      if (wsMember.role === 'OWNER') return 'Owner';
+      if (wsMember.role === 'ADMIN') return 'Admin';
+      if (wsMember.role === 'VIEWER') return 'Viewer';
+    }
+    return 'Developer';
+  };
+
+  const hasPermission = (userId: string, permissionKey: string): boolean => {
+    const role = getMemberRole(userId);
+    if (role === 'Owner') return true;
+    if (config?.rolePermissions && config.rolePermissions[role]) {
+      if (config.rolePermissions[role][permissionKey] !== undefined) {
+        return !!config.rolePermissions[role][permissionKey];
+      }
+    }
+    const defaultPermissions: Record<string, Record<string, boolean>> = {
+      Admin: { create_task: true, edit_task: true, delete_task: true, move_task: true },
+      'Project Manager': { create_task: true, edit_task: true, delete_task: true, move_task: true },
+      Developer: { create_task: true, edit_task: true, delete_task: false, move_task: true },
+      Viewer: { create_task: false, edit_task: false, delete_task: false, move_task: false }
+    };
+    return !!defaultPermissions[role]?.[permissionKey];
+  };
+
+  const canEdit = currentUser && !config?.archived ? hasPermission(currentUser.id, 'edit_task') : false;
 
   // Consume unified metadata from config prop reactively
   const localMetadata = useMemo(() => {
@@ -203,6 +239,7 @@ export default function ListView({
                     <td className="px-4 py-3.5 align-middle">
                       <select
                         value={task.assigneeId || assignee?.id || ''}
+                        disabled={!canEdit}
                         onChange={(e) => {
                           const val = e.target.value;
                           const memberUser = members.find(m => m.userId === val)?.user;
@@ -210,11 +247,11 @@ export default function ListView({
                           // Trigger database update
                           void onUpdateTask(task.id, { assigneeId: val || null });
                         }}
-                        className="bg-transparent border-0 outline-none text-xs text-slate-400 font-semibold cursor-pointer py-1 pr-4 focus:ring-0 focus:text-white transition"
+                        className="bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 text-xs text-slate-300 font-semibold cursor-pointer focus:ring-0 focus:border-indigo-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        <option value="">👤 Unassigned</option>
+                        <option value="" className="bg-[#17191d] text-slate-300">👤 Unassigned</option>
                         {members.map((m) => (
-                          <option key={m.userId} value={m.userId}>
+                          <option key={m.userId} value={m.userId} className="bg-[#17191d] text-slate-300">
                             👤 {m.user?.name || m.user?.email || 'Unnamed'}
                           </option>
                         ))}
@@ -225,16 +262,17 @@ export default function ListView({
                     <td className="px-4 py-3.5 align-middle">
                       <select
                         value={task.status}
+                        disabled={!canEdit}
                         onChange={(e) => {
                           const val = e.target.value as TaskStatus;
                           void onUpdateTask(task.id, { status: val });
                         }}
-                        className={`bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide cursor-pointer focus:ring-0 focus:border-indigo-500 transition ${statusVal.text}`}
+                        className={`bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide cursor-pointer focus:ring-0 focus:border-indigo-500 transition disabled:opacity-60 disabled:cursor-not-allowed ${statusVal.text}`}
                       >
-                        <option value="TODO">To Do</option>
-                        <option value="IN_PROGRESS">In Progress</option>
-                        <option value="IN_REVIEW">In Review</option>
-                        <option value="DONE">Done</option>
+                        <option value="TODO" className="bg-[#17191d] text-slate-300">To Do</option>
+                        <option value="IN_PROGRESS" className="bg-[#17191d] text-slate-300">In Progress</option>
+                        <option value="IN_REVIEW" className="bg-[#17191d] text-slate-300">In Review</option>
+                        <option value="DONE" className="bg-[#17191d] text-slate-300">Done</option>
                       </select>
                     </td>
 
@@ -242,15 +280,16 @@ export default function ListView({
                     <td className="px-4 py-3.5 align-middle">
                       <select
                         value={task.priority}
+                        disabled={!canEdit}
                         onChange={(e) => {
                           const val = e.target.value as TaskPriority;
                           void onUpdateTask(task.id, { priority: val });
                         }}
-                        className={`bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide cursor-pointer focus:ring-0 focus:border-indigo-500 transition ${prioVal.text}`}
+                        className={`bg-slate-950 border border-white/[0.04] rounded-lg px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide cursor-pointer focus:ring-0 focus:border-indigo-500 transition disabled:opacity-60 disabled:cursor-not-allowed ${prioVal.text}`}
                       >
-                        <option value="P0">P0 (Critical)</option>
-                        <option value="P1">P1 (High)</option>
-                        <option value="P2">P2 (Normal)</option>
+                        <option value="P0" className="bg-[#17191d] text-slate-300">P0 (Critical)</option>
+                        <option value="P1" className="bg-[#17191d] text-slate-300">P1 (High)</option>
+                        <option value="P2" className="bg-[#17191d] text-slate-300">P2 (Normal)</option>
                       </select>
                     </td>
 
@@ -263,6 +302,7 @@ export default function ListView({
                             void onUpdateTask(task.id, { dueDate: date ? formatLocalDateToUTCNoon(date) : null });
                           }}
                           placeholder="Set due date"
+                          disabled={!canEdit}
                         />
                         {isOverdue && (
                           <span className="text-[8px] text-rose-400 font-extrabold uppercase tracking-wider block mt-1 ml-1 animate-pulse">

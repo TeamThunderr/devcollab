@@ -3,7 +3,6 @@ import { Comment, Task, TaskPriority, TaskStatus, User } from '../../types';
 import { DatePicker } from '../ui/DatePicker';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
-import { useProjectStore } from '../../stores/projectStore';
 
 interface TaskModalProps {
   task: Task;
@@ -16,7 +15,6 @@ interface TaskModalProps {
     dueDate?: string | null;
     description?: string;
     title?: string;
-    assigneeId?: string | null;
     assigneeId?: string | null;
   }) => Promise<Task>;
   onDelete: (taskId: string) => Promise<void>;
@@ -47,16 +45,8 @@ export default function TaskModal({
   onDelete,
   onAddComment,
 }: TaskModalProps): React.ReactElement {
-  const { members: workspaceMembers } = useWorkspaceStore();
-  const { projectMembers, fetchProjectMembers } = useProjectStore();
+  const { members } = useWorkspaceStore();
   const { user: currentUser } = useAuthStore();
-  const members = projectMembers[task.projectId] || [];
-
-  useEffect(() => {
-    if (task.projectId && (!projectMembers[task.projectId] || projectMembers[task.projectId].length === 0)) {
-      fetchProjectMembers(task.projectId);
-    }
-  }, [task.projectId, fetchProjectMembers, projectMembers]);
 
   const getMemberRole = (userId: string): string => {
     if (config?.ownerId === userId) return 'Owner';
@@ -65,12 +55,11 @@ export default function TaskModal({
     }
     
     // Default based on workspace role
-    const wsMember = workspaceMembers.find(m => m.userId === userId);
+    const wsMember = members.find(m => m.userId === userId);
     if (wsMember) {
-      const role = (wsMember.role as string).toUpperCase();
-      if (role === 'OWNER') return 'Owner';
-      if (role === 'ADMIN') return 'Admin';
-      if (role === 'VIEWER') return 'Viewer';
+      if (wsMember.role === 'OWNER') return 'Owner';
+      if (wsMember.role === 'ADMIN') return 'Admin';
+      if (wsMember.role === 'VIEWER') return 'Viewer';
     }
     return 'Developer';
   };
@@ -109,9 +98,11 @@ export default function TaskModal({
 
   const isArchived = !!config?.archived;
 
-  const canEdit = currentUser && !isArchived ? hasPermission(currentUser.id, 'edit_task') : false;
+  const canEdit = currentUser && !isArchived ? (task.id.startsWith('draft-') || hasPermission(currentUser.id, 'edit_task')) : false;
   const canDelete = currentUser && !isArchived ? hasPermission(currentUser.id, 'delete_task') : false;
+  const canComment = currentUser && !isArchived && getMemberRole(currentUser.id) !== 'Viewer';
 
+  const prevTaskIdRef = useRef<string | null>(null);
   const [draft, setDraft] = useState(task);
   const [commentText, setCommentText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -129,23 +120,51 @@ export default function TaskModal({
   const [attachments, setAttachments] = useState<{ id: string; name: string; size: number; type?: string; data?: string; uploadedAt: string }[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadingName, setUploadingName] = useState<string>('');
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // @ Mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [selectedMentionedUser, setSelectedMentionedUser] = useState<User | null>(null);
-  const [mentionedUserRole, setMentionedUserRole] = useState('Developer');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load project configuration from localStorage
-  const loadLocalMetadata = () => {
-    try {
-      const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
-      if (stored) {
-        const config = JSON.parse(stored);
-        const savedAssignee = task.assignee || config.assignees?.[task.id];
-        if (savedAssignee) setAssigneeId(task.assigneeId || savedAssignee.id);
+  // Drag & drop file state
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  
+  // Clicked mention user popover
+  const [selectedMentionedUser, setSelectedMentionedUser] = useState<User | null>(null);
+  const [mentionedUserRole, setMentionedUserRole] = useState<string>('');
+
+  useEffect(() => {
+    if (prevTaskIdRef.current === task.id) {
+      return;
+    }
+    prevTaskIdRef.current = task.id;
+
+    setDraft(task);
+    
+    if (task.id.startsWith('draft-')) {
+      try {
+        const stored = sessionStorage.getItem(`devcollab_draft_task_${task.projectId}_${task.id}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.task && parsed.task.id === task.id) {
+            setDraft(parsed.task);
+            setAssigneeId(parsed.task.assigneeId || '');
+          }
+          if (parsed && parsed.metadata) {
+            setTags(parsed.metadata.tags || []);
+            setAttachments(parsed.metadata.attachments || []);
+            setChecklist(parsed.metadata.checklist || []);
+          }
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to restore draft metadata", e);
+      }
+    }
+
+    // Reactively extract metadata from config prop
+    const savedAssignee = task.assignee || config?.assignees?.[task.id];
+    setAssigneeId(task.assigneeId || savedAssignee?.id || '');
 
     const savedTags = config?.tags?.[task.id] || [];
     setTags(savedTags);
@@ -153,39 +172,32 @@ export default function TaskModal({
     const savedAttachments = config?.attachments?.[task.id] || [];
     setAttachments(savedAttachments);
 
-    const activeSprint = config?.sprints?.find((s: any) => s.taskIds?.includes(task.id));
-    setSprintId(activeSprint?.id || '');
-
-        const savedChecklist = config.checklists?.[task.id] || [];
-        setChecklist(savedChecklist);
-      }
-    } catch (e) {
-      // Ignore
-    }
-  };
-
-  useEffect(() => {
-    setDraft(task);
-    loadLocalMetadata();
-  }, [task]);
+    const savedChecklist = config?.checklists?.[task.id] || [];
+    setChecklist(savedChecklist);
+  }, [task, config]);
 
   // Save local metadata changes back to parent
   const saveLocalMetadata = (updates: { assigneeId?: string; tags?: string[]; attachments?: any[]; checklist?: any[] }) => {
+    if (task.id.startsWith('draft-')) {
+      return;
+    }
     try {
       const stored = localStorage.getItem(`devcollab_project_workspace_${task.projectId}`);
       if (stored) {
         const localConfig = JSON.parse(stored);
         
-        // Handle Assignee local notification
+        // Handle Assignee
         if (updates.assigneeId !== undefined) {
-          if (!config.assignees) config.assignees = {};
+          if (!localConfig.assignees) localConfig.assignees = {};
           if (updates.assigneeId) {
             const memberUser = members.find(m => m.userId === updates.assigneeId)?.user;
             if (memberUser) {
-              config.assignees[task.id] = memberUser;
+              localConfig.assignees[task.id] = memberUser;
+              onUpdateMetadata(task.id, 'assignees', memberUser);
             }
           } else {
-            delete config.assignees[task.id];
+            delete localConfig.assignees[task.id];
+            onUpdateMetadata(task.id, 'assignees', null);
           }
         }
 
@@ -243,7 +255,63 @@ export default function TaskModal({
     saveLocalMetadata({ checklist: nextChecklist });
   }
 
+  // Debounced Autosave for drafts
+  useEffect(() => {
+    if (!task.id.startsWith('draft-')) return;
+
+    const handler = setTimeout(() => {
+      try {
+        const draftData = {
+          task: {
+            ...task,
+            title: draft.title,
+            description: draft.description,
+            status: draft.status,
+            priority: draft.priority,
+            dueDate: draft.dueDate,
+            assigneeId: assigneeId || null,
+          },
+          metadata: {
+            tags,
+            checklist,
+            attachments,
+          }
+        };
+        sessionStorage.setItem(`devcollab_draft_task_${task.projectId}_${task.id}`, JSON.stringify(draftData));
+      } catch (e) {
+        console.error("Failed to autosave draft", e);
+      }
+    }, 750);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [
+    task.id,
+    task.projectId,
+    draft.title,
+    draft.description,
+    draft.status,
+    draft.priority,
+    draft.dueDate,
+    assigneeId,
+    tags,
+    checklist,
+    attachments
+  ]);
+
+  function handleDiscardDraft() {
+    if (window.confirm('Discard this draft? All progress will be lost.')) {
+      sessionStorage.removeItem(`devcollab_draft_task_${task.projectId}_${task.id}`);
+      onClose();
+    }
+  }
+
   async function handleSave() {
+    if (task.id.startsWith('draft-') && !draft.title.trim()) {
+      alert('Task title is required.');
+      return;
+    }
     setIsSaving(true);
     try {
       const updated = await onSave({
@@ -253,8 +321,15 @@ export default function TaskModal({
         priority: draft.priority,
         dueDate: draft.dueDate ?? null,
         assigneeId: assigneeId || null,
-      });
+        tags: task.id.startsWith('draft-') ? tags : undefined,
+        checklist: task.id.startsWith('draft-') ? checklist : undefined,
+        attachments: task.id.startsWith('draft-') ? attachments : undefined,
+      } as any);
+      
+      prevTaskIdRef.current = updated.id;
       setDraft(updated);
+    } catch (err: any) {
+      alert(`Failed to save task: ${err.message || err}`);
     } finally {
       setIsSaving(false);
     }
@@ -695,119 +770,126 @@ export default function TaskModal({
             </div>
 
             {/* Comment Suite */}
-            <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800/80">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                💬 Comments ({draft.comments?.length || 0})
-              </span>
-
-              <div className="space-y-3 relative">
-                <textarea
-                  ref={textareaRef}
-                  value={commentText}
-                  onChange={handleCommentChange}
-                  placeholder="Add context, review notes... type '@' to mention project members"
-                  rows={3}
-                  className="w-full text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500 resize-none leading-relaxed"
-                />
-
-                {mentionQuery !== null && filteredMembers.length > 0 && (
-                  <div className="absolute bottom-full left-0 mb-1.5 w-60 max-h-40 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl z-40 py-1 animate-in slide-in-from-bottom-2 duration-100">
-                    {filteredMembers.map((memberUser) => (
-                      <button
-                        key={memberUser.id}
-                        type="button"
-                        onClick={() => selectMentionUser(memberUser)}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                      >
-                        <div className="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center text-[8px] font-bold text-white">
-                          {(memberUser.name || memberUser.email || '?').charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold truncate">{memberUser.name || 'No Name'}</p>
-                          <p className="text-[10px] text-slate-400 truncate">{memberUser.email}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => void handleAddComment()}
-                    disabled={isPosting || !commentText.trim()}
-                    className="rounded-full bg-slate-900 dark:bg-slate-100 dark:text-slate-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
-                  >
-                    {isPosting ? 'Posting...' : 'Add Comment'}
-                  </button>
-                </div>
+            {task.id.startsWith('draft-') ? (
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 text-center py-6 text-xs text-slate-400 italic bg-slate-500/[0.01] rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                💬 Comments will be unlocked once this task is created.
               </div>
+            ) : (
+              <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  💬 Comments ({draft.comments?.length || 0})
+                </span>
 
-              {/* Comments Thread */}
-              <div className="space-y-3 mt-4">
-                {draft.comments?.length === 0 ? (
-                  <p className="text-center text-xs text-slate-400 py-6 border border-dashed border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/10">
-                    No comments yet.
-                  </p>
-                ) : (
-                  (draft.comments || []).map((comment) => {
-                    const authorInitials = (comment.createdBy?.name || '?').charAt(0).toUpperCase();
-                    const parts = comment.content.split(/(@[a-zA-Z0-9\s]+)/g);
+                <div className="space-y-3 relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={commentText}
+                    onChange={handleCommentChange}
+                    disabled={!canComment}
+                    placeholder={canComment ? "Add context, review notes... type '@' to mention project members" : "You have read-only access and cannot post comments."}
+                    rows={3}
+                    className="w-full text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none transition focus:border-indigo-500 resize-none leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
 
-                    return (
-                      <article key={comment.id} className="flex gap-3 p-3.5 border border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 shadow-sm hover:shadow transition duration-150">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-300 flex-shrink-0">
-                          {authorInitials}
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                              {comment.createdBy?.name || 'Workspace Member'}
-                            </h4>
-                            <span className="text-[10px] text-slate-400">
-                              {new Date(comment.createdAt).toLocaleString()}
-                            </span>
+                  {mentionQuery !== null && filteredMembers.length > 0 && (
+                    <div className="absolute bottom-full left-0 mb-1.5 w-60 max-h-40 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl z-40 py-1 animate-in slide-in-from-bottom-2 duration-100">
+                      {filteredMembers.map((memberUser) => (
+                        <button
+                          key={memberUser.id}
+                          type="button"
+                          onClick={() => selectMentionUser(memberUser)}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                        >
+                          <div className="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center text-[8px] font-bold text-white">
+                            {(memberUser.name || memberUser.email || '?').charAt(0).toUpperCase()}
                           </div>
-                          <div className="text-xs text-slate-650 dark:text-slate-300 leading-relaxed whitespace-pre-wrap text-left">
-                            {parts.map((part, i) => {
-                              if (part.startsWith('@')) {
-                                  const mentionName = part.substring(1).trim();
-                                  return (
-                                    <button
-                                      key={i}
-                                      type="button"
-                                      onClick={() => {
-                                        const matched = members.find(m => 
-                                          (m.user?.name || '').toLowerCase() === mentionName.toLowerCase() ||
-                                          (m.user?.email || '').toLowerCase().includes(mentionName.toLowerCase())
-                                        );
-                                        if (matched && matched.user) {
-                                          setSelectedMentionedUser(matched.user);
-                                          setMentionedUserRole(matched.role);
-                                        } else {
-                                          const loose = members.find(m => (m.user?.name || '').toLowerCase().includes(mentionName.toLowerCase()));
-                                          if (loose && loose.user) {
-                                            setSelectedMentionedUser(loose.user);
-                                            setMentionedUserRole(loose.role);
-                                          }
-                                        }
-                                      }}
-                                      className="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-semibold px-1 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition inline-block text-left"
-                                    >
-                                      {part}
-                                    </button>
-                                  );
-                                }
-                                return part;
-                              })}
-                            </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{memberUser.name || 'No Name'}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{memberUser.email}</p>
                           </div>
-                        </article>
-                      );
-                    })
+                        </button>
+                      ))}
+                    </div>
                   )}
+
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => void handleAddComment()}
+                      disabled={isPosting || !commentText.trim() || !canComment}
+                      className="rounded-full bg-slate-900 dark:bg-slate-100 dark:text-slate-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
+                    >
+                      {isPosting ? 'Posting...' : 'Add Comment'}
+                    </button>
+                  </div>
                 </div>
-              </section>
+
+                {/* Comments Thread */}
+                <div className="space-y-3 mt-4">
+                  {draft.comments?.length === 0 ? (
+                    <p className="text-center text-xs text-slate-400 py-6 border border-dashed border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/10">
+                      No comments yet.
+                    </p>
+                  ) : (
+                    (draft.comments || []).map((comment) => {
+                      const authorInitials = (comment.createdBy?.name || '?').charAt(0).toUpperCase();
+                      const parts = comment.content.split(/(@[a-zA-Z0-9\s]+)/g);
+
+                      return (
+                        <article key={comment.id} className="flex gap-3 p-3.5 border border-slate-100 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 shadow-sm hover:shadow transition duration-150">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-300 flex-shrink-0">
+                            {authorInitials}
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                {comment.createdBy?.name || 'Workspace Member'}
+                              </h4>
+                              <span className="text-[10px] text-slate-400">
+                                {new Date(comment.createdAt).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-650 dark:text-slate-300 leading-relaxed whitespace-pre-wrap text-left">
+                              {parts.map((part, i) => {
+                                if (part.startsWith('@')) {
+                                    const mentionName = part.substring(1).trim();
+                                    return (
+                                      <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => {
+                                          const matched = members.find(m => 
+                                            (m.user?.name || '').toLowerCase() === mentionName.toLowerCase() ||
+                                            (m.user?.email || '').toLowerCase().includes(mentionName.toLowerCase())
+                                          );
+                                          if (matched && matched.user) {
+                                            setSelectedMentionedUser(matched.user);
+                                            setMentionedUserRole(matched.role);
+                                          } else {
+                                            const loose = members.find(m => (m.user?.name || '').toLowerCase().includes(mentionName.toLowerCase()));
+                                            if (loose && loose.user) {
+                                              setSelectedMentionedUser(loose.user);
+                                              setMentionedUserRole(loose.role);
+                                            }
+                                          }
+                                        }}
+                                        className="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-semibold px-1 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition inline-block text-left"
+                                      >
+                                        {part}
+                                      </button>
+                                    );
+                                  }
+                                  return part;
+                                })}
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
 
             {/* Right sidebar area (Metadata Controls) */}
@@ -829,10 +911,10 @@ export default function TaskModal({
                     }
                     className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <option value="TODO">To Do</option>
-                    <option value="IN_PROGRESS">In Progress</option>
-                    <option value="IN_REVIEW">In Review</option>
-                    <option value="DONE">Done</option>
+                    <option value="TODO" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">To Do</option>
+                    <option value="IN_PROGRESS" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">In Progress</option>
+                    <option value="IN_REVIEW" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">In Review</option>
+                    <option value="DONE" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">Done</option>
                   </select>
                 </label>
 
@@ -850,9 +932,9 @@ export default function TaskModal({
                     }
                     className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <option value="P0">P0 (Critical)</option>
-                    <option value="P1">P1 (High)</option>
-                    <option value="P2">P2 (Normal)</option>
+                    <option value="P0" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">P0 (Critical)</option>
+                    <option value="P1" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">P1 (High)</option>
+                    <option value="P2" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">P2 (Normal)</option>
                   </select>
                 </label>
 
@@ -872,9 +954,9 @@ export default function TaskModal({
                     }}
                     className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <option value="">Unassigned</option>
+                    <option value="" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">Unassigned</option>
                     {members.map((m) => (
-                      <option key={m.userId} value={m.userId}>
+                      <option key={m.userId} value={m.userId} className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-300">
                         👤 {m.user?.name || m.user?.email || 'Unnamed'} ({m.role})
                       </option>
                     ))}
@@ -952,26 +1034,48 @@ export default function TaskModal({
               </div>
 
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5">
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => void handleSave()}
-                    disabled={isSaving}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-3 text-xs font-bold transition shadow-md"
-                  >
-                    {isSaving ? 'Saving...' : '💾 Save Changes'}
-                  </button>
-                )}
-                
-                {canDelete && (
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete()}
-                    disabled={isDeleting}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 dark:border-rose-950 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100/50 transition px-4 py-3 text-xs font-bold"
-                  >
-                    {isDeleting ? 'Deleting...' : '🗑️ Delete Task'}
-                  </button>
+                {task.id.startsWith('draft-') ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleSave()}
+                      disabled={isSaving}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-3 text-xs font-bold transition shadow-md"
+                    >
+                      {isSaving ? 'Creating...' : '✨ Create Task'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDiscardDraft()}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20 text-slate-650 dark:text-slate-400 hover:bg-slate-100/50 hover:text-white transition px-4 py-3 text-xs font-bold"
+                    >
+                      Discard Draft
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSave()}
+                        disabled={isSaving}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-3 text-xs font-bold transition shadow-md"
+                      >
+                        {isSaving ? 'Saving...' : '💾 Save Changes'}
+                      </button>
+                    )}
+                    
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete()}
+                        disabled={isDeleting}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 dark:border-rose-950 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100/50 transition px-4 py-3 text-xs font-bold"
+                      >
+                        {isDeleting ? 'Deleting...' : '🗑️ Delete Task'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

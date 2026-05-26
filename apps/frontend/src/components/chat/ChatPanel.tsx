@@ -22,6 +22,18 @@ export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps
   
   const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
 
+  const [projectMembers, setProjectMembers] = useState<any[]>([]);
+
+  const isViewer = React.useMemo(() => {
+    if (!user) return true;
+    const pm = projectMembers.find((m: any) => m.userId === user.id);
+    if (pm) {
+      if (pm.role === 'ADMIN' || pm.role === 'OWNER') return false;
+      if (pm.role === 'VIEWER') return true;
+    }
+    return pm?.role === 'VIEWER';
+  }, [user, projectMembers]);
+
   const {
     messages,
     sendMessage,
@@ -45,7 +57,6 @@ export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps
   const [mentionQuery, setMentionQuery] = useState('');
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
-  const [projectMembers, setProjectMembers] = useState([]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -288,7 +299,7 @@ export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps
                   <div className={`relative max-w-[80%] ${isOwn ? 'ml-auto' : ''}`}>
                     
                     {/* Hover Actions */}
-                    {hoveredMessageId === msg.id && msg.id !== 'temp-msg' && !msg.deletedAt && (
+                    {hoveredMessageId === msg.id && msg.id !== 'temp-msg' && !msg.deletedAt && !isViewer && (
                       <div className={`absolute -top-8 ${isOwn ? 'right-0' : 'left-0'} bg-gray-900 border border-gray-700 rounded-xl flex items-center gap-1 px-1 py-1 shadow-lg z-20`}>
                         <button onClick={() => setShowEmojiPickerFor(showEmojiPickerFor === msg.id ? null : msg.id)} className="w-7 h-7 flex items-center justify-center hover:bg-gray-800 rounded-lg text-sm" title="React">😊</button>
                         <button onClick={() => setReplyingTo(msg)} className="w-7 h-7 flex items-center justify-center hover:bg-gray-800 rounded-lg text-sm" title="Reply">↩</button>
@@ -420,15 +431,16 @@ export default function ChatPanel({ projectId, isOpen, onClose }: ChatPanelProps
             value={inputContent}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Message #project-chat"
-            className="flex-1 bg-transparent text-sm text-white resize-none outline-none min-h-[20px] max-h-[120px] py-0.5"
+            disabled={isViewer}
+            placeholder={isViewer ? "Chat locked (Read-only)" : "Message #project-chat"}
+            className="flex-1 bg-transparent text-sm text-white resize-none outline-none min-h-[20px] max-h-[120px] py-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
             rows={1}
           />
           <button
             onClick={handleSubmit}
-            disabled={!inputContent.trim()}
+            disabled={!inputContent.trim() || isViewer}
             className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors
-              ${inputContent.trim() ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}
+              ${inputContent.trim() && !isViewer ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}
             `}
           >
             <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
