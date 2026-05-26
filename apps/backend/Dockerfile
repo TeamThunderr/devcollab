@@ -20,7 +20,7 @@ COPY package.json package-lock.json ./
 COPY apps/backend/package.json ./apps/backend/
 
 # Install full workspace (including devDependencies for tsc)
-RUN npm ci --workspace=apps/backend --include=workspace-root
+RUN npm ci --workspace=apps/backend
 
 # ── Stage 2: Build TypeScript → JavaScript ────────────────────────────────────
 FROM node:20-alpine AS build
@@ -49,8 +49,8 @@ WORKDIR /app
 # Non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodeapp -u 1001 -G nodejs
 
-# Copy root workspace manifest (needed for npm workspaces path resolution)
-COPY package.json ./
+# Copy root workspace manifest and lockfile (needed for npm ci and workspaces)
+COPY package.json package-lock.json ./
 
 # Copy backend production manifest and install ONLY production deps
 COPY apps/backend/package.json ./apps/backend/
