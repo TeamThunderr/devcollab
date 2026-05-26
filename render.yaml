@@ -1,58 +1,49 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # DevCollab — render.yaml  (Render Blueprint)
 #
-# This file deploys ONLY the backend web service on Render (free tier).
-# PostgreSQL and Redis are hosted externally for free — no credit card needed:
-#
-#   PostgreSQL → Supabase free tier  (supabase.com — no card required)
-#   Redis      → Upstash free tier   (upstash.com  — no card required)
-#
-# After setting up Supabase and Upstash, paste their connection URLs
-# into the Render dashboard → Service → Environment tab.
+# This file defines ALL Render services as code.
+# Commit it to your repo root — Render reads it automatically.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
+  # ── Backend Web Service ─────────────────────────────────────────────────────
   - type: web
     name: devcollab-backend
     runtime: docker
     dockerfilePath: apps/backend/Dockerfile
     dockerContext: .
-    plan: free             # Free tier — no credit card required
-    region: singapore      # Closest to India — options: oregon, ohio, frankfurt
+    plan: free             # Free tier
+    region: singapore      
     branch: main
     autoDeploy: true
     healthCheckPath: /api/health
 
     envVars:
-      # ── Server ────────────────────────────────────────────────────────────
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: "10000"     # Render free tier assigns port 10000
+        value: "10000"
 
-      # ── Database (Supabase) ───────────────────────────────────────────────
-      # Get from: supabase.com → Project → Settings → Database → Connection string
-      # Use the "URI" format: postgresql://postgres:[PASSWORD]@db.[ref].supabase.co:5432/postgres
+      # ── Database — auto-linked from the postgres service below ────────────
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: devcollab-postgres
+          property: connectionString
 
-      # ── Redis (Upstash) ───────────────────────────────────────────────────
-      # Get from: upstash.com → Database → Details → REDIS_URL
-      # Format: rediss://:[PASSWORD]@[host].upstash.io:6379
+      # ── Redis — auto-linked from the redis service below ──────────────────
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: devcollab-redis
+          type: redis
+          property: connectionString
 
-      # ── Auth secrets ──────────────────────────────────────────────────────
+      # ── Secrets — sync:false means you set these in the dashboard ─────────
       - key: JWT_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
         sync: false
-
-      # ── CORS ──────────────────────────────────────────────────────────────
       - key: FRONTEND_URL
         sync: false
-
-      # ── AI ────────────────────────────────────────────────────────────────
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
@@ -61,14 +52,10 @@ services:
         value: gemini-3.1-flash-lite
       - key: AI_MOCK_MODE
         value: "false"
-
-      # ── Payments ──────────────────────────────────────────────────────────
       - key: RAZORPAY_KEY_ID
         sync: false
       - key: RAZORPAY_KEY_SECRET
         sync: false
-
-      # ── Email ─────────────────────────────────────────────────────────────
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -77,3 +64,19 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  - type: redis
+    name: devcollab-redis
+    plan: free                     # <--- Fixed: Using Render's Free tier
+    region: singapore
+    maxmemoryPolicy: allkeys-lru   
+    ipAllowList: []
+
+# ── PostgreSQL ─────────────────────────────────────────────────────────────────
+databases:
+  - name: devcollab-postgres
+    databaseName: devcollab
+    user: devcollab
+    plan: free                     # <--- Fixed: Using Render's Free tier
+    region: singapore
