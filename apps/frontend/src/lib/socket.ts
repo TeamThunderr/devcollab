@@ -3,8 +3,8 @@
  *
  * Socket.IO client singleton.
  * - Created once at module load with autoConnect: false
- * - connectSocket() is called after login with the JWT + workspaceId
- * - disconnectSocket() is called on logout
+ * - connectSocket() is called after login/refresh with JWT + workspaceId
+ * - disconnectSocket() is called ONLY on logout
  */
 
 import { io, Socket } from "socket.io-client";
@@ -62,11 +62,11 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
   SOCKET_URL,
   {
     autoConnect: false,          // Connect manually after login
-    auth: { token: "" },         // Populated by connectSocket()
+    auth: { token: "", workspaceId: "" }, // Populated by connectSocket()
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 2000,     // Wait 2s before first retry
-    reconnectionDelayMax: 10000, // Max 10s between retries
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
     timeout: 10000,
     transports: ["websocket"],
   }
@@ -78,12 +78,12 @@ socket.on("connect", () => {
   console.log(`✅ Socket connected: ${socket.id}`);
 });
 
-socket.on("disconnect", () => {
-  console.log("❌ Socket disconnected");
+socket.on("disconnect", (reason) => {
+  console.log(`❌ Socket disconnected: ${reason}`);
 });
 
 socket.on("connect_error", (err: Error) => {
-  console.log(`Socket error: ${err.message}`);
+  console.warn(`⚠️ Socket connect_error: ${err.message}`);
 });
 
 // ─── Global notification listener ────────────────────────────────────────────
@@ -96,41 +96,61 @@ socket.on("notification:new", (data: unknown) => {
 // ─── Exported helpers ────────────────────────────────────────────────────────
 
 /**
- * Inject the JWT and workspaceId into the socket auth object, then connect.
- * Call this immediately after a successful login.
+ * Inject the JWT and workspaceId into the socket auth, then connect.
+ * Safe to call multiple times — no-ops if already connected to same workspace.
+ * If connected to a DIFFERENT workspace, disconnects first then reconnects.
  */
 export function connectSocket(token: string, workspaceId: string): void {
-  if (socket.connected) {
-    if ((socket.auth as any).workspaceId === workspaceId) {
-      return; // Already connected to this workspace
-    }
+  if (!token || !workspaceId) return;
+
+  const auth = socket.auth as { token: string; workspaceId: string };
+
+  // Already connected to this exact workspace — nothing to do
+  if (socket.connected && auth.workspaceId === workspaceId) {
+    // Token may have refreshed — update it silently
+    auth.token = token;
+    return;
+  }
+
+  // Switching workspaces — disconnect first
+  if (socket.connected && auth.workspaceId !== workspaceId) {
     socket.disconnect();
   }
+
+  // Set credentials and connect
   socket.auth = { token, workspaceId };
   socket.connect();
-  console.log("Socket connecting...");
+  console.log(`🔌 Socket connecting to workspace ${workspaceId}…`);
 }
 
 /**
- * Update the token for an existing socket, e.g. after silent refresh.
- * If the socket is disconnected due to a 401, this will trigger a reconnect.
+ * Update the access token on the socket auth object (e.g. after a silent
+ * token refresh). If the socket has a workspaceId but is not connected,
+ * this will trigger a reconnect with the new token.
  */
 export function updateSocketToken(token: string): void {
-  if (socket.auth) {
-    (socket.auth as any).token = token;
-  }
-  if (!socket.connected && (socket.auth as any).workspaceId) {
+  if (!token) return;
+  const auth = socket.auth as { token: string; workspaceId: string };
+  auth.token = token;
+
+  // If we have a workspace context but the socket fell off, reconnect now
+  if (!socket.connected && auth.workspaceId) {
     socket.connect();
+    console.log("🔄 Socket reconnecting after token refresh…");
   }
 }
 
 /**
  * Gracefully disconnect the socket.
- * Call this on logout or when the user leaves a workspace.
+ * ONLY call this on explicit logout — not on component unmount.
  */
 export function disconnectSocket(): void {
+  const auth = socket.auth as { token: string; workspaceId: string };
+  // Clear credentials so reconnection logic won't re-connect automatically
+  auth.token = "";
+  auth.workspaceId = "";
   socket.disconnect();
-  console.log("Socket disconnected");
+  console.log("🔌 Socket disconnected (logout)");
 }
 
 /**

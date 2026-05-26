@@ -12,7 +12,7 @@ import useAuthStore from "../stores/authStore";
 import useWorkspaceStore from "../stores/workspaceStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useBillingStore } from "../stores/billingStore";
-import { connectSocket, disconnectSocket } from "../lib/socket";
+import { connectSocket } from "../lib/socket";
 import MainSidebar from "../components/sidebar/MainSidebar";
 import Topbar from "../components/topbar/Topbar";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
@@ -35,10 +35,9 @@ export default function WorkspaceLayout(): React.ReactElement {
         connectSocket(token, workspaceId);
       }
     }
-
-    return () => {
-      disconnectSocket();
-    };
+    // NOTE: Do NOT call disconnectSocket() on cleanup here.
+    // The socket must stay alive for the full workspace session.
+    // disconnectSocket() is only called by authStore.logout().
   }, [workspaceId, isInitialized, isAuthenticated, fetchWorkspaceDetails, fetchProjects, fetchSubscription]);
 
   if (!isInitialized) {

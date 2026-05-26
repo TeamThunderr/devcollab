@@ -92,22 +92,28 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       let token = useAuthStore.getState().accessToken;
       
       // If we don't have an access token in memory (e.g. after a page reload),
-      // attempting to call getMe() will result in a 401 which logs to the console natively.
-      // To avoid this error spam, we proactively try to refresh the token first!
+      // proactively try to refresh via the httpOnly cookie before calling getMe().
       if (!token) {
         const { api } = await import('../lib/axios');
-        const res = await api.post('/api/auth/refresh', {}, { _retry: true } as any);
+        const res = await api.post(
+          '/api/auth/refresh',
+          {},
+          { _retry: true, _silentError: true } as any
+        );
         token = res.data.accessToken;
-        // Persist the refreshed token into the store AND update the socket
-        // so that WorkspaceLayout.connectSocket() has a token ready when it fires.
+        // Store the refreshed token AND prime the socket so connectSocket()
+        // in WorkspaceLayout finds a token ready when it fires.
         set({ accessToken: token });
         updateSocketToken(token!);
       }
 
       const user = await authService.getMe();
       set({ user, isAuthenticated: true, isInitialized: true });
-    } catch (error) {
-      disconnectSocket();
+    } catch {
+      // Refresh token missing/expired — user must log in again.
+      // Don't call disconnectSocket() here; the socket hasn't connected yet
+      // on a fresh page load, and we don't want to clear workspaceId from
+      // a socket that's mid-reconnect for an already-authenticated session.
       set({ user: null, accessToken: null, isAuthenticated: false, isInitialized: true });
     }
   },
