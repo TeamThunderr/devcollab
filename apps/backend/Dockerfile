@@ -29,7 +29,7 @@ WORKDIR /app
 
 # Copy installed modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
+COPY --from=deps /app/apps/backend/node_module[s] ./apps/backend/node_modules/
 
 # Copy source
 COPY apps/backend/ ./apps/backend/

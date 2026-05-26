@@ -24,7 +24,7 @@ COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
 
 # Install all frontend dependencies
-RUN npm ci --workspace=apps/frontend --include=workspace-root
+RUN npm ci --workspace=apps/frontend
 
 # ── Stage 2: Build Vite application ──────────────────────────────────────────
 FROM node:20-alpine AS build
@@ -36,7 +36,7 @@ ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
+COPY --from=deps /app/apps/frontend/node_module[s] ./apps/frontend/node_modules/
 
 # Copy source files
 COPY apps/frontend/ ./apps/frontend/
