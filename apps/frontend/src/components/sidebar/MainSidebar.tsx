@@ -19,7 +19,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, FolderOpen, Users, CreditCard, Kanban, BookOpen,
-  Code2, Zap, Activity, Sparkles, MessageSquare, ArrowLeft,
+  Code2, Activity, Sparkles, MessageSquare, ArrowLeft,
   ChevronLeft, ChevronRight, Settings,
 } from 'lucide-react';
 import useWorkspaceStore from '../../stores/workspaceStore';
@@ -381,6 +381,7 @@ export default function MainSidebar(): React.ReactElement {
               </div>
             )}
           </div>
+          )}
         </nav>
 
         {/* Active Now */}
