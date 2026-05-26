@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
@@ -18,7 +18,7 @@ import TextStyle from '@tiptap/extension-text-style';
 import Highlight from '@tiptap/extension-highlight';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
-import EmojiPicker from 'emoji-picker-react';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
 
 import SlashCommands, { getSuggestionItems, renderItems } from './SlashCommands';
 import { Callout } from './extensions/Callout';
@@ -27,6 +27,7 @@ import useWikiStore from '../../stores/wikiStore';
 import useTaskStore from '../../stores/taskStore';
 import useEditorStore from '../../stores/editorStore';
 import api from '../../lib/axios';
+import { toast } from '../../stores/toastStore';
 
 const lowlight = createLowlight(common);
 
@@ -181,7 +182,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
       editor.commands.insertContentAt(0, `<div data-type="info" class="callout callout-info"><p><strong>✨ AI Summary</strong></p>${summaryText}</div><p></p>`);
     } catch (err) {
       console.error('Failed to generate summary', err);
-      alert('Failed to generate AI Summary.');
+      toast.error('Failed to generate AI Summary.');
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -377,7 +378,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
                 {showEmojiPicker && (
                   <div className="absolute top-full mt-2 left-0 z-50 shadow-2xl">
                     <EmojiPicker
-                      theme="dark"
+                      theme={Theme.DARK}
                       onEmojiClick={(emojiData) => {
                         updatePage(activePage.id, { icon: emojiData.emoji });
                         setShowEmojiPicker(false);

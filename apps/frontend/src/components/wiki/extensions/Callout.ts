@@ -33,12 +33,12 @@ export const Callout = Node.create({
     return ['div', mergeAttributes(HTMLAttributes, { class: 'p-4 rounded-lg my-4 flex gap-3 border items-start callout' }), ['div', { class: 'callout-icon mt-0.5' }], ['div', { class: 'callout-content flex-1' }, 0]];
   },
 
-  addCommands() {
+  addCommands(): any {
     return {
-      setCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }) => {
+      setCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }: any) => {
         return commands.setNode(this.name, options);
       },
-      toggleCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }) => {
+      toggleCallout: (options: { type: 'info' | 'warning' | 'success' }) => ({ commands }: any) => {
         return commands.toggleNode(this.name, 'paragraph', options);
       },
     };
