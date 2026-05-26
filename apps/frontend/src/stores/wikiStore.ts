@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/axios';
+import { toast } from './toastStore';
 
 export interface WikiPage {
   id: string;
@@ -75,8 +76,8 @@ const useWikiStore = create<WikiState>((set, get) => ({
       const response = await api.get(`/api/wiki/projects/${projectId}/pages`);
       set({ pages: response.data, isLoading: false });
     } catch (error) {
-      console.error('Failed to fetch wiki pages:', error);
       set({ isLoading: false });
+      // HTTP interceptor handles the toast
     }
   },
 
@@ -86,7 +87,6 @@ const useWikiStore = create<WikiState>((set, get) => ({
       const response = await api.get(`/api/wiki/pages/${id}`);
       set({ activePage: response.data, isLoading: false, editorVersion: get().editorVersion + 1 });
     } catch (error) {
-      console.error('Failed to fetch wiki page:', error);
       set({ isLoading: false });
     }
   },
@@ -95,9 +95,10 @@ const useWikiStore = create<WikiState>((set, get) => ({
     try {
       const response = await api.post(`/api/wiki/projects/${projectId}/pages`, { title, workspaceId });
       set((state) => ({ pages: [response.data, ...state.pages] }));
+      toast.success('Page created', `"${title}" is ready to edit`);
       return response.data;
     } catch (error) {
-      console.error('Failed to create wiki page:', error);
+      // HTTP interceptor handles the toast
       throw error;
     }
   },
@@ -117,8 +118,8 @@ const useWikiStore = create<WikiState>((set, get) => ({
         if (get().saveStatus === 'saved') set({ saveStatus: null });
       }, 2000);
     } catch (error) {
-      console.error('Failed to update wiki page:', error);
       set({ isSaving: false, saveStatus: 'error' });
+      toast.error('Save failed', 'Could not save your changes. Please try again.');
       throw error;
     }
   },
@@ -131,8 +132,9 @@ const useWikiStore = create<WikiState>((set, get) => ({
         activePageId: state.activePageId === id ? null : state.activePageId,
         activePage: state.activePage?.id === id ? null : state.activePage,
       }));
+      toast.success('Page deleted');
     } catch (error) {
-      console.error('Failed to delete wiki page:', error);
+      // HTTP interceptor handles the toast
       throw error;
     }
   },
@@ -151,7 +153,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
       const response = await api.get(`/api/wiki/pages/${pageId}/versions`);
       set({ versions: response.data });
     } catch (error) {
-      console.error('Failed to fetch versions:', error);
+      // silent — versions are secondary UI
     }
   },
 
@@ -160,7 +162,6 @@ const useWikiStore = create<WikiState>((set, get) => ({
       await api.post(`/api/wiki/pages/${pageId}/versions`);
       get().fetchVersions(pageId);
     } catch (error) {
-      console.error('Failed to create version:', error);
       throw error;
     }
   },
@@ -173,8 +174,9 @@ const useWikiStore = create<WikiState>((set, get) => ({
         activePage: { ...state.activePage!, ...response.data },
         editorVersion: state.editorVersion + 1,
       }));
+      toast.success('Version restored', 'The page has been rolled back successfully.');
     } catch (error) {
-      console.error('Failed to restore version:', error);
+      // HTTP interceptor handles the toast
       throw error;
     }
   },
@@ -184,7 +186,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
       const response = await api.get(`/api/wiki/projects/${projectId}/favorites`);
       set({ favorites: response.data });
     } catch (error) {
-      console.error('Failed to fetch favorites:', error);
+      // silent — favorites are secondary
     }
   },
 
@@ -198,7 +200,7 @@ const useWikiStore = create<WikiState>((set, get) => ({
           : state.favorites.filter(id => id !== pageId)
       }));
     } catch (error) {
-      console.error('Failed to toggle favorite:', error);
+      // HTTP interceptor handles the toast
     }
   },
 

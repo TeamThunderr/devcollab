@@ -1,10 +1,24 @@
 import React, { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  Eye,
+  Zap,
+  CheckCircle2,
+  ClipboardList,
+  Code2,
+  BarChart2,
+  Sun,
+  Bot,
+  Sparkles,
+} from "lucide-react";
 import CodeReviewPanel from "../../components/ai/CodeReviewPanel";
 import ProjectSummaryPanel from "../../components/ai/ProjectSummaryPanel";
 import StandupPanel from "../../components/ai/StandupPanel";
 import TaskBreakdownPanel from "../../components/ai/TaskBreakdownPanel";
+import WikiPlanPanel from "../../components/ai/WikiPlanPanel";
 import { useTaskStore } from "../../stores/taskStore";
+import { cn } from "../../lib/utils";
 
 // ─── Project health snapshot ─────────────────────────────────────────────────
 
@@ -34,37 +48,41 @@ function HealthSnapshot({ projectId }: { projectId: string }): React.ReactElemen
     {
       label: "Overdue",
       value: stats.overdue,
-      icon: "⚠️",
+      Icon: AlertTriangle,
       color: stats.overdue > 0
         ? "border-red-500/30 bg-red-500/10 text-red-400"
         : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      iconColor: stats.overdue > 0 ? "text-red-400" : "text-slate-600",
       pulse: stats.overdue > 0,
     },
     {
       label: "In Review",
       value: stats.inReview,
-      icon: "👁️",
+      Icon: Eye,
       color: stats.inReview > 0
         ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
         : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      iconColor: stats.inReview > 0 ? "text-amber-400" : "text-slate-600",
       pulse: false,
     },
     {
       label: "In Progress",
       value: stats.inProgress,
-      icon: "⚡",
+      Icon: Zap,
       color: stats.inProgress > 0
         ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
         : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      iconColor: stats.inProgress > 0 ? "text-blue-400" : "text-slate-600",
       pulse: false,
     },
     {
       label: "Completed",
       value: stats.done,
-      icon: "✅",
+      Icon: CheckCircle2,
       color: stats.done > 0
         ? "border-green-500/30 bg-green-500/10 text-green-400"
         : "border-white/[0.05] bg-white/[0.02] text-slate-500",
+      iconColor: stats.done > 0 ? "text-green-400" : "text-slate-600",
       pulse: false,
     },
   ];
@@ -96,7 +114,7 @@ function HealthSnapshot({ projectId }: { projectId: string }): React.ReactElemen
             {s.pulse && s.value > 0 && (
               <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
             )}
-            <span className="text-base leading-none">{s.icon}</span>
+            <s.Icon className={cn("w-4 h-4", s.iconColor)} />
             <span className="text-xl font-black leading-none">{s.value}</span>
             <span className="text-[9px] font-bold uppercase tracking-wider opacity-60">
               {s.label}
@@ -110,20 +128,21 @@ function HealthSnapshot({ projectId }: { projectId: string }): React.ReactElemen
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
-type TabId = "review" | "summary" | "standup" | "breakdown";
+type TabId = "wiki-plan" | "review" | "summary" | "standup" | "breakdown";
 
 interface Tab {
   id: TabId;
   label: string;
-  emoji: string;
+  Icon: React.FC<{ className?: string }>;
   desc: string;
 }
 
 const TABS: Tab[] = [
-  { id: "review",    label: "Code Review",      emoji: "⭐", desc: "Audit your code instantly" },
-  { id: "summary",   label: "Project Summary",   emoji: "📊", desc: "AI health report" },
-  { id: "standup",   label: "Standup",           emoji: "☀️", desc: "Generate from activity" },
-  { id: "breakdown", label: "Eng Plan",          emoji: "⚡", desc: "Feature → tasks" },
+  { id: "wiki-plan",  label: "Wiki Plan",       Icon: ClipboardList, desc: "Wiki → week plan + tasks" },
+  { id: "review",    label: "Code Review",     Icon: Code2,         desc: "Audit your code instantly" },
+  { id: "summary",   label: "Project Summary", Icon: BarChart2,     desc: "AI health report" },
+  { id: "standup",   label: "Standup",         Icon: Sun,           desc: "Generate from activity" },
+  { id: "breakdown", label: "Eng Plan",        Icon: Zap,           desc: "Feature → tasks" },
 ];
 
 // ─── Page component ───────────────────────────────────────────────────────────
@@ -131,7 +150,7 @@ const TABS: Tab[] = [
 export default function AIAssistantView(): React.ReactElement {
   const { projectId, workspaceId } = useParams<{ projectId: string; workspaceId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = React.useState<TabId>("review");
+  const [activeTab, setActiveTab] = React.useState<TabId>("wiki-plan");
 
   if (!projectId) {
     return (
@@ -142,7 +161,6 @@ export default function AIAssistantView(): React.ReactElement {
   }
 
   function handleTasksAdded(taskIds: string[]) {
-    // Redirect to board with highlight state
     navigate(`/w/${workspaceId}/p/${projectId}/board`, {
       state: { aiAddedTaskIds: taskIds },
     });
@@ -154,7 +172,7 @@ export default function AIAssistantView(): React.ReactElement {
       <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-white/[0.04]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-violet-500/25 flex-shrink-0">
-            <span className="text-lg leading-none">✨</span>
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-sm font-bold text-white leading-none">
@@ -174,32 +192,42 @@ export default function AIAssistantView(): React.ReactElement {
 
         {/* Tab bar — with active glow */}
         <div className="flex gap-1 mb-5 bg-black/20 rounded-xl p-1 border border-white/[0.04]">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                activeTab === tab.id
-                  ? "text-white"
-                  : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
-              }`}
-            >
-              {/* Active background glow */}
-              {activeTab === tab.id && (
-                <span className="absolute inset-0 rounded-lg bg-gradient-to-b from-violet-500/20 to-indigo-500/10 border border-violet-500/20 shadow-sm shadow-violet-500/10" />
-              )}
-              <span className="relative z-10 text-base leading-none">{tab.emoji}</span>
-              <span className="relative z-10 hidden sm:block text-[10px] font-bold">{tab.label}</span>
-              {/* Active underline */}
-              {activeTab === tab.id && (
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-violet-400" />
-              )}
-            </button>
-          ))}
+          {TABS.map((tab) => {
+            const Icon = tab.Icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? "text-white"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
+                }`}
+                title={tab.desc}
+              >
+                {/* Active background glow */}
+                {activeTab === tab.id && (
+                  <span className="absolute inset-0 rounded-lg bg-gradient-to-b from-violet-500/20 to-indigo-500/10 border border-violet-500/20 shadow-sm shadow-violet-500/10" />
+                )}
+                <Icon className="relative z-10 w-4 h-4" />
+                <span className="relative z-10 hidden sm:block text-[10px] font-bold">{tab.label}</span>
+                {/* Active underline */}
+                {activeTab === tab.id && (
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-violet-400" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Active panel */}
         <div className="bg-[#17191d] border border-white/[0.04] rounded-2xl p-5 min-h-[320px]">
+          {activeTab === "wiki-plan" && (
+            <WikiPlanPanel
+              projectId={projectId}
+              workspaceId={workspaceId ?? ""}
+            />
+          )}
           {activeTab === "review"    && <CodeReviewPanel />}
           {activeTab === "summary"   && <ProjectSummaryPanel projectId={projectId} />}
           {activeTab === "standup"   && <StandupPanel projectId={projectId} />}
@@ -210,6 +238,11 @@ export default function AIAssistantView(): React.ReactElement {
             />
           )}
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-[10px] text-slate-600 mt-4">
+          Powered by Gemini 2.0 Flash · Responses may vary
+        </p>
       </div>
     </div>
   );

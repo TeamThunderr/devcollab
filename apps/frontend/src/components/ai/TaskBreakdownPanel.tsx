@@ -29,26 +29,42 @@ export interface GeneratedTask {
   priority: "P0" | "P1" | "P2";
 }
 
-// ─── Priority config ──────────────────────────────────────────────────────────
+// ─── Priority config — handles uppercase (P0/P1/P2) and lowercase (p0/p1/p2) ─
 
-const PRIORITY_CONFIG: Record<
-  GeneratedTask["priority"],
-  { label: string; color: string; dot: string; badge: string }
-> = {
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; dot: string; badge: string }> = {
   P0: {
-    label: "Critical",
+    label: "P0",
     color: "text-rose-400",
     dot: "bg-rose-500",
     badge: "bg-rose-500/15 border-rose-500/25 text-rose-400",
   },
   P1: {
-    label: "High",
+    label: "P1",
     color: "text-amber-400",
     dot: "bg-amber-500",
     badge: "bg-amber-500/15 border-amber-500/25 text-amber-400",
   },
   P2: {
-    label: "Normal",
+    label: "P2",
+    color: "text-emerald-400",
+    dot: "bg-emerald-500",
+    badge: "bg-emerald-500/15 border-emerald-500/25 text-emerald-400",
+  },
+  // Lowercase fallbacks in case Gemini ignores the uppercase instruction
+  p0: {
+    label: "P0",
+    color: "text-rose-400",
+    dot: "bg-rose-500",
+    badge: "bg-rose-500/15 border-rose-500/25 text-rose-400",
+  },
+  p1: {
+    label: "P1",
+    color: "text-amber-400",
+    dot: "bg-amber-500",
+    badge: "bg-amber-500/15 border-amber-500/25 text-amber-400",
+  },
+  p2: {
+    label: "P2",
     color: "text-emerald-400",
     dot: "bg-emerald-500",
     badge: "bg-emerald-500/15 border-emerald-500/25 text-emerald-400",
@@ -102,7 +118,7 @@ function TaskCardItem({
   task: GeneratedTask;
   index: number;
 }): React.ReactElement {
-  const prio = PRIORITY_CONFIG[task.priority];
+  const prio = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG["P1"];
 
   return (
     <div

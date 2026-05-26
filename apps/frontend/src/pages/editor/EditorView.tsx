@@ -103,9 +103,9 @@ export default function EditorView() {
           {/* Tab bar */}
           <EditorTabs />
 
-          <div className="flex flex-col flex-1 overflow-hidden relative">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
             {activeFile ? (
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <MonacoEditor
                   key={activeFileId}
                   fileId={activeFile.id}
@@ -137,7 +137,7 @@ export default function EditorView() {
               </div>
             )}
 
-            {/* AI Review Bar — docked above the bottom panel */}
+            {/* AI Review Bar — flex-shrink-0 keeps it out of Monaco's flow */}
             <AIReviewBar
               code={currentContent}
               language={activeFile?.language ?? "plaintext"}

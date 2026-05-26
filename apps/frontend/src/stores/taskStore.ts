@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api from '../lib/axios';
 import { Task, Comment, TaskStatus, TaskPriority } from '../types';
+import { toast } from './toastStore';
 
 export type { Task, Comment, TaskStatus, TaskPriority };
 
@@ -88,6 +89,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       set((state) => ({
         tasks: state.tasks.map((t) => (t.id === tempId ? response.data : t)),
       }));
+      toast.success('Task created', data.title ? `"${data.title}" added to your board` : 'Task added to your board');
       return response.data;
     } catch (error: any) {
       // Revert the temp task on error
@@ -126,6 +128,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       set((state) => ({
         tasks: state.tasks.filter((t) => t.id !== id),
       }));
+      toast.success('Task deleted');
     } catch (error: any) {
       throw new Error(error.response?.data?.message || error.message);
     }

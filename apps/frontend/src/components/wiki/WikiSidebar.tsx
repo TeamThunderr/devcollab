@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import useWikiStore from '../../stores/wikiStore';
+import ConfirmDialog from '../common/ConfirmDialog';
+import { SkeletonWikiItem } from '../common/Skeleton';
 
 export default function WikiSidebar({ projectId, workspaceId }: { projectId: string; workspaceId: string }) {
   const { pages, activePageId, fetchPages, createPage, setActivePageId, deletePage, isLoading, favorites, fetchFavorites, toggleFavorite } = useWikiStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [search, setSearch] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteTitle, setConfirmDeleteTitle] = useState('');
 
   useEffect(() => {
     fetchPages(projectId);
@@ -68,7 +72,7 @@ export default function WikiSidebar({ projectId, workspaceId }: { projectId: str
                 await store.updatePage(newPage.id, { content });
                 store.setActivePageId(newPage.id);
               } catch (err) {
-                console.error("Failed to upload wiki page", err);
+                // wiki store shows toast
               }
             };
             reader.readAsText(file);
@@ -116,7 +120,11 @@ export default function WikiSidebar({ projectId, workspaceId }: { projectId: str
         </div>
 
         {isLoading ? (
-          <div className="px-4 py-2 text-xs text-gray-500 italic">Loading...</div>
+          <div className="px-2 space-y-1">
+            <SkeletonWikiItem />
+            <SkeletonWikiItem />
+            <SkeletonWikiItem />
+          </div>
         ) : filteredPages.length === 0 ? (
           <div className="px-4 py-4 text-xs text-center text-gray-500">
             <p className="mb-2">No pages found.</p>
@@ -154,9 +162,8 @@ export default function WikiSidebar({ projectId, workspaceId }: { projectId: str
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm('Are you sure you want to delete this page?')) {
-                      deletePage(page.id);
-                    }
+                    setConfirmDeleteId(page.id);
+                    setConfirmDeleteTitle(page.title);
                   }}
                   className="text-gray-500 hover:text-red-400 p-1 hover:bg-white/10 rounded"
                   title="Delete Page"
@@ -189,6 +196,19 @@ export default function WikiSidebar({ projectId, workspaceId }: { projectId: str
           </div>
         </div>
       )}
+
+      {/* Confirm delete page dialog */}
+      <ConfirmDialog
+        isOpen={!!confirmDeleteId}
+        title={`Delete "${confirmDeleteTitle}"?`}
+        message="This page and all its content will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete Page"
+        onConfirm={() => {
+          if (confirmDeleteId) deletePage(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

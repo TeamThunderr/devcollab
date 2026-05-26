@@ -2,13 +2,16 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
+
+  // ── Dev server ────────────────────────────────────────────────────────────
   server: {
     port: 5173,
     watch: {
@@ -26,13 +29,33 @@ export default defineConfig({
       },
     },
   },
+
+  // ── Production build ──────────────────────────────────────────────────────
   build: {
     outDir: 'dist',
+    // Generate sourcemaps for Sentry error tracking
+    sourcemap: mode === 'production' ? 'hidden' : true,
+    // Warn when a single chunk exceeds 1MB
+    chunkSizeWarningLimit: 1000,
+
     rollupOptions: {
       onwarn(warning, warn) {
         if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return
         warn(warning)
       },
+
+      output: {
+        // ── Code splitting strategy ────────────────────────────────────────
+        // Split large dependencies into separate cached chunks.
+        manualChunks(id) {
+          // Monaco editor is ~2MB — isolated so it doesn't bloat the main bundle
+          if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
+            return 'monaco'
+          }
+          // We let Vite handle the rest naturally. Grouping tiptap manually 
+          // without prosemirror caused circular reference errors in production.
+        },
+      },
     },
   },
-})
+}))

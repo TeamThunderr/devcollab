@@ -174,7 +174,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
     setIsGeneratingSummary(true);
     try {
       const content = editor.getText();
-      const response = await api.post('/api/wiki/ai/summarize', { content });
+      const response = await api.post('/api/wiki/ai/summarize', { content, projectId });
       const summaryText = typeof response.data === 'string' ? response.data : response.data.summary || 'Failed to generate summary.';
 
       // Insert at the top of the document as a callout

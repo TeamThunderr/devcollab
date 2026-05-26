@@ -35,9 +35,23 @@ import chatRoutes from './modules/chat/chat.routes';
 export const fastify = Fastify({ logger: true });
 
 async function bootstrap() {
+  // ── CORS ───────────────────────────────────────────────────────────────────
+  // In production FRONTEND_URL is the only allowed origin.
+  // In development we also allow the two Vite dev-server ports.
+  const isProd = process.env.NODE_ENV === 'production';
+  const rawOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, '')); // Strip trailing slashes
+
+  const allowedOrigins = [
+    ...rawOrigins,
+    ...(!isProd ? ['http://localhost:5173', 'http://localhost:5174'] : []),
+  ].filter(Boolean);
+
   await fastify.register(cors, {
-    origin: [process.env.FRONTEND_URL ?? 'http://localhost:5173', 'http://localhost:5174'],
+    origin: allowedOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await fastify.register(cookie, {
@@ -107,3 +121,22 @@ bootstrap().catch((err) => {
   console.error('Fatal error during startup:', err);
   process.exit(1);
 });
+
+// ─── Graceful shutdown ────────────────────────────────────────────────────────
+// Railway (and Docker) send SIGTERM before forcefully killing the process.
+// We listen for it, close Fastify cleanly (finishes in-flight requests),
+// then exit. This prevents dropped connections during deployments.
+async function shutdown(signal: string) {
+  console.log(`\n⚠️  Received ${signal} — shutting down gracefully…`);
+  try {
+    await fastify.close();
+    console.log('✅ Server closed cleanly');
+    process.exit(0);
+  } catch (err) {
+    console.error('❌ Error during shutdown:', err);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));

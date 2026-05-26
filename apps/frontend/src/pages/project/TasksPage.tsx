@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useLocation, Link } from 'react-router-dom';
+import { useParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import { DndContext, DragEndEvent, closestCorners } from '@dnd-kit/core';
 import { useTaskStore } from '../../stores/taskStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -10,14 +10,16 @@ import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';
 import { usePresence } from '../../hooks/usePresence';
-import { Task, TaskStatus, TaskPriority } from '../../types';
+import { Task, TaskStatus } from '../../types';
 import ListView from './ListView';
 import CalendarView from './CalendarView';
 import {
   Search, Plus, Clock, Bot, Calendar,
-  TrendingUp, ChevronRight, CheckCircle2, Layers,
-  Code, Copy, Users, Trash2, X, CheckSquare, FileText
+  TrendingUp, CheckCircle2, Layers,
+  Code, Copy, Users, Trash2, X, CheckSquare, FileText,
+  Target, Zap, Eye, BarChart2, Settings, AlertTriangle
 } from 'lucide-react';
+import { toast } from '../../stores/toastStore';
 
 
 interface ProjectWorkspaceConfig {
@@ -129,11 +131,6 @@ export default function TasksPage(): React.ReactElement {
     }
   }, [location.state]);
 
-  // AI assistant states
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiSuggestions, setAiSuggestions] = useState<{ title: string; description: string; priority: TaskPriority }[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
 
   // Project Workspace local metadata config
   const [config, setConfig] = useState<ProjectWorkspaceConfig | null>(null);
@@ -384,7 +381,7 @@ export default function TasksPage(): React.ReactElement {
 
   const handleInstantTaskCreate = (status: TaskStatus = 'TODO', dueDate?: Date) => {
     if (!pid) {
-      alert("Project ID is missing. Please reload the page.");
+      toast.error('Missing project', 'Project ID is missing. Please reload the page.');
       return;
     }
     const uuid = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
@@ -412,7 +409,7 @@ export default function TasksPage(): React.ReactElement {
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (!canMoveTask) {
-      alert("You do not have permission to move tasks in this project workspace.");
+      toast.error('Permission denied', 'You cannot move tasks in this project workspace.');
       return;
     }
     const { active, over } = event;
@@ -427,55 +424,15 @@ export default function TasksPage(): React.ReactElement {
     if (activeTask.status !== nextStatus) {
       logActivity(`moved task "${activeTask.title}" to ${nextStatus.replace('_', ' ')}`);
       void updateTask(activeTask.id, { status: nextStatus }).catch((err) => {
-        alert(`Failed to update task placement: ${err.message}`);
+        toast.error('Failed to move task', err.message);
       });
     }
   };
 
-  // AI assistant handlers
-  const handleGenerateAISuggestions = () => {
-    if (!aiPrompt.trim()) return;
-    setAiLoading(true);
-    setAiSummary(null);
-
-    setTimeout(() => {
-      setAiSuggestions([
-        { title: `Initialize data validation adapters for ${aiPrompt.trim()}`, description: `Design validation schemas and context filters.`, priority: 'P1' },
-        { title: `Refactor responsive view constraints for ${aiPrompt.trim()}`, description: `Benchmark flex boxes on tablet and mobile viewports.`, priority: 'P2' },
-        { title: `Setup robust error exception capture models for ${aiPrompt.trim()}`, description: `Hook global catches and Sentry-grade monitors.`, priority: 'P0' }
-      ]);
-      setAiLoading(false);
-    }, 700);
-  };
-
-  const handleAISummarizeProgress = () => {
-    setAiLoading(true);
-    setAiSuggestions([]);
-
-    setTimeout(() => {
-      const completed = tasks.filter(t => t.status === 'DONE').length;
-      const total = tasks.length;
-      const progress = total ? Math.round((completed / total) * 100) : 0;
-      setAiSummary(`📊 DevCollab AI Project Status Report:\n\nThis stream is currently resolving **${progress}%** of all tracked milestones (${completed}/${total} completed tasks). The delivery index is stable. To accelerate velocity, consider breaking down pending high priority deliverables in the In Progress column.`);
-      setAiLoading(false);
-    }, 600);
-  };
-
-  const handleAddAISugToBoard = async (sug: typeof aiSuggestions[number]) => {
-    if (!pid) return;
-    try {
-      await createTask({
-        title: sug.title,
-        description: sug.description,
-        status: 'TODO',
-        priority: sug.priority,
-        projectId: pid
-      });
-      logActivity(`created task from AI suggestion: "${sug.title}"`);
-      alert(`Added "${sug.title}" to Kanban Todo lane!`);
-    } catch (err: any) {
-      alert(`Failed to add task: ${err.message}`);
-    }
+  // AI Copilot tab — navigate to real AI assistant (not a stub)
+  const navigate = useNavigate();
+  const handleOpenAIAssistant = () => {
+    navigate(`/w/${workspaceId}/p/${pid}/ai`);
   };
 
   // Stats
@@ -1188,89 +1145,30 @@ export default function TasksPage(): React.ReactElement {
           </div>
         )}
 
-        {/* ─── TAB 4: AI COPIOT ASSISTANT ──────────────────────────────────────── */}
+        {/* ─── TAB 4: AI ASSISTANT — redirect to real AI page ──────────────── */}
         {activeTab === 'ai' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-150 text-left">
-            <div className="glass-panel p-5 rounded-2xl shadow-sm space-y-4 h-fit">
-              <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400 flex items-center gap-1.5">
-                <Bot className="h-4 w-4 text-indigo-400" /> AI Copilot
-              </h3>
-              <p className="text-xs text-slate-500 leading-relaxed font-medium">Use structured pipelines to instantly draft milestone subtasks or synthesize delivery reports.</p>
-
-              <div className="space-y-3.5 pt-1.5 border-t border-white/[0.04]">
-                <button type="button" onClick={handleAISummarizeProgress} disabled={aiLoading} className="w-full text-left p-3 border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] rounded-xl transition text-[11px] font-bold text-slate-300 flex items-center justify-between">
-                  <span>📊 Synthesize Stream Status</span>
-                  <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
-                </button>
-                <div className="space-y-2 pt-1.5">
-                  <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Subtask Composer</label>
-                  <textarea
-                    placeholder="Describe a goal to generate structured subtasks..."
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/[0.04] rounded-xl p-3 resize-none outline-none focus:border-indigo-500/50 text-xs text-slate-200 transition"
-                    rows={3}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleGenerateAISuggestions}
-                    disabled={aiLoading || !aiPrompt.trim()}
-                    className="w-full bg-indigo-650 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl py-2 text-xs font-bold transition flex items-center justify-center gap-1"
-                  >
-                    {aiLoading ? 'Composing...' : '⚡ Generate Subtasks'}
-                  </button>
-                </div>
-              </div>
+          <div className="flex flex-col items-center justify-center py-20 gap-6 animate-in fade-in duration-150">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-violet-500/30">
+              <span className="text-3xl leading-none">✨</span>
             </div>
-
-            {/* Output screen */}
-            <div className="glass-panel p-5 rounded-2xl shadow-sm lg:col-span-2 space-y-4 min-h-[280px] flex flex-col">
-              <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Copilot Output</h3>
-
-              {aiLoading ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-500 py-12 gap-2 animate-pulse">
-                  <Bot className="h-8 w-8 text-indigo-500 animate-bounce" />
-                  <span className="text-[9px] font-extrabold uppercase tracking-widest font-mono">Synthesizing...</span>
-                </div>
-              ) : aiSummary ? (
-                <div className="p-4 border border-indigo-500/10 rounded-xl bg-indigo-500/5 leading-relaxed text-xs text-indigo-200 whitespace-pre-line font-medium shadow-inner animate-in fade-in duration-150">
-                  {aiSummary}
-                </div>
-              ) : aiSuggestions.length > 0 ? (
-                <div className="space-y-2 flex-1 overflow-y-auto pr-1 premium-scrollbar">
-                  {aiSuggestions.map((sug, i) => (
-                    <div key={i} className="p-3 border border-white/[0.04] rounded-xl bg-white/[0.005] flex justify-between items-center text-xs gap-4 hover:border-slate-800 transition animate-in fade-in duration-100">
-                      <div className="min-w-0 text-left">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border ${sug.priority === 'P0'
-                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                              : sug.priority === 'P1'
-                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                            }`}>
-                            {sug.priority}
-                          </span>
-                          <h4 className="font-bold text-white truncate">{sug.title}</h4>
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed font-medium">{sug.description}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleAddAISugToBoard(sug)}
-                        className="bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg px-2.5 py-1 font-bold text-[9px] flex-shrink-0"
-                      >
-                        + Add
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-500 py-16 text-center space-y-2">
-                  <Bot className="h-6 w-6 text-slate-700" />
-                  <p className="text-[11px] italic text-slate-600 font-medium">Select a quick command or write a prompt to coordinate AI deliverables.</p>
-                </div>
-              )}
+            <div className="text-center space-y-2">
+              <h2 className="text-lg font-bold text-white">Team Intelligence Center</h2>
+              <p className="text-sm text-slate-400 max-w-sm">
+                Code review, project summaries, standup generation, wiki planning, and task breakdown — all powered by Gemini.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={handleOpenAIAssistant}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl
+                         bg-gradient-to-r from-violet-600 to-indigo-600
+                         hover:from-violet-500 hover:to-indigo-500
+                         text-white font-semibold text-sm
+                         transition-all duration-200
+                         shadow-lg shadow-violet-500/20"
+            >
+              Open AI Assistant →
+            </button>
           </div>
         )}
 

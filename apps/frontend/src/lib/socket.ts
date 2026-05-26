@@ -62,7 +62,9 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
     auth: { token: "" },         // Populated by connectSocket()
     reconnection: true,
     reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
+    reconnectionDelay: 2000,     // Wait 2s before first retry
+    reconnectionDelayMax: 10000, // Max 10s between retries
+    timeout: 10000,
     transports: ["websocket"],
   }
 );

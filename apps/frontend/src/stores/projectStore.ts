@@ -99,9 +99,8 @@ export const useProjectStore = create<ProjectStore>((set) => ({
           [projectId]: [...(state.projectMembers[projectId] || []), response.data],
         },
       }));
-    } catch (error: any) {
-      set({ error: error.message });
-      console.error('Failed to assign project member', error);
+    } catch (error) {
+      // HTTP interceptor handles toast
       throw error;
     }
   },
@@ -115,9 +114,8 @@ export const useProjectStore = create<ProjectStore>((set) => ({
           [projectId]: (state.projectMembers[projectId] || []).filter((m) => m.userId !== userId),
         },
       }));
-    } catch (error: any) {
-      set({ error: error.message });
-      console.error('Failed to remove project member', error);
+    } catch (error) {
+      // HTTP interceptor handles toast
       throw error;
     }
   },

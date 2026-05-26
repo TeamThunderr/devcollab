@@ -3,7 +3,10 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import TaskCard from './TaskCard';
 import { Task } from '../../types';
-import { Plus, MoreHorizontal, MoveLeft, MoveRight, Edit2, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, MoveLeft, MoveRight, Edit2, Trash2, Kanban } from 'lucide-react';
+import ConfirmDialog from '../common/ConfirmDialog';
+import { SkeletonTaskCard } from '../common/Skeleton';
+import EmptyState from '../common/EmptyState';
 
 interface KanbanColumnProps {
   title: string;
@@ -11,6 +14,7 @@ interface KanbanColumnProps {
   tasks: Task[];
   config?: any;
   highlightedTaskIds?: Set<string>;
+  isLoading?: boolean;
   onTaskClick?: (task: Task) => void;
   onAddTask?: (status: string) => void;
   onRenameColumn?: (status: string, newTitle: string) => void;
@@ -31,6 +35,7 @@ export default function KanbanColumn({
   tasks,
   config,
   highlightedTaskIds,
+  isLoading = false,
   onTaskClick,
   onAddTask,
   onRenameColumn,
@@ -45,6 +50,7 @@ export default function KanbanColumn({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,6 +117,7 @@ export default function KanbanColumn({
               onClick={() => onAddTask(status)}
               className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.02] transition"
               title="Create task in this column"
+              aria-label="Add task to this column"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -122,6 +129,7 @@ export default function KanbanColumn({
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
               className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.02] transition"
+              aria-label="Column options"
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
@@ -168,12 +176,10 @@ export default function KanbanColumn({
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(`Delete the column "${title}"?`)) {
-                        onDeleteColumn(status);
-                      }
+                      setConfirmDeleteOpen(true);
                       setMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-450 hover:bg-rose-950/20 font-bold border-t border-white/[0.04] mt-1 pt-1.5"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-950/20 font-bold border-t border-white/[0.04] mt-1 pt-1.5"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-rose-500" /> Delete Column
                   </button>
@@ -184,27 +190,64 @@ export default function KanbanColumn({
         </div>
       </div>
 
-      {/* Task Cards List - Grows naturally with page-level scrolling */}
+      {/* Task Cards List */}
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
         <div className="space-y-2.5 mt-1">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              config={config}
-              onClick={onTaskClick}
-              isHighlighted={highlightedTaskIds?.has(task.id)}
-            />
-          ))}
-          {tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.04] px-4 py-8 text-center text-xs text-slate-500 bg-white/[0.005] min-h-[120px] transition-all relative overflow-hidden group">
-              <span className="text-xl mb-1 grayscale opacity-50 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-200">📥</span>
-              <p className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">Empty Column</p>
-              <p className="text-[9px] text-slate-600 mt-0.5 max-w-[140px] leading-relaxed">Drag a task or click + to assign.</p>
-            </div>
-          ) : null}
+          {/* Skeleton loading state */}
+          {isLoading ? (
+            <>
+              <SkeletonTaskCard />
+              <SkeletonTaskCard />
+              <SkeletonTaskCard />
+            </>
+          ) : (
+            <>
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  config={config}
+                  onClick={onTaskClick}
+                  isHighlighted={highlightedTaskIds?.has(task.id)}
+                />
+              ))}
+              {tasks.length === 0 && (
+                <EmptyState
+                  icon={Kanban}
+                  title="No tasks yet"
+                  subtitle="Drag a task here or click + to create one"
+                  className="py-8"
+                />
+              )}
+            </>
+          )}
         </div>
       </SortableContext>
+
+      {/* Add task at bottom — only when tasks exist */}
+      {!isLoading && tasks.length > 0 && onAddTask && (
+        <button
+          type="button"
+          onClick={() => onAddTask(status)}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-semibold text-slate-500 hover:text-slate-300 hover:bg-white/[0.02] border border-dashed border-white/[0.04] hover:border-white/[0.08] transition-all"
+        >
+          <Plus className="w-3 h-3" />
+          Add task
+        </button>
+      )}
+
+      {/* Confirm delete column dialog */}
+      <ConfirmDialog
+        isOpen={confirmDeleteOpen}
+        title={`Delete "${title}"?`}
+        message="All tasks in this column will remain on the board but lose their column assignment. This action cannot be undone."
+        confirmLabel="Delete Column"
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          onDeleteColumn?.(status);
+        }}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
     </section>
   );
 }

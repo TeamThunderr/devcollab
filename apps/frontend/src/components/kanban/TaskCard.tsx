@@ -2,7 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Task } from '../../types';
-import { MessageSquare, Paperclip, Calendar, CheckSquare, User } from 'lucide-react';
+import { MessageSquare, Paperclip, Calendar, CheckSquare, User, AlertTriangle } from 'lucide-react';
 import useRealtimeStore from '../../stores/realtimeStore';
 import useAuthStore from '../../stores/authStore';
 
@@ -130,7 +130,8 @@ export default function TaskCard({ task, config, onClick, isHighlighted }: TaskC
             </h3>
             {!assignee && (
               <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase text-amber-500 tracking-wider">
-                ⚠️ Unassigned
+                <AlertTriangle className="w-2.5 h-2.5" />
+                Unassigned
               </span>
             )}
           </div>
