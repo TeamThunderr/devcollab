@@ -16,8 +16,7 @@ import CalendarView from './CalendarView';
 import {
   Search, Plus, Clock, Bot, Calendar,
   TrendingUp, CheckCircle2, Layers,
-  Code, Copy, Users, Trash2, X, CheckSquare, FileText,
-  Target, Zap, Eye, BarChart2, Settings, AlertTriangle
+  Code, Copy, Users, Trash2, X, CheckSquare, FileText
 } from 'lucide-react';
 import { toast } from '../../stores/toastStore';
 

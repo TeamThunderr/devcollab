@@ -103,7 +103,6 @@ export class TaskService {
         data.assigneeId ?? null,
         data.projectId,
         userId,
-        data.assigneeId ?? null,
       ]
     );
     const createdTask = await this.getTaskById(result.rows[0].id, userId);

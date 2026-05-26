@@ -263,11 +263,6 @@ export default function MainSidebar(): React.ReactElement {
           to: `/w/${workspaceId}/projects`,
           icon: <Icon d={ICONS.projects} />,
         },
-        {
-          label: "Snippets",
-          to: `/w/${workspaceId}/snippets`,
-          icon: <Icon d={ICONS.snippets} />,
-        },
         ...(isOwnerOrAdmin
           ? [
               {
