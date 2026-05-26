@@ -292,7 +292,9 @@ export const verifyProjectAccess = async (request: FastifyRequest, reply: Fastif
 
     // 4. Enforce write limitations for VIEWER role
     const method = request.method;
-    const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+    const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
+                    !routerPath.includes('/summarise-project') &&
+                    !routerPath.includes('/explain-snippet');
     if (isWrite) {
       const projRole = request.projectMembership!.role;
       if (projRole === Role.VIEWER) {
