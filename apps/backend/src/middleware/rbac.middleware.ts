@@ -240,17 +240,33 @@ export const verifyProjectAccess = async (request: FastifyRequest, reply: Fastif
       if (reply.sent) return; // Hook has already responded
     }
 
-    // 3. Owner / Admin bypass project filtering
-    const wsRole = request.membership!.role;
-    if (wsRole === Role.OWNER || wsRole === Role.ADMIN) {
+    // 3. Enforce strictly team-scoped project visibility rules
+    const projectRes = await query<{ visibility: string }>(
+      'SELECT visibility FROM projects WHERE id = $1',
+      [projectId]
+    );
+    const project = projectRes.rows[0];
+    if (!project) {
+      throw new AppError(404, 'Project not found');
+    }
+
+    const wsRole = request.membership!.role; // OWNER, ADMIN, MEMBER, VIEWER
+    const visibility = project.visibility || 'public';
+
+    if (wsRole === Role.VIEWER) {
+      // Viewers can access ONLY public projects
+      if (visibility !== 'public') {
+        throw new AppError(403, 'Forbidden: Private projects are not accessible to viewers');
+      }
+
       request.projectMembership = {
-        id: 'workspace-admin-bypass',
+        id: 'workspace-viewer-bypass',
         projectId,
         userId: request.user!.userId,
-        role: wsRole === Role.OWNER ? Role.OWNER : Role.ADMIN,
+        role: Role.VIEWER,
       };
     } else {
-      // 4. Member / Viewer must be explicitly assigned to this project
+      // Owners, Admins, and Members strictly require explicit membership in project_members
       const projMemberResult = await query<{
         id: string;
         project_id: string;
@@ -263,7 +279,7 @@ export const verifyProjectAccess = async (request: FastifyRequest, reply: Fastif
       const projMembership = projMemberResult.rows[0];
 
       if (!projMembership) {
-        throw new AppError(403, 'Forbidden: You are not a member of this project');
+        throw new AppError(403, 'Forbidden: You are not assigned to this project');
       }
 
       request.projectMembership = {
@@ -274,7 +290,7 @@ export const verifyProjectAccess = async (request: FastifyRequest, reply: Fastif
       };
     }
 
-    // 5. Enforce write limitations for VIEWER role
+    // 4. Enforce write limitations for VIEWER role
     const method = request.method;
     const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
     if (isWrite) {

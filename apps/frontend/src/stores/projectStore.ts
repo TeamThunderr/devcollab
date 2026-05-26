@@ -20,6 +20,7 @@ interface CreateProjectPayload {
   name: string;
   description?: string;
   workspaceId: string;
+  visibility?: 'public' | 'private';
 }
 
 interface ProjectStore {
@@ -36,6 +37,8 @@ interface ProjectStore {
   fetchProjectMembers: (projectId: string) => Promise<void>;
   assignProjectMember: (projectId: string, userId: string, role?: string) => Promise<void>;
   removeProjectMember: (projectId: string, userId: string) => Promise<void>;
+  addProjectMemberState: (projectId: string, member: ProjectMember) => void;
+  removeProjectMemberState: (projectId: string, userId: string) => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
@@ -119,5 +122,32 @@ export const useProjectStore = create<ProjectStore>((set) => ({
       throw error;
     }
   },
+
+  addProjectMemberState: (projectId, member) =>
+    set((state) => {
+      const current = state.projectMembers[projectId] || [];
+      if (current.some((m) => m.userId === member.userId)) {
+        return {
+          projectMembers: {
+            ...state.projectMembers,
+            [projectId]: current.map((m) => (m.userId === member.userId ? member : m)),
+          },
+        };
+      }
+      return {
+        projectMembers: {
+          ...state.projectMembers,
+          [projectId]: [...current, member],
+        },
+      };
+    }),
+
+  removeProjectMemberState: (projectId, userId) =>
+    set((state) => ({
+      projectMembers: {
+        ...state.projectMembers,
+        [projectId]: (state.projectMembers[projectId] || []).filter((m) => m.userId !== userId),
+      },
+    })),
 
 }));

@@ -19,7 +19,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, FolderOpen, Users, CreditCard, Kanban, BookOpen,
-  Code2, Zap, Activity, Sparkles, MessageSquare, ArrowLeft,
+  Code2, Activity, Sparkles, MessageSquare, ArrowLeft,
   ChevronLeft, ChevronRight, Settings,
 } from 'lucide-react';
 import useWorkspaceStore from '../../stores/workspaceStore';
@@ -247,6 +247,28 @@ export default function MainSidebar(): React.ReactElement {
 
   const sidebarWidth = collapsed ? 64 : 208;
 
+  const projectMembers = useProjectStore((s) => s.projectMembers);
+  const activeProjMembers = projectId ? (projectMembers[projectId] || []) : [];
+
+  const getMemberRole = (userId: string): string => {
+    const wsMember = useWorkspaceStore.getState().members.find(m => m.userId === userId);
+    if (wsMember?.role === 'OWNER') return 'Owner';
+    if (wsMember?.role === 'ADMIN') return 'Admin';
+    if (activeProject?.createdBy?.id === userId) return 'Owner';
+
+    const pm = activeProjMembers.find(m => m.userId === userId);
+    if (pm) {
+      if (pm.role === 'ADMIN') return 'Admin';
+      if (pm.role === 'VIEWER') return 'Viewer';
+      return 'Developer';
+    }
+
+    if (wsMember?.role === 'VIEWER') return 'Viewer';
+    return 'Developer';
+  };
+
+  const isViewer = user ? getMemberRole(user.id) === 'Viewer' : false;
+
   // ── Condition B: Project nav ──────────────────────────────────────────────
 
   if (workspaceId && projectId) {
@@ -257,7 +279,12 @@ export default function MainSidebar(): React.ReactElement {
       { label: 'Editor',      to: `/w/${workspaceId}/p/${projectId}/editor`,        icon: <Code2 className="w-4 h-4" />     },
       { label: 'AI Assistant',to: `/w/${workspaceId}/p/${projectId}/ai`,            icon: <Sparkles className="w-4 h-4" />, isAI: true },
       { label: 'Members',     to: `/w/${workspaceId}/p/${projectId}/members`,       icon: <Users className="w-4 h-4" />     },
-    ];
+    ].filter(item => {
+      if (isViewer) {
+        return item.label === "Board";
+      }
+      return true;
+    });
 
     return (
       <motion.aside
@@ -320,6 +347,7 @@ export default function MainSidebar(): React.ReactElement {
           ))}
 
           {/* Chat button */}
+          {!isViewer && (
           <div className="relative group/tooltip">
             <button
               onClick={() => setChatOpen(true)}
@@ -353,6 +381,7 @@ export default function MainSidebar(): React.ReactElement {
               </div>
             )}
           </div>
+          )}
         </nav>
 
         {/* Active Now */}

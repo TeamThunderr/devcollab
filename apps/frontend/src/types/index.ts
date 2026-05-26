@@ -31,6 +31,7 @@ export interface Project {
   id: string;
   name: string;
   description?: string;
+  visibility?: 'public' | 'private';
   createdAt: string;
   updatedAt: string;
   createdBy: User;

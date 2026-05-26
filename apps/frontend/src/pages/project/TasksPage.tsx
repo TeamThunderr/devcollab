@@ -108,6 +108,14 @@ export default function TasksPage(): React.ReactElement {
     }
   }, [pid, activeTab, fetchSnippetsByProject]);
 
+  useEffect(() => {
+    if (user && getMemberRole(user.id) === 'Viewer') {
+      if (activeTab !== 'dashboard' && activeTab !== 'board') {
+        setActiveTab('dashboard');
+      }
+    }
+  }, [activeTab, user, activeProjMembers]);
+
 
 
 
@@ -579,7 +587,12 @@ export default function TasksPage(): React.ReactElement {
               ...(canManageAuditFeed ? [{ id: 'activity', label: 'Audits', icon: <Clock className="h-3.5 w-3.5" /> }] : []),
               ...(canAccessAI ? [{ id: 'ai', label: 'AI Copilot', icon: <Bot className="h-3.5 w-3.5" /> }] : []),
               { id: 'snippets', label: 'Snippets', icon: <Code className="h-3.5 w-3.5" /> }
-            ].map(tab => (
+            ].filter(tab => {
+              if (getMemberRole(user?.id || '') === 'Viewer') {
+                return tab.id === 'dashboard' || tab.id === 'board';
+              }
+              return true;
+            }).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -793,18 +806,20 @@ export default function TasksPage(): React.ReactElement {
                   <span className="text-[10px] font-mono font-extrabold text-slate-500 uppercase tracking-widest">👥 Project Members</span>
                 </div>
                 <div className="space-y-2.5">
-                  {members.length === 0 ? (
+                  {activeProjMembers.length === 0 ? (
                     <p className="text-[11px] text-slate-500 italic py-2 text-center">No members available.</p>
                   ) : (
-                    members.slice(0, 3).map(m => (
-                      <div key={m.userId} className="flex items-center justify-between text-xs py-0.5">
+                    activeProjMembers.map(m => (
+                      <div key={m.userId} className="flex items-center justify-between text-xs py-0.5 animate-in fade-in duration-150">
                         <div className="flex items-center gap-2">
                           <div className="w-5.5 h-5.5 rounded-full bg-indigo-650 flex items-center justify-center font-bold text-[8px] text-white">
                             {(m.user?.name || m.user?.email || '?').charAt(0).toUpperCase()}
                           </div>
                           <span className="font-bold text-slate-300 truncate max-w-[120px]">{m.user?.name || m.user?.email}</span>
                         </div>
-                        <span className="text-[8px] uppercase font-mono px-1.5 py-0.5 border border-white/[0.04] rounded text-slate-500">{m.role}</span>
+                        <span className="text-[8px] uppercase font-mono px-1.5 py-0.5 border border-white/[0.04] rounded text-slate-500">
+                          {getMemberRole(m.userId) === 'Owner' ? 'Owner' : m.role === 'ADMIN' ? 'Lead' : m.role === 'VIEWER' ? 'Viewer' : 'Member'}
+                        </span>
                       </div>
                     ))
                   )}
@@ -984,6 +999,7 @@ export default function TasksPage(): React.ReactElement {
                         highlightedTaskIds={highlightedTaskIds}
                         onTaskClick={setSelectedTask}
                         onAddTask={canCreateTask ? (colId) => void handleInstantTaskCreate(colId as TaskStatus) : undefined}
+                        isDraggable={canMoveTask}
                       />
                     );
                   })}
@@ -1014,7 +1030,7 @@ export default function TasksPage(): React.ReactElement {
                   logActivity(`updated task: "${res.title}"`);
                   return res;
                 }}
-                onDayClick={(date) => void handleInstantTaskCreate('TODO', date)}
+                onDayClick={canCreateTask ? (date) => void handleInstantTaskCreate('TODO', date) : undefined}
               />
             )}
           </div>

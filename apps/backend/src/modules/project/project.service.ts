@@ -3,6 +3,7 @@ import { CreateProjectInput, UpdateProjectInput, AssignMemberInput } from './pro
 import { Role } from '../../middleware/rbac.middleware';
 import { requireProjectAccess } from '../../middleware/projectAccess';
 import { AppError } from '../../utils/errors';
+import { emitToProject, kickUserFromProject } from '../../socket/socket';
 
 function mapProject(project: any) {
   return {
@@ -10,6 +11,7 @@ function mapProject(project: any) {
     name: project.name,
     description: project.description ?? undefined,
     workspaceId: project.workspace_id,
+    visibility: project.visibility ?? 'public',
     createdAt: project.created_at?.toISOString?.() ?? project.created_at,
     updatedAt: project.updated_at?.toISOString?.() ?? project.updated_at,
     createdBy: project.created_by ? {
@@ -28,19 +30,36 @@ export class ProjectService {
   async createProject(data: CreateProjectInput, userId: string) {
     const project = await transaction(async (client) => {
       const projectResult = await client.query(
-        `INSERT INTO projects (name, description, workspace_id, created_by)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, name, description, workspace_id, created_by, created_at, updated_at`,
-        [data.name, data.description ?? null, data.workspaceId, userId]
+        `INSERT INTO projects (name, description, workspace_id, created_by, visibility)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, name, description, workspace_id, created_by, visibility, created_at, updated_at`,
+        [data.name, data.description ?? null, data.workspaceId, userId, data.visibility ?? 'public']
       );
       const created = projectResult.rows[0];
 
       // Auto-assign creator as Project Admin
       await client.query(
         `INSERT INTO project_members (project_id, user_id, role)
-         VALUES ($1, $2, 'admin')`,
+         VALUES ($1, $2, 'admin')
+         ON CONFLICT (project_id, user_id) DO NOTHING`,
         [created.id, userId]
       );
+
+      // Auto-assign all Workspace Owners and Workspace Admins as project admins so they don't lose access
+      const workspaceAdmins = await client.query<{ user_id: string }>(
+        `SELECT user_id FROM workspace_members 
+         WHERE workspace_id = $1 AND role IN ('owner', 'admin')`,
+        [data.workspaceId]
+      );
+
+      for (const adminRow of workspaceAdmins.rows) {
+        await client.query(
+          `INSERT INTO project_members (project_id, user_id, role)
+           VALUES ($1, $2, 'admin')
+           ON CONFLICT (project_id, user_id) DO NOTHING`,
+          [created.id, adminRow.user_id]
+        );
+      }
 
       return created;
     });
@@ -59,44 +78,29 @@ export class ProjectService {
       throw new AppError(403, 'Forbidden: You are not a member of this workspace');
     }
 
-    const isOwnerOrAdmin = role === 'owner' || role === 'admin';
+    // Determine strict visibility scoping by role:
+    // - Viewers see ONLY public projects
+    // - Workspace Owners, Admins, and Members strictly see ONLY projects they are explicitly assigned to
+    const result = await query(
+      `SELECT p.*,
+              u.email AS creator_email,
+              u.name AS creator_name,
+              COUNT(DISTINCT t.id)::int AS task_count,
+              COUNT(DISTINCT s.id)::int AS snippet_count
+       FROM projects p
+       LEFT JOIN users u ON u.id = p.created_by
+       LEFT JOIN tasks t ON t.project_id = p.id
+       LEFT JOIN snippets s ON s.project_id = p.id
+       LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $2
+       WHERE p.workspace_id = $1 AND (
+         (LOWER($3) = 'viewer' AND p.visibility = 'public') OR
+         (LOWER($3) IN ('owner', 'admin', 'member') AND pm.user_id IS NOT NULL)
+       )
+       GROUP BY p.id, u.email, u.name
+       ORDER BY p.created_at DESC`,
+      [workspaceId, userId, role]
+    );
 
-    let result;
-    if (userRole === Role.OWNER || userRole === Role.ADMIN || !userId) {
-      result = await query(
-        `SELECT p.*,
-                u.email AS creator_email,
-                u.name AS creator_name,
-                COUNT(DISTINCT t.id)::int AS task_count,
-                COUNT(DISTINCT s.id)::int AS snippet_count
-         FROM projects p
-         LEFT JOIN users u ON u.id = p.created_by
-         LEFT JOIN tasks t ON t.project_id = p.id
-         LEFT JOIN snippets s ON s.project_id = p.id
-         ${isOwnerOrAdmin ? '' : 'INNER JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $2'}
-       WHERE p.workspace_id = $1
-         GROUP BY p.id, u.email, u.name
-         ORDER BY p.created_at DESC`,
-        isOwnerOrAdmin ? [workspaceId] : [workspaceId, userId]
-      );
-    } else {
-      result = await query(
-        `SELECT p.*,
-                u.email AS creator_email,
-                u.name AS creator_name,
-                COUNT(DISTINCT t.id)::int AS task_count,
-                COUNT(DISTINCT s.id)::int AS snippet_count
-         FROM projects p
-         JOIN project_members pm ON pm.project_id = p.id
-         LEFT JOIN users u ON u.id = p.created_by
-         LEFT JOIN tasks t ON t.project_id = p.id
-         LEFT JOIN snippets s ON s.project_id = p.id
-         WHERE p.workspace_id = $1 AND pm.user_id = $2
-         GROUP BY p.id, u.email, u.name
-         ORDER BY p.created_at DESC`,
-        [workspaceId, userId]
-      );
-    }
     return result.rows.map(mapProject);
   }
 
@@ -127,10 +131,11 @@ export class ProjectService {
       `UPDATE projects
        SET name = COALESCE($2, name),
            description = COALESCE($3, description),
+           visibility = COALESCE($4, visibility),
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, name, description, workspace_id, created_by, created_at, updated_at`,
-      [projectId, data.name ?? null, data.description ?? null]
+       RETURNING id, name, description, workspace_id, created_by, visibility, created_at, updated_at`,
+      [projectId, data.name ?? null, data.description ?? null, data.visibility ?? null]
     );
     if (!result.rows[0]) {
       throw new Error('Project not found');
@@ -205,7 +210,7 @@ export class ProjectService {
 
     const userRow = userResult.rows[0];
 
-    return {
+    const member = {
       id: result.rows[0].id,
       projectId: result.rows[0].project_id,
       userId: result.rows[0].user_id,
@@ -218,6 +223,10 @@ export class ProjectService {
         bio: userRow.bio,
       },
     };
+
+    emitToProject(projectId, 'project:member:assigned', member);
+
+    return member;
   }
 
   async removeMember(projectId: string, targetUserId: string, removerId: string) {
@@ -242,6 +251,9 @@ export class ProjectService {
     if (!result.rowCount) {
       throw new AppError(404, 'Project member not found');
     }
+
+    emitToProject(projectId, 'project:member:removed', { userId: targetUserId });
+    kickUserFromProject(targetUserId, projectId);
   }
 
 }

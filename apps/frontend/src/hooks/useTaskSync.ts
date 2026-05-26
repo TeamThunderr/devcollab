@@ -24,6 +24,10 @@ import { useEffect } from "react";
 import { socket } from "../lib/socket";
 import useTaskStore, { Task, Comment } from "../stores/taskStore";
 import useRealtimeStore, { OnlineUser } from "../stores/realtimeStore";
+import { useProjectStore, ProjectMember } from "../stores/projectStore";
+import { useNavigate, useParams } from "react-router-dom";
+import useAuthStore from "../stores/authStore";
+import { toast } from "../stores/toastStore";
 
 // ─── Payload shapes from the server ──────────────────────────────────────────
 
@@ -55,6 +59,10 @@ interface TaskStoppedViewingPayload {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useTaskSync(projectId: string): void {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const navigate = useNavigate();
+  const currentUser = useAuthStore((s) => s.user);
+
   const addTask = useTaskStore((s) => s.addTaskState);
   const updateTask = useTaskStore((s) => s.updateTaskState);
   const moveTask = useTaskStore((s) => s.moveTaskState);
@@ -63,6 +71,9 @@ export function useTaskSync(projectId: string): void {
 
   const addTaskViewer = useRealtimeStore((s) => s.addTaskViewer);
   const removeTaskViewer = useRealtimeStore((s) => s.removeTaskViewer);
+
+  const addProjectMemberState = useProjectStore((s) => s.addProjectMemberState);
+  const removeProjectMemberState = useProjectStore((s) => s.removeProjectMemberState);
 
   useEffect(() => {
     if (!projectId) return;
@@ -114,6 +125,28 @@ export function useTaskSync(projectId: string): void {
       removeTaskViewer(taskId, userId);
     };
 
+    const onProjectMemberAssigned = (data: unknown) => {
+      addProjectMemberState(projectId, data as ProjectMember);
+    };
+
+    const onProjectMemberRemoved = (data: unknown) => {
+      const { userId } = data as { userId: string };
+      removeProjectMemberState(projectId, userId);
+
+      if (userId === currentUser?.id) {
+        toast.error("Access Revoked", "You have been removed from this project workspace.");
+        navigate(`/w/${workspaceId}/projects`);
+      }
+    };
+
+    const onAccessRevoked = (data: unknown) => {
+      const payload = data as { projectId: string };
+      if (payload.projectId === projectId) {
+        toast.error("Access Revoked", "You have been removed from this project workspace.");
+        navigate(`/w/${workspaceId}/projects`);
+      }
+    };
+
     // ── Register listeners ────────────────────────────────────────────────
 
     socket.on("task:created", onTaskCreated);
@@ -123,6 +156,9 @@ export function useTaskSync(projectId: string): void {
     socket.on("comment:new", onCommentNew);
     socket.on("task:viewing", onTaskViewing);
     socket.on("task:stopped-viewing", onTaskStoppedViewing);
+    socket.on("project:member:assigned", onProjectMemberAssigned);
+    socket.on("project:member:removed", onProjectMemberRemoved);
+    socket.on("project:access:revoked", onAccessRevoked);
 
     // ── Cleanup ───────────────────────────────────────────────────────────
 
@@ -137,6 +173,9 @@ export function useTaskSync(projectId: string): void {
       socket.off("comment:new", onCommentNew);
       socket.off("task:viewing", onTaskViewing);
       socket.off("task:stopped-viewing", onTaskStoppedViewing);
+      socket.off("project:member:assigned", onProjectMemberAssigned);
+      socket.off("project:member:removed", onProjectMemberRemoved);
+      socket.off("project:access:revoked", onAccessRevoked);
     };
   }, [
     projectId,
