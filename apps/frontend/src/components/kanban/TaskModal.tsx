@@ -3,6 +3,7 @@ import { Comment, Task, TaskPriority, TaskStatus, User } from '../../types';
 import { DatePicker } from '../ui/DatePicker';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
+import { toast } from '../../stores/toastStore';
 
 interface TaskModalProps {
   task: Task;
@@ -132,6 +133,7 @@ export default function TaskModal({
   // Clicked mention user popover
   const [selectedMentionedUser, setSelectedMentionedUser] = useState<User | null>(null);
   const [mentionedUserRole, setMentionedUserRole] = useState<string>('');
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
     if (prevTaskIdRef.current === task.id) {
@@ -301,15 +303,19 @@ export default function TaskModal({
   ]);
 
   function handleDiscardDraft() {
-    if (window.confirm('Discard this draft? All progress will be lost.')) {
-      sessionStorage.removeItem(`devcollab_draft_task_${task.projectId}_${task.id}`);
-      onClose();
-    }
+    setConfirmConfig({
+      title: 'Discard Draft',
+      message: 'Are you sure you want to discard this draft? All progress will be lost.',
+      onConfirm: () => {
+        sessionStorage.removeItem(`devcollab_draft_task_${task.projectId}_${task.id}`);
+        onClose();
+      }
+    });
   }
 
   async function handleSave() {
     if (task.id.startsWith('draft-') && !draft.title.trim()) {
-      alert('Task title is required.');
+      toast.warning('Task title is required.');
       return;
     }
     setIsSaving(true);
@@ -329,21 +335,26 @@ export default function TaskModal({
       prevTaskIdRef.current = updated.id;
       setDraft(updated);
     } catch (err: any) {
-      alert(`Failed to save task: ${err.message || err}`);
+      toast.error('Failed to save task', err.message || err);
     } finally {
       setIsSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!window.confirm('Delete this task?')) return;
-    setIsDeleting(true);
-    try {
-      await onDelete(task.id);
-      onClose();
-    } finally {
-      setIsDeleting(false);
-    }
+    setConfirmConfig({
+      title: 'Delete Task',
+      message: 'Are you sure you want to delete this task? This action is permanent and cannot be undone.',
+      onConfirm: async () => {
+        setIsDeleting(true);
+        try {
+          await onDelete(task.id);
+          onClose();
+        } finally {
+          setIsDeleting(false);
+        }
+      }
+    });
   }
 
   async function handleAddComment() {
@@ -409,7 +420,7 @@ export default function TaskModal({
   // Real Attachments handler using FileReader & Base64 encoding
   function uploadFile(file: File) {
     if (file.size > 1.5 * 1024 * 1024) {
-      alert("To prevent exceeding browser localStorage limits, attachments must be under 1.5 MB.");
+      toast.warning('File size limit exceeded', 'To prevent exceeding browser localStorage limits, attachments must be under 1.5 MB.');
       return;
     }
 
@@ -443,7 +454,7 @@ export default function TaskModal({
     };
 
     reader.onerror = () => {
-      alert("Failed to read the file content.");
+      toast.error('File read error', 'Failed to read the file content.');
       setUploadProgress(null);
       setUploadingName('');
     };
@@ -744,7 +755,7 @@ export default function TaskModal({
                           ) : (
                             <a
                               href="#"
-                              onClick={(e) => { e.preventDefault(); alert(`Simulated download for ${file.name}`); }}
+                              onClick={(e) => { e.preventDefault(); toast.info('Simulated download', `Simulated download for ${file.name}`); }}
                               className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 flex items-center justify-center"
                               title="Download"
                             >
@@ -948,9 +959,11 @@ export default function TaskModal({
                       const val = e.target.value;
                       setAssigneeId(val);
                       saveLocalMetadata({ assigneeId: val });
-                      void onSave({ assigneeId: val || null }).catch((err) => {
-                        alert(`Failed to update task assignee: ${err.message}`);
-                      });
+                      if (!task.id.startsWith('draft-')) {
+                        void onSave({ assigneeId: val || null }).catch((err) => {
+                          toast.error('Failed to update assignee', err.message);
+                        });
+                      }
                     }}
                     className="w-full mt-1.5 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 outline-none font-semibold transition focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
@@ -1112,6 +1125,55 @@ export default function TaskModal({
                   className="px-3.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition"
                 >
                   Close Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Floating confirmation overlay */}
+        {confirmConfig && (
+          <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="w-96 bg-[#17191d] border border-white/[0.08] rounded-2xl p-6 text-white shadow-2xl text-left animate-in zoom-in-95 duration-150 relative">
+              <button 
+                type="button" 
+                onClick={() => setConfirmConfig(null)} 
+                className="absolute top-4 right-4 text-slate-500 hover:text-white transition text-xs font-sans font-bold"
+              >
+                ✕
+              </button>
+              
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 text-lg flex-shrink-0">
+                  ⚠️
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-extrabold text-white leading-none mt-1">
+                    {confirmConfig.title}
+                  </h4>
+                  <p className="text-xs text-slate-400 leading-relaxed mt-2.5 font-medium">
+                    {confirmConfig.message}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-white/[0.04] flex justify-end gap-2.5">
+                <button 
+                  type="button" 
+                  onClick={() => setConfirmConfig(null)}
+                  className="px-4 py-2 bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] text-slate-300 hover:text-white rounded-xl text-xs font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    confirmConfig.onConfirm();
+                    setConfirmConfig(null);
+                  }}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-rose-500/15"
+                >
+                  Confirm
                 </button>
               </div>
             </div>

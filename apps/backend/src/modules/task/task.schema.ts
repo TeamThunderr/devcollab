@@ -5,17 +5,17 @@ export const taskPriorityEnum = z.enum(['P0', 'P1', 'P2']);
 
 export const createTaskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   projectId: z.string().min(1, 'Project ID is required'),
   status: taskStatusEnum.default('TODO'),
   priority: taskPriorityEnum.default('P1'),
-  dueDate: z.string().datetime().optional(),
+  dueDate: z.string().datetime().nullable().optional(),
   assigneeId: z.string().uuid().nullable().optional(),
 });
 
 export const updateTaskSchema = z.object({
   title: z.string().min(1).optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   status: taskStatusEnum.optional(),
   priority: taskPriorityEnum.optional(),
   dueDate: z.string().datetime().nullable().optional(),

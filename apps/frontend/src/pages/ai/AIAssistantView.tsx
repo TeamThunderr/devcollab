@@ -9,7 +9,6 @@ import {
   Code2,
   BarChart2,
   Sun,
-  Bot,
   Sparkles,
 } from "lucide-react";
 import CodeReviewPanel from "../../components/ai/CodeReviewPanel";

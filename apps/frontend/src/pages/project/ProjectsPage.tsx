@@ -4,6 +4,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
 import { useBillingStore } from '../../stores/billingStore';
+import { toast } from '../../stores/toastStore';
 import {
   Search, Plus, Star, Users, Trash2, Crown,
   Zap, Compass, X
@@ -34,6 +35,7 @@ export default function ProjectsPage(): React.ReactElement {
   const [isCompiling, setIsCompiling] = useState(false);
   const [compilingProgress, setCompilingProgress] = useState(0);
   const [compilingStatusText, setCompilingStatusText] = useState('');
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   // Fetch initial data
   useEffect(() => {
@@ -167,23 +169,29 @@ export default function ProjectsPage(): React.ReactElement {
           navigate(`/w/${workspaceId}/p/${created.id}`);
         } catch (err: any) {
           setIsCompiling(false);
-          alert(`Failed to create project: ${err.message}`);
+          toast.error(`Failed to create project: ${err.message}`);
         }
       }
     }, 300);
   };
 
-  const handleDeleteProject = async (projectId: string, name: string) => {
-    if (!window.confirm(`Are you absolutely sure you want to delete "${name}"? This will permanently wipe all tasks, comments, and project data.`)) {
-      return;
-    }
-    try {
-      await deleteProject(projectId);
-      localStorage.removeItem(`devcollab_project_workspace_${projectId}`);
-    } catch (err: any) {
-      alert(`Error deleting project: ${err.message}`);
-    }
-  };  return (
+  const handleDeleteProject = (projectId: string, name: string) => {
+    setConfirmConfig({
+      title: 'Delete Project',
+      message: `Are you absolutely sure you want to delete "${name}"? This will permanently wipe all tasks, comments, and project data.`,
+      onConfirm: async () => {
+        try {
+          await deleteProject(projectId);
+          localStorage.removeItem(`devcollab_project_workspace_${projectId}`);
+          toast.success('Project deleted successfully');
+        } catch (err: any) {
+          toast.error(`Error deleting project: ${err.message}`);
+        }
+      }
+    });
+  };
+
+  return (
     <div className="min-h-screen bg-[#121316] text-slate-200 font-sans antialiased premium-scrollbar selection:bg-indigo-500/30 selection:text-white">
       {/* Visual Depth Injectors */}
       <style>{`
@@ -566,6 +574,55 @@ export default function ProjectsPage(): React.ReactElement {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating confirmation overlay */}
+      {confirmConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-96 bg-[#17191d] border border-white/[0.08] rounded-2xl p-6 text-white shadow-2xl text-left animate-in zoom-in-95 duration-150 relative">
+            <button 
+              type="button" 
+              onClick={() => setConfirmConfig(null)} 
+              className="absolute top-4 right-4 text-slate-500 hover:text-white transition text-xs font-sans font-bold"
+            >
+              ✕
+            </button>
+            
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 text-lg flex-shrink-0">
+                ⚠️
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-extrabold text-white leading-none mt-1">
+                  {confirmConfig.title}
+                </h4>
+                <p className="text-xs text-slate-400 leading-relaxed mt-2.5 font-medium font-sans">
+                  {confirmConfig.message}
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-white/[0.04] flex justify-end gap-2.5">
+              <button 
+                type="button" 
+                onClick={() => setConfirmConfig(null)}
+                className="px-4 py-2 bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] text-slate-300 hover:text-white rounded-xl text-xs font-bold transition font-sans"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  confirmConfig.onConfirm();
+                  setConfirmConfig(null);
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-rose-500/15 font-sans"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

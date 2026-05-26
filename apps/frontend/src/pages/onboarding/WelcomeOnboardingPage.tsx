@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import useAuthStore from '../../stores/authStore';
 import { Users, Layers, Code, Bot, Bell, Shield } from 'lucide-react';
