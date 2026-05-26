@@ -16,7 +16,7 @@ export default function WorkspaceList(): React.ReactElement {
   // Intercept completely new users
   useEffect(() => {
     if (!isLoading && hasFetchedWorkspaces && workspaces.length === 0) {
-      navigate('/onboarding/create-workspace', { replace: true });
+      navigate('/onboarding/welcome', { replace: true });
     }
   }, [isLoading, hasFetchedWorkspaces, workspaces.length, navigate]);
 

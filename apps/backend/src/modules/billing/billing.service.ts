@@ -94,7 +94,7 @@ export const billingService = {
       if (existing.rows[0]) {
         const updated = await client.query(
           `UPDATE plans
-           SET type = 'pro', razorpay_payment_id = $2, started_at = NOW()
+           SET type = 'pro', razorpay_payment_id = $2, started_at = NOW(), expires_at = NOW() + INTERVAL '30 days'
            WHERE id = $1
            RETURNING id, workspace_id, type, razorpay_payment_id, started_at, expires_at`,
           [existing.rows[0].id, data.razorpayPaymentId]
@@ -103,8 +103,8 @@ export const billingService = {
       }
 
       const created = await client.query(
-        `INSERT INTO plans (workspace_id, type, razorpay_payment_id)
-         VALUES ($1, 'pro', $2)
+        `INSERT INTO plans (workspace_id, type, razorpay_payment_id, expires_at)
+         VALUES ($1, 'pro', $2, NOW() + INTERVAL '30 days')
          RETURNING id, workspace_id, type, razorpay_payment_id, started_at, expires_at`,
         [data.workspaceId, data.razorpayPaymentId]
       );
