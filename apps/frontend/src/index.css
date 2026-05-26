@@ -1,8 +1,277 @@
+/* ─── Google Fonts ──────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Tiptap Tables */
+/* ─── CSS Custom Properties ─────────────────────────────────────────────────── */
+:root {
+  --dc-bg:        #0B1020;
+  --dc-surface:   #0F1629;
+  --dc-card:      #111827;
+  --dc-border:    #1F2937;
+  --dc-accent:    #7C3AED;
+  --dc-accent2:   #3B82F6;
+  --dc-success:   #10B981;
+  --dc-warning:   #F59E0B;
+  --dc-danger:    #EF4444;
+  --dc-tx-pri:    #F9FAFB;
+  --dc-tx-sec:    #9CA3AF;
+  --dc-tx-muted:  #4B5563;
+  --cursor-x:     50%;
+  --cursor-y:     50%;
+  --gradient-angle: 0deg;
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--dc-bg);
+  color: var(--dc-tx-pri);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv01';
+}
+
+::selection {
+  background: rgba(124, 58, 237, 0.35);
+  color: #fff;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
+.premium-scrollbar::-webkit-scrollbar,
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.07) transparent;
+}
+
+/* ─── Glass Utility ─────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(31, 41, 55, 0.8);
+}
+
+.glass-sm {
+  background: rgba(15, 22, 41, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(31, 41, 55, 0.6);
+}
+
+.glass-topbar {
+  background: rgba(11, 16, 32, 0.85);
+  backdrop-filter: blur(20px) saturate(200%);
+  -webkit-backdrop-filter: blur(20px) saturate(200%);
+  border-bottom: 1px solid rgba(31, 41, 55, 0.7);
+}
+
+/* ─── AI Glow Utilities ─────────────────────────────────────────────────────── */
+.ai-glow {
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.2), 0 0 40px rgba(124, 58, 237, 0.08);
+}
+
+.ai-glow-hover {
+  transition: box-shadow 0.3s ease;
+}
+.ai-glow-hover:hover {
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.3), 0 0 48px rgba(124, 58, 237, 0.12);
+}
+
+.blue-glow {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.08);
+}
+
+/* ─── Gradient Border (via ::before pseudo) ──────────────────────────────────── */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(var(--gradient-angle), #7C3AED, #3B82F6, #06B6D4, #7C3AED);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.gradient-border:hover::before {
+  opacity: 1;
+  animation: gradient-spin 3s linear infinite;
+}
+
+/* ─── Shimmer / Skeleton ─────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg,
+    rgba(31, 41, 55, 0.8) 25%,
+    rgba(55, 65, 81, 0.6) 50%,
+    rgba(31, 41, 55, 0.8) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* ─── Spotlight Effect ───────────────────────────────────────────────────────── */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+.spotlight-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(
+    circle 180px at var(--card-x, 50%) var(--card-y, 50%),
+    rgba(124, 58, 237, 0.08),
+    transparent 70%
+  );
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.spotlight-card:hover::after {
+  opacity: 1;
+}
+
+/* ─── AI Thinking Dots ───────────────────────────────────────────────────────── */
+.ai-thinking-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dc-accent);
+  animation: ai-thinking 1.4s ease-in-out infinite;
+}
+.ai-thinking-dot:nth-child(2) { animation-delay: 0.18s; }
+.ai-thinking-dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes ai-thinking {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%           { transform: scale(1);   opacity: 1;   }
+}
+
+/* ─── Cursor Streaming Blink ─────────────────────────────────────────────────── */
+.ai-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--dc-accent);
+  border-radius: 1px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink-cursor 0.85s step-end infinite;
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* ─── Active Nav Glow ────────────────────────────────────────────────────────── */
+.nav-active {
+  background: rgba(124, 58, 237, 0.12);
+  border-left: 2px solid #7C3AED;
+  color: #F9FAFB;
+}
+.nav-active-glow {
+  box-shadow: inset 0 0 12px rgba(124, 58, 237, 0.08);
+}
+
+/* ─── Bento Card ─────────────────────────────────────────────────────────────── */
+.bento-card {
+  background: var(--dc-card);
+  border: 1px solid var(--dc-border);
+  border-radius: 1rem;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s ease,
+              border-color 0.2s ease;
+}
+.bento-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(124, 58, 237, 0.12);
+}
+
+/* ─── Page Transition ────────────────────────────────────────────────────────── */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.page-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+.page-exit-active {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+/* ─── Dock Magnification ─────────────────────────────────────────────────────── */
+.dock-item {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              width 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              height 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─── Notification Slide ─────────────────────────────────────────────────────── */
+.notification-item {
+  animation: notification-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes notification-in {
+  from { opacity: 0; transform: translateX(100%) scale(0.9); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* ─── Callouts ───────────────────────────────────────────────────────────────── */
+.callout-info    { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); }
+.callout-warning { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25); }
+.callout-error   { background: rgba(239, 68, 68, 0.08);  border-color: rgba(239, 68, 68, 0.25);  }
+.callout-success { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); }
+
+/* ─── Tiptap Editor ──────────────────────────────────────────────────────────── */
 .tiptap table {
   border-collapse: collapse;
   table-layout: fixed;
@@ -10,122 +279,85 @@
   margin: 0;
   overflow: hidden;
 }
-
-.tiptap table td,
-.tiptap table th {
+.tiptap table td, .tiptap table th {
   min-width: 1em;
-  border: 1px solid #3c3c3c;
+  border: 1px solid #1F2937;
   padding: 8px 12px;
   vertical-align: top;
   box-sizing: border-box;
   position: relative;
 }
-
 .tiptap table th {
   font-weight: bold;
   text-align: left;
-  background-color: #2d2d2d;
+  background-color: #111827;
 }
-
 .tiptap table .column-resize-handle {
   position: absolute;
   right: -2px;
   top: 0;
   bottom: -2px;
   width: 4px;
-  background-color: #007aff;
+  background-color: #7C3AED;
   pointer-events: none;
 }
+.tiptap table p { margin: 0; }
 
-.tiptap table p {
-  margin: 0;
-}
-
-/* Tiptap Code Block (lowlight) */
 .tiptap pre {
-  background: #181818;
+  background: #0F1629;
   color: #e4e4e4;
-  font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
   padding: 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid #333;
+  border-radius: 0.75rem;
+  border: 1px solid #1F2937;
 }
-
 .tiptap pre code {
   color: inherit;
   padding: 0;
   background: none;
   font-size: 0.875rem;
 }
+.tiptap pre .hljs-comment, .tiptap pre .hljs-quote { color: #6B7280; font-style: italic; }
+.tiptap pre .hljs-keyword, .tiptap pre .hljs-selector-tag { color: #C084FC; }
+.tiptap pre .hljs-string, .tiptap pre .hljs-attr { color: #86EFAC; }
+.tiptap pre .hljs-number { color: #67E8F9; }
+.tiptap pre .hljs-title, .tiptap pre .hljs-section { color: #A5B4FC; }
 
-.tiptap pre .hljs-comment,
-.tiptap pre .hljs-quote {
-  color: #8b949e;
-  font-style: italic;
-}
-
-.tiptap pre .hljs-keyword,
-.tiptap pre .hljs-selector-tag {
-  color: #ff7b72;
-}
-
-.tiptap pre .hljs-string,
-.tiptap pre .hljs-attr {
-  color: #a5d6ff;
-}
-
-.tiptap pre .hljs-number {
-  color: #79c0ff;
-}
-
-.tiptap pre .hljs-title,
-.tiptap pre .hljs-section {
-  color: #d2a8ff;
-}
-
-/* Placeholder */
 .tiptap p.is-editor-empty:first-child::before {
-  color: #555;
+  color: #4B5563;
   content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;
 }
 
-/* Premium Thin Scrollbar Styling */
-.premium-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+/* ─── Ripple Effect ──────────────────────────────────────────────────────────── */
+@keyframes ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+.ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(124, 58, 237, 0.3);
+  transform: scale(0);
+  animation: ripple 0.5s linear;
+  pointer-events: none;
 }
 
-.premium-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+/* ─── Gradient Text ──────────────────────────────────────────────────────────── */
+.text-gradient-ai {
+  background: linear-gradient(135deg, #A78BFA, #60A5FA, #34D399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-
-.premium-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 9999px;
-  transition: background 0.15s ease-out;
-}
-
-.premium-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-/* Firefox compatibility */
-.premium-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
-}
-
-
-/* Callouts */
-.callout-info {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-.callout-warning {
-  background: rgba(234, 179, 8, 0.1);
-  border-color: rgba(234, 179, 8, 0.3);
+.text-gradient-violet {
+  background: linear-gradient(135deg, #C084FC, #818CF8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

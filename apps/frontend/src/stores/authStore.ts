@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     set({ isLoading: true, error: null });
     try {
       const { user, accessToken } = await authService.login({ email, password });
-      set({ user, accessToken, isAuthenticated: true, isLoading: false });
+      set({ user, accessToken, isAuthenticated: true, isInitialized: true, isLoading: false });
     } catch (error: any) {
       set({ 
         error: error.response?.data?.error || "Failed to login", 
@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       await authService.register({ email, password, name, githubLink });
       
       const { user, accessToken } = await authService.login({ email, password });
-      set({ user, accessToken, isAuthenticated: true, isLoading: false });
+      set({ user, accessToken, isAuthenticated: true, isInitialized: true, isLoading: false });
     } catch (error: any) {
       const errData = error.response?.data?.error;
       const errMsg = Array.isArray(errData) ? errData[0].message : errData || "Failed to register";
@@ -89,31 +89,15 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   fetchCurrentUser: async () => {
     set({ isInitialized: false, error: null });
     try {
-      let token = useAuthStore.getState().accessToken;
-      
-      // If we don't have an access token in memory (e.g. after a page reload),
-      // proactively try to refresh via the httpOnly cookie before calling getMe().
-      if (!token) {
-        const { api } = await import('../lib/axios');
-        const res = await api.post(
-          '/api/auth/refresh',
-          {},
-          { _retry: true, _silentError: true } as any
-        );
-        token = res.data.accessToken;
-        // Store the refreshed token AND prime the socket so connectSocket()
-        // in WorkspaceLayout finds a token ready when it fires.
-        set({ accessToken: token });
-        updateSocketToken(token!);
-      }
-
+      // We don't need a manual refresh here. If the token is missing or expired,
+      // authService.getMe() will get a 401, and the global axios interceptor 
+      // in lib/axios.ts will automatically pause, refresh the token, update 
+      // the socket via setAuthToken, and retry the request.
       const user = await authService.getMe();
       set({ user, isAuthenticated: true, isInitialized: true });
     } catch {
-      // Refresh token missing/expired — user must log in again.
-      // Don't call disconnectSocket() here; the socket hasn't connected yet
-      // on a fresh page load, and we don't want to clear workspaceId from
-      // a socket that's mid-reconnect for an already-authenticated session.
+      // If getMe() ultimately fails (e.g. refresh token expired/missing), 
+      // the user must log in again.
       set({ user: null, accessToken: null, isAuthenticated: false, isInitialized: true });
     }
   },

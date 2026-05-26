@@ -201,7 +201,7 @@ export default function AIReviewBar({
             className="flex justify-between text-xs text-gray-600
                        mt-3 pt-3 border-t border-gray-800"
           >
-            <span>Powered by Gemini</span>
+            <span>Powered by Devcollab</span>
             <span>AI reviews may contain errors — always verify</span>
           </div>
         </div>

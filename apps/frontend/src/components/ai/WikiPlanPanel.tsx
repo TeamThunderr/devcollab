@@ -109,7 +109,7 @@ function ThinkingIndicator(): React.ReactElement {
   return (
     <div className="flex items-center gap-2 py-4 text-slate-400">
       <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
-      <span className="text-xs font-medium">Gemini is thinking</span>
+      <span className="text-xs font-medium">Devcollab is thinking</span>
       <span className="flex gap-0.5">
         {[0, 1, 2].map((i) => (
           <span

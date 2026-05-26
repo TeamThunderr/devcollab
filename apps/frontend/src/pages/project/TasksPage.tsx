@@ -1155,7 +1155,7 @@ export default function TasksPage(): React.ReactElement {
             <div className="text-center space-y-2">
               <h2 className="text-lg font-bold text-white">Team Intelligence Center</h2>
               <p className="text-sm text-slate-400 max-w-sm">
-                Code review, project summaries, standup generation, wiki planning, and task breakdown — all powered by Gemini.
+                Code review, project summaries, standup generation, wiki planning, and task breakdown — all powered by Devcollab.
               </p>
             </div>
             <button
