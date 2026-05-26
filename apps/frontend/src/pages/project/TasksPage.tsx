@@ -557,7 +557,8 @@ export default function TasksPage(): React.ReactElement {
         .smooth-lift {
           transition: all 0.15s ease-out;
         }
-      `}</style>      {/* Top Navbar details */}
+      `}</style>
+      {/* Top Navbar details */}
       <div className="border-b border-white/[0.04] bg-[#17191d]/85 backdrop-blur-md sticky top-0 z-30 px-6 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="text-left">

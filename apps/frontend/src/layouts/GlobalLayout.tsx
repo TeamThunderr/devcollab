@@ -10,6 +10,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import useAuthStore from "../stores/authStore";
 import Topbar from "../components/topbar/Topbar";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
+import LogoutButton from "../components/auth/LogoutButton";
 
 export default function GlobalLayout(): React.ReactElement {
   const { isAuthenticated, isInitialized } = useAuthStore();
@@ -31,6 +32,7 @@ export default function GlobalLayout(): React.ReactElement {
       <Topbar />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
+        <LogoutButton isFloating={true} />
       </main>
     </div>
   );
