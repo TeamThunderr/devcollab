@@ -47,7 +47,11 @@ function setSseHeaders(reply: FastifyReply): void {
   void reply.hijack(); // Tell Fastify we're taking over the response
 
   // reply.hijack() bypasses @fastify/cors, so we must set CORS headers manually
-  const origin = process.env.FRONTEND_URL ?? "http://localhost:5173";
+  const rawOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''));
+  const reqOrigin = reply.request.headers.origin;
+  const origin = reqOrigin && rawOrigins.includes(reqOrigin) ? reqOrigin : rawOrigins[0];
   reply.raw.setHeader("Access-Control-Allow-Origin", origin);
   reply.raw.setHeader("Access-Control-Allow-Credentials", "true");
 
