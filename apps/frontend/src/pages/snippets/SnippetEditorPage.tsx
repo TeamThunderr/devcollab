@@ -5,6 +5,7 @@ import { useSnippetStore } from '../../stores/snippetStore';
 import { useProjectStore } from '../../stores/projectStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
+import { useSnippetSync } from '../../hooks/useSnippetSync';
 import api from '../../lib/axios';
 import {
   ArrowLeft, Copy, CheckCircle2, Trash2, Save, FileCode2, Clock, Info
@@ -34,17 +35,20 @@ export default function SnippetEditorPage(): React.ReactElement {
   const [code, setCode] = useState('// Paste or write your code fragment here\n');
   const [targetProjectId, setTargetProjectId] = useState('');
 
+  // Synchronize snippet changes reactively
+  useSnippetSync(targetProjectId || effectiveProjectId || undefined);
+
   const isViewer = useMemo(() => {
     if (!currentUser) return true;
-    const project = projects.find(p => p.id === targetProjectId);
-    if (project?.createdBy?.id === currentUser.id) return false;
-
     const wsMember = members.find(m => m.userId === currentUser.id);
     if (wsMember) {
       if (wsMember.role === 'OWNER' || wsMember.role === 'ADMIN') return false;
       if (wsMember.role === 'VIEWER') return true;
     }
-    return wsMember?.role === 'VIEWER';
+
+    const project = projects.find(p => p.id === targetProjectId);
+    if (project?.createdBy?.id === currentUser.id) return false;
+    return wsMember?.role === 'VIEWER' || !wsMember;
   }, [currentUser, members, projects, targetProjectId]);
   
   // Timestamps (Read-only)
@@ -55,6 +59,33 @@ export default function SnippetEditorPage(): React.ReactElement {
   const [copied, setCopied] = useState(false);
 
   const isNew = snippetId === 'new';
+
+  // Prevent VIEWERS from accessing composition workflow
+  if (isNew && isViewer) {
+    return (
+      <div className="min-h-screen bg-[#121316] text-slate-200 font-sans antialiased flex items-center justify-center p-6">
+        <div className="glass-panel max-w-md w-full rounded-2xl p-8 text-center space-y-4 shadow-2xl border border-white/[0.04]">
+          <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto text-rose-500">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-white uppercase tracking-wider">Access Denied</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Workspace Viewers have strictly read-only access and are not authorized to compose or create new code snippets.
+          </p>
+          <div className="pt-2">
+            <Link
+              to={projectId ? `/w/${workspaceId}/p/${projectId}/board?tab=snippets` : `/w/${workspaceId}/snippets`}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-5 py-2.5 text-xs font-bold transition shadow-sm"
+            >
+              Go Back
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 1. Removed redundant fetchProjects since WorkspaceLayout handles it.
   useEffect(() => {

@@ -29,7 +29,6 @@ WORKDIR /app
 
 # Copy installed modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
 
 # Copy source
 COPY apps/backend/ ./apps/backend/
@@ -50,7 +49,7 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && adduser -S nodeapp -u 1001 -G nodejs
 
 # Copy root workspace manifest (needed for npm workspaces path resolution)
-COPY package.json ./
+COPY package.json package-lock.json ./
 
 # Copy backend production manifest and install ONLY production deps
 COPY apps/backend/package.json ./apps/backend/

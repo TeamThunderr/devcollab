@@ -8,7 +8,7 @@ interface User {
   name?: string;
 }
 
-interface Snippet {
+export interface Snippet {
   id: string;
   title: string;
   language: string;
@@ -42,6 +42,10 @@ interface SnippetStore {
   deleteSnippet: (id: string) => Promise<void>;
   searchSnippets: (projectId: string, query: string) => Promise<void>;
   filterSnippets: (predicate: (s: Snippet) => boolean) => Snippet[];
+  addSnippetState: (snippet: Snippet) => void;
+  updateSnippetState: (id: string, snippet: Snippet) => void;
+  deleteSnippetState: (id: string) => void;
+  clearSnippets: () => void;
 }
 
 export const useSnippetStore = create<SnippetStore>((set, get) => ({
@@ -50,7 +54,8 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
   error: undefined,
 
   fetchSnippetsByProject: async (projectId) => {
-    set({ loading: true, error: undefined });
+    // Immediately evict stale cache to isolate projects
+    set({ snippets: [], loading: true, error: undefined });
     try {
       const response = await api.get(`/api/snippets/project/${projectId}`);
       set({ snippets: response.data, loading: false });
@@ -117,5 +122,28 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
 
   filterSnippets: (predicate) => {
     return get().snippets.filter(predicate);
+  },
+
+  addSnippetState: (snippet) => {
+    set((state) => {
+      if (state.snippets.some((s) => s.id === snippet.id)) return state;
+      return { snippets: [snippet, ...state.snippets] };
+    });
+  },
+
+  updateSnippetState: (id, snippet) => {
+    set((state) => ({
+      snippets: state.snippets.map((s) => (s.id === id ? snippet : s)),
+    }));
+  },
+
+  deleteSnippetState: (id) => {
+    set((state) => ({
+      snippets: state.snippets.filter((s) => s.id !== id),
+    }));
+  },
+
+  clearSnippets: () => {
+    set({ snippets: [], error: undefined, loading: false });
   },
 }));

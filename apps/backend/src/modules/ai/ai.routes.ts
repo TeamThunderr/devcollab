@@ -58,6 +58,7 @@ const explainSnippetSchema = z.object({
   code: z.string().min(1).max(20_000),
   language: z.string(),
   title: z.string().optional(),
+  projectId: z.string().uuid("projectId must be a valid UUID"),
 });
 
 // ─── HTML stripper helper ─────────────────────────────────────────────────────
@@ -453,7 +454,7 @@ export default async function aiRoutes(
   // ── POST /api/ai/explain-snippet ────────────────────────────────────────────
   fastify.post(
     "/explain-snippet",
-    { preHandler: authenticate },
+    { preHandler: [authenticate, verifyProjectAccess] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const parseResult = explainSnippetSchema.safeParse(request.body);
       if (!parseResult.success) {

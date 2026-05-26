@@ -67,3 +67,24 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
+
+# ── Stage 4: Development environment (used by docker-compose) ──────────────────
+FROM node:20-alpine AS development
+
+WORKDIR /app
+
+# Copy manifestations
+COPY package.json package-lock.json ./
+COPY apps/frontend/package.json ./apps/frontend/
+COPY apps/backend/package.json ./apps/backend/
+
+# Copy all installed node_modules from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+WORKDIR /app/apps/frontend
+
+CMD ["npm", "run", "dev", "--", "--host"]

@@ -37,6 +37,7 @@ export default function SnippetExplainModal({
       code: snippet.code,
       language: snippet.language,
       title: snippet.title,
+      projectId: snippet.projectId,
     });
   }, [isOpen, snippet?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -103,6 +104,7 @@ export default function SnippetExplainModal({
                     code: snippet.code,
                     language: snippet.language,
                     title: snippet.title,
+                    projectId: snippet.projectId,
                   });
                 }}
                 className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors font-semibold"
