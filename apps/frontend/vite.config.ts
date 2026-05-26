@@ -47,28 +47,13 @@ export default defineConfig(({ mode }) => ({
       output: {
         // ── Code splitting strategy ────────────────────────────────────────
         // Split large dependencies into separate cached chunks.
-        // Users only re-download a chunk when THAT package changes.
         manualChunks(id) {
           // Monaco editor is ~2MB — isolated so it doesn't bloat the main bundle
           if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
             return 'monaco'
           }
-          // Tiptap rich text editor
-          if (id.includes('@tiptap')) {
-            return 'tiptap'
-          }
-          // React and core libraries
-          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-            return 'react-vendor'
-          }
-          // Charting / dnd
-          if (id.includes('@dnd-kit')) {
-            return 'dnd'
-          }
-          // All other node_modules → vendor chunk
-          if (id.includes('node_modules')) {
-            return 'vendor'
-          }
+          // We let Vite handle the rest naturally. Grouping tiptap manually 
+          // without prosemirror caused circular reference errors in production.
         },
       },
     },
