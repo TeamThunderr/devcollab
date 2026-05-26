@@ -14,7 +14,7 @@ export const loginSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().min(1).optional().nullable(),
-  avatar: z.string().url().optional().nullable(),
+  avatar: z.string().optional().nullable(),
   bio: z.string().max(500).optional().nullable(),
   skills: z.array(z.string()).max(10).optional().nullable(),
   githubLink: z.string().url().optional().nullable(),
