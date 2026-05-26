@@ -1,17 +1,17 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 
-export async function getSuggestion(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: stream Claude AI code suggestion
+export async function getSuggestion(_request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  reply.status(404).send({ error: 'Route is not registered' });
 }
 
-export async function reviewCode(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: stream AI code review
+export async function reviewCode(_request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  reply.status(404).send({ error: 'Route is not registered' });
 }
 
-export async function explainCode(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: stream AI code explanation
+export async function explainCode(_request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  reply.status(404).send({ error: 'Route is not registered' });
 }
 
-export async function generateCode(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: stream AI code generation from prompt
+export async function generateCode(_request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  reply.status(404).send({ error: 'Route is not registered' });
 }

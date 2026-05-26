@@ -1,13 +1,23 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { activityService } from './activity.service';
+import { getActivityFeedSchema } from './activity.schema';
 
-export async function listActivities(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: list all activities for authenticated user
-}
-
-export async function getWorkspaceActivity(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: list activities scoped to workspace
-}
-
-export async function getProjectActivity(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  // TODO: list activities scoped to project
-}
+export const activityController = {
+  async getWorkspaceActivity(request: FastifyRequest<{ Params: { workspaceId: string }, Querystring: any }>, reply: FastifyReply) {
+    try {
+      const filters = getActivityFeedSchema.parse(request.query);
+      const { workspaceId } = request.params;
+      
+      const feed = await activityService.getActivities(
+        workspaceId, request.user!.userId,
+        filters,
+        request.user!.userId,
+        request.membership?.role
+      );
+      return reply.send(feed);
+    } catch (error: any) {
+      if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  }
+};
