@@ -15,6 +15,7 @@ import { useBillingStore } from "../../stores/billingStore";
 import useChatStore from "../../stores/chatStore";
 import SubscriptionBadge from "../billing/SubscriptionBadge";
 import { usePresence } from "../../hooks/usePresence";
+import LogoutButton from "../auth/LogoutButton";
 
 // ─── Nav item types ───────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export default function MainSidebar(): React.ReactElement {
   }>();
 
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const activeWorkspaceMember = useWorkspaceStore((s) => 
     s.members.find((m) => m.userId === user?.id)
@@ -242,7 +243,7 @@ export default function MainSidebar(): React.ReactElement {
         )}
 
         {/* User footer */}
-        <UserFooter user={user} onLogout={async () => { await logout(); navigate("/login"); }} />
+        <UserFooter user={user} />
       </aside>
     );
   }
@@ -332,7 +333,7 @@ export default function MainSidebar(): React.ReactElement {
       </nav>
 
       {/* User footer */}
-      <UserFooter user={user} onLogout={async () => { await logout(); navigate("/login"); }} />
+      <UserFooter user={user} />
     </aside>
   );
 }
@@ -341,28 +342,18 @@ export default function MainSidebar(): React.ReactElement {
 
 function UserFooter({
   user,
-  onLogout,
 }: {
   user: { name?: string | null; email: string } | null;
-  onLogout: () => void;
 }) {
   return (
-    <div className="px-3 py-3 border-t border-white/[0.04] flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2 min-w-0">
+    <div className="px-3 py-3 border-t border-white/[0.04] flex flex-col gap-3">
+      <div className="flex items-center gap-2 min-w-0 px-1">
         <div className="w-6.5 h-6.5 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
           {(user?.name ?? user?.email ?? "U").substring(0, 1).toUpperCase()}
         </div>
         <span className="text-[11px] font-semibold text-slate-300 truncate">{user?.name ?? user?.email}</span>
       </div>
-      <button
-        onClick={onLogout}
-        title="Logout"
-        className="text-slate-400 hover:text-white transition-colors flex-shrink-0 animate-in fade-in"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-        </svg>
-      </button>
+      <LogoutButton />
     </div>
   );
 }

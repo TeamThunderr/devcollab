@@ -48,7 +48,6 @@ export default function TasksPage(): React.ReactElement {
 
   const { tasks, loading, error, fetchTasksByProject, createTask, updateTask, deleteTask, addComment } = useTaskStore();
   const { projects, projectMembers, fetchProjectMembers, assignProjectMember, removeProjectMember } = useProjectStore();
-  const currentProjectMembers = pid ? (projectMembers[pid] || []) : [];
   const { members } = useWorkspaceStore();
   const activeProjMembers = pid ? (projectMembers[pid] || []) : [];
   const { user } = useAuthStore();
