@@ -16,6 +16,7 @@ export interface MonacoEditorProps {
   initialContent: string;
   onContentChange: (content: string) => void;
   onSave: (content: string) => void;
+  readOnly?: boolean;
 }
 
 export interface MonacoEditorHandle {
@@ -31,6 +32,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       initialContent,
       onContentChange,
       onSave,
+      readOnly = false,
     },
     ref
   ) => {
@@ -51,6 +53,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     }));
 
     const handleChange: OnChange = (newValue) => {
+      if (readOnly) return;
       const value = newValue ?? "";
       setContent(value);
       setIsDirty(true);
@@ -64,11 +67,13 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     };
 
     const handleEditorMount = (editor: any, monaco: Monaco) => {
-      // Add Ctrl+S action
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-        onSave(editor.getValue());
-        setIsDirty(false);
-      });
+      // Add Ctrl+S action if not readOnly
+      if (!readOnly) {
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+          onSave(editor.getValue());
+          setIsDirty(false);
+        });
+      }
     };
 
     const EDITOR_OPTIONS = {
@@ -91,6 +96,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       stickyScroll: { enabled: true },
       smoothScrolling: true,
       multiCursorModifier: 'alt' as const,
+      readOnly: readOnly,
     };
 
     return (

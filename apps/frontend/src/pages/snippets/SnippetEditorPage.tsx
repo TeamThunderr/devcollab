@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { useSnippetStore } from '../../stores/snippetStore';
 import { useProjectStore } from '../../stores/projectStore';
+import useWorkspaceStore from '../../stores/workspaceStore';
+import useAuthStore from '../../stores/authStore';
 import api from '../../lib/axios';
 import {
   ArrowLeft, Copy, CheckCircle2, Trash2, Save, FileCode2, Clock, Info
@@ -18,6 +20,8 @@ export default function SnippetEditorPage(): React.ReactElement {
 
   const { projects } = useProjectStore();
   const { createSnippet, updateSnippet, deleteSnippet } = useSnippetStore();
+  const { user: currentUser } = useAuthStore();
+  const { members } = useWorkspaceStore();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -29,6 +33,19 @@ export default function SnippetEditorPage(): React.ReactElement {
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState('// Paste or write your code fragment here\n');
   const [targetProjectId, setTargetProjectId] = useState('');
+
+  const isViewer = useMemo(() => {
+    if (!currentUser) return true;
+    const project = projects.find(p => p.id === targetProjectId);
+    if (project?.createdBy?.id === currentUser.id) return false;
+
+    const wsMember = members.find(m => m.userId === currentUser.id);
+    if (wsMember) {
+      if (wsMember.role === 'OWNER' || wsMember.role === 'ADMIN') return false;
+      if (wsMember.role === 'VIEWER') return true;
+    }
+    return wsMember?.role === 'VIEWER';
+  }, [currentUser, members, projects, targetProjectId]);
   
   // Timestamps (Read-only)
   const [createdAt, setCreatedAt] = useState<string | null>(null);
@@ -191,6 +208,7 @@ export default function SnippetEditorPage(): React.ReactElement {
     tabSize: 2,
     renderLineHighlight: 'all' as const,
     smoothScrolling: true,
+    readOnly: isViewer,
     scrollbar: {
       vertical: 'visible' as const,
       horizontal: 'visible' as const,
@@ -244,7 +262,7 @@ export default function SnippetEditorPage(): React.ReactElement {
           </div>
 
           <div className="flex items-center gap-2">
-            {!isNew && (
+            {!isNew && !isViewer && (
               <button
                 type="button"
                 onClick={handleDelete}
@@ -255,14 +273,20 @@ export default function SnippetEditorPage(): React.ReactElement {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={loading || saving || !title.trim()}
-              className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 disabled:opacity-40 disabled:pointer-events-none text-white px-5 py-2.5 text-xs font-bold transition shadow-sm"
-            >
-              <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Snippet'}
-            </button>
+            {isViewer ? (
+              <span className="bg-white/[0.04] border border-white/[0.08] text-slate-400 rounded-xl px-4 py-2.5 text-xs font-bold font-mono">
+                👁️ Viewer Mode (Read-only)
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={loading || saving || !title.trim()}
+                className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 disabled:opacity-40 disabled:pointer-events-none text-white px-5 py-2.5 text-xs font-bold transition shadow-sm"
+              >
+                <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Snippet'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -360,7 +384,8 @@ export default function SnippetEditorPage(): React.ReactElement {
                       placeholder="e.g. Fetch adapter utility"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 placeholder-slate-650 focus:border-indigo-500/50 transition font-medium"
+                      disabled={isViewer}
+                      className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 placeholder-slate-650 focus:border-indigo-500/50 transition font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -372,7 +397,8 @@ export default function SnippetEditorPage(): React.ReactElement {
                       placeholder="Explain what this snippet accomplishes..."
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 placeholder-slate-650 focus:border-indigo-500/50 transition font-medium"
+                      disabled={isViewer}
+                      className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 placeholder-slate-650 focus:border-indigo-500/50 transition font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -382,7 +408,8 @@ export default function SnippetEditorPage(): React.ReactElement {
                     <select
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
-                      className="bg-slate-950 border border-white/[0.04] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition cursor-pointer font-medium"
+                      disabled={isViewer}
+                      className="bg-slate-950 border border-white/[0.04] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="javascript">JavaScript</option>
                       <option value="typescript">TypeScript</option>
@@ -403,7 +430,7 @@ export default function SnippetEditorPage(): React.ReactElement {
                     <select
                       value={targetProjectId}
                       onChange={(e) => setTargetProjectId(e.target.value)}
-                      disabled={!!projectId}
+                      disabled={!!projectId || isViewer}
                       className="bg-slate-950 border border-white/[0.04] rounded-xl px-3.5 py-2.5 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {projects.map((p) => (

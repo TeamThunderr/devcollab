@@ -1,4 +1,6 @@
+import { useState } from "react";
 import useEditorStore from "../../stores/editorStore";
+import { useSnippetStore } from "../../stores/snippetStore";
 import { X } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -13,7 +15,11 @@ function fileIcon(language: string): string {
 
 export default function EditorTabs() {
   const { files, openTabs, activeFileId, openTab, closeTab } = useEditorStore();
+  const { createSnippet } = useSnippetStore();
   const { projectId } = useParams();
+  const [showSnippetModal, setShowSnippetModal] = useState(false);
+  const [snippetTitle, setSnippetTitle] = useState("");
+  const [snippetDesc, setSnippetDesc] = useState("");
   
   const openFiles = openTabs.map(id => files.find(f => f.id === id)).filter(Boolean) as typeof files;
 
@@ -80,7 +86,70 @@ export default function EditorTabs() {
             <path d="M8 5v14l11-7z" />
           </svg>
         </button>
+        <button 
+          title="Save as Snippet"
+          className="text-gray-400 hover:text-white p-1 rounded hover:bg-white/10 ml-2"
+          onClick={() => {
+            const activeFile = files.find(f => f.id === activeFileId);
+            if (activeFile && activeFile.content) {
+              setSnippetTitle(activeFile.name);
+              setShowSnippetModal(true);
+            }
+          }}
+        >
+          <svg className="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+        </button>
       </div>
+
+      {/* Snippet Modal */}
+      {showSnippetModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#17191d] border border-white/[0.04] rounded-2xl p-5 text-white shadow-2xl w-full max-w-sm space-y-4 font-sans text-left">
+            <h2 className="text-sm font-bold text-white">Save as Snippet</h2>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Title</label>
+                <input 
+                  type="text" 
+                  value={snippetTitle}
+                  onChange={e => setSnippetTitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/[0.04] rounded-lg px-3 py-2 outline-none focus:border-indigo-500/50 transition text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                <textarea 
+                  value={snippetDesc}
+                  onChange={e => setSnippetDesc(e.target.value)}
+                  rows={2}
+                  className="w-full bg-slate-950 border border-white/[0.04] rounded-lg px-3 py-2 outline-none focus:border-indigo-500/50 transition text-slate-200 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-white/[0.04]">
+              <button 
+                onClick={() => setShowSnippetModal(false)}
+                className="px-4 py-2 text-xs font-bold hover:bg-white/[0.01] rounded-lg transition text-slate-400"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  const activeFile = files.find(f => f.id === activeFileId);
+                  if (activeFile && projectId) {
+                    await createSnippet(snippetTitle, activeFile.language || 'plaintext', activeFile.content || '', snippetDesc, [], projectId);
+                    setShowSnippetModal(false);
+                    setSnippetDesc("");
+                  }
+                }}
+                className="px-4 py-2 text-xs font-bold bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg transition shadow-sm"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

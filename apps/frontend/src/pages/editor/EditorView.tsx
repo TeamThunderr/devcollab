@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ActivityBar from "../../components/editor/ActivityBar";
 import Sidebar from "../../components/editor/Sidebar";
 import EditorTabs from "../../components/editor/EditorTabs";
@@ -8,6 +8,8 @@ import CommandPalette from "../../components/editor/CommandPalette";
 import TopMenuBar from "../../components/editor/TopMenuBar";
 import AIReviewBar from "../../components/editor/AIReviewBar";
 import useEditorStore from "../../stores/editorStore";
+import useWorkspaceStore from "../../stores/workspaceStore";
+import useAuthStore from "../../stores/authStore";
 import { useParams } from "react-router-dom";
 
 export default function EditorView() {
@@ -15,12 +17,20 @@ export default function EditorView() {
 
   if (!projectId) return null;
   const { files, activeFileId, updateFile, fetchEditorState, settings } = useEditorStore();
+  const { user: currentUser } = useAuthStore();
+  const { members } = useWorkspaceStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [isAIBarVisible, setIsAIBarVisible] = useState(true);
 
   // Track Monaco's live content so AIReviewBar always has the latest code
   const currentContentRef = useRef<string>("");
   const [currentContent, setCurrentContent] = useState<string>("");
+
+  const isViewer = useMemo(() => {
+    if (!currentUser) return true;
+    const wsMember = members.find(m => m.userId === currentUser.id);
+    return wsMember?.role === 'VIEWER';
+  }, [currentUser, members]);
 
   useEffect(() => {
     fetchEditorState(projectId);
@@ -104,6 +114,7 @@ export default function EditorView() {
                   initialContent={activeFile.content || ''}
                   onContentChange={handleContentChange}
                   onSave={handleSave}
+                  readOnly={isViewer}
                 />
               </div>
             ) : (

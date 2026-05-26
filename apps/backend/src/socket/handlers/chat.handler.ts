@@ -1,22 +1,51 @@
 import { Server, Socket } from 'socket.io';
 import { redis } from '../../redis/client';
+import { query } from '../../db/client';
 
 export function registerChatHandlers(io: Server, socket: Socket) {
   socket.on('chat:join', async ({ projectId }) => {
-    socket.join('chat:' + projectId);
-    
-    // Mark as seen
-    if (redis && socket.data?.user?.userId) {
-      try {
-        await redis.set(
-          'chat:seen:' + projectId + ':' + socket.data.user.userId,
-          new Date().toISOString()
-        );
-      } catch (err) {
-        console.error('Redis chat:seen set failed', err);
+    if (!projectId) return;
+
+    try {
+      const userId = socket.data?.user?.userId;
+      const wsRole = socket.data?.workspaceRole;
+
+      if (!userId) {
+        socket.emit('error', { message: 'Unauthorized: No user session found' });
+        return;
       }
+
+      // Owner and Admin bypass project membership check
+      if (wsRole !== 'OWNER' && wsRole !== 'ADMIN') {
+        const projCheck = await query(
+          'SELECT id FROM project_members WHERE project_id = $1 AND user_id = $2',
+          [projectId, userId]
+        );
+        if (!projCheck.rowCount) {
+          console.warn(`[Socket Chat Join Denied] User ${userId} not assigned to project ${projectId}`);
+          socket.emit('error', { message: 'Unauthorized: You are not assigned to this project' });
+          return;
+        }
+      }
+
+      socket.join('chat:' + projectId);
+      
+      // Mark as seen
+      if (redis) {
+        try {
+          await redis.set(
+            'chat:seen:' + projectId + ':' + userId,
+            new Date().toISOString()
+          );
+        } catch (err) {
+          console.error('Redis chat:seen set failed', err);
+        }
+      }
+      socket.emit('chat:joined', { projectId });
+    } catch (err) {
+      console.error('[Socket Chat Join Error]', err);
+      socket.emit('error', { message: 'Internal server error validating project membership' });
     }
-    socket.emit('chat:joined', { projectId });
   });
 
   socket.on('chat:leave', ({ projectId }) => {

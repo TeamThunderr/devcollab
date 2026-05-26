@@ -5,20 +5,18 @@ import { useTaskStore } from '../../stores/taskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import useWorkspaceStore from '../../stores/workspaceStore';
 import useAuthStore from '../../stores/authStore';
-
 import { useSnippetStore } from '../../stores/snippetStore';
 import KanbanColumn from '../../components/kanban/KanbanColumn';
 import TaskModal from '../../components/kanban/TaskModal';
 import OnlineAvatars from '../../components/presence/OnlineAvatars';
 import { usePresence } from '../../hooks/usePresence';
-import { DatePicker } from '../../components/ui/DatePicker';
 import { Task, TaskStatus, TaskPriority } from '../../types';
 import ListView from './ListView';
 import CalendarView from './CalendarView';
 import {
   Search, Plus, Clock, Bot, Calendar,
   TrendingUp, ChevronRight, CheckCircle2, Layers,
-  Code, Copy, Users, Trash2, X, CheckSquare
+  Code, Copy, Users, Trash2, X, CheckSquare, FileText
 } from 'lucide-react';
 
 
@@ -40,6 +38,8 @@ interface ProjectWorkspaceConfig {
   checklists?: Record<string, any[]>;
 }
 
+
+
 export default function TasksPage(): React.ReactElement {
   const { workspaceId, projectId: pid } = useParams<{ workspaceId: string; projectId: string }>();
   const location = useLocation();
@@ -50,33 +50,16 @@ export default function TasksPage(): React.ReactElement {
   const { projects, projectMembers, fetchProjectMembers, assignProjectMember, removeProjectMember } = useProjectStore();
   const currentProjectMembers = pid ? (projectMembers[pid] || []) : [];
   const { members } = useWorkspaceStore();
+  const activeProjMembers = pid ? (projectMembers[pid] || []) : [];
   const { user } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'board' | 'mytasks' | 'activity' | 'ai' | 'snippets'>('dashboard');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showTaskForm, setShowTaskForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [selectedWorkspaceMemberId, setSelectedWorkspaceMemberId] = useState('');
   const [selectedProjectRole, setSelectedProjectRole] = useState<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER');
-
-  // Highlight tasks freshly added from AI (passed via navigation state)
-  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(() => {
-    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
-    return new Set(ids);
-  });
-
-  // If we arrived with aiAddedTaskIds → auto-switch to Board and clear after 4 s
-  useEffect(() => {
-    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
-    if (ids.length > 0) {
-      setActiveTab('board');
-      setHighlightedTaskIds(new Set(ids));
-      const t = setTimeout(() => setHighlightedTaskIds(new Set()), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [location.state]);
 
   const { onlineUsers } = usePresence(workspaceId || '', pid);
   const othersOnline = onlineUsers.filter(u => u.userId !== user?.id);
@@ -126,15 +109,26 @@ export default function TasksPage(): React.ReactElement {
 
 
 
-  // Create Task Form States
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDesc, setTaskDesc] = useState('');
-  const [taskPrio, setTaskPrio] = useState<TaskPriority>('P2');
-  const [taskStatus, setTaskStatus] = useState<TaskStatus>('TODO');
-  const [taskDue, setTaskDue] = useState<Date | undefined>();
-  const [taskAssigneeId, setTaskAssigneeId] = useState<string>('');
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [titleError, setTitleError] = useState<string | null>(null);
+  // Task Creation & Draft Recovery States
+  const [hasActiveDraft, setHasActiveDraft] = useState(false);
+  const [draftRecoveryKey, setDraftRecoveryKey] = useState<string | null>(null);
+
+  // Highlight tasks freshly added from AI (passed via navigation state)
+  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    return new Set(ids);
+  });
+
+  // If we arrived with aiAddedTaskIds → auto-switch to Board and clear after 4 s
+  useEffect(() => {
+    const ids: string[] = (location.state as any)?.aiAddedTaskIds ?? [];
+    if (ids.length > 0) {
+      setActiveTab('board');
+      setHighlightedTaskIds(new Set(ids));
+      const t = setTimeout(() => setHighlightedTaskIds(new Set()), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [location.state]);
 
   // AI assistant states
   const [aiPrompt, setAiPrompt] = useState('');
@@ -207,7 +201,7 @@ export default function TasksPage(): React.ReactElement {
     if (wsMember?.role === 'ADMIN') return 'Admin';
     if (activeProject?.createdBy?.id === userId) return 'Owner';
 
-    const pm = currentProjectMembers.find(m => m.userId === userId);
+    const pm = activeProjMembers.find(m => m.userId === userId);
     if (pm) {
       if (pm.role === 'ADMIN') return 'Admin';
       if (pm.role === 'VIEWER') return 'Viewer';
@@ -297,6 +291,7 @@ export default function TasksPage(): React.ReactElement {
   };
 
 
+
   useEffect(() => {
     if (pid) {
       void fetchTasksByProject(pid);
@@ -305,14 +300,69 @@ export default function TasksPage(): React.ReactElement {
     }
   }, [pid, fetchTasksByProject, fetchProjectMembers]);
 
+  useEffect(() => {
+    if (pid) {
+      const keys = Object.keys(sessionStorage);
+      const draftKey = keys.find(k => k.startsWith(`devcollab_draft_task_${pid}_`));
+      if (draftKey) {
+        try {
+          const stored = sessionStorage.getItem(draftKey);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.task) {
+              setHasActiveDraft(true);
+              setDraftRecoveryKey(draftKey);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse draft recovery from sessionStorage", e);
+        }
+      } else {
+        setHasActiveDraft(false);
+        setDraftRecoveryKey(null);
+      }
+    }
+  }, [pid]);
+
+  const handleRestoreDraft = () => {
+    if (draftRecoveryKey) {
+      try {
+        const stored = sessionStorage.getItem(draftRecoveryKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.task) {
+            setSelectedTask(parsed.task);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore draft", e);
+      }
+    }
+    setHasActiveDraft(false);
+  };
+
+  const handleDiscardDraftFromPrompt = () => {
+    if (draftRecoveryKey) {
+      sessionStorage.removeItem(draftRecoveryKey);
+    }
+    setHasActiveDraft(false);
+    setDraftRecoveryKey(null);
+  };
 
 
+
+
+  useEffect(() => {
+    if (config && pid) {
+      localStorage.setItem(`devcollab_project_workspace_${pid}`, JSON.stringify(config));
+    }
+  }, [config, pid]);
 
   const updateProjectConfig = (updater: (prev: ProjectWorkspaceConfig) => ProjectWorkspaceConfig) => {
-    if (!config || !pid) return;
-    const next = updater(config);
-    localStorage.setItem(`devcollab_project_workspace_${pid}`, JSON.stringify(next));
-    setConfig(next);
+    setConfig(prev => {
+      if (!prev) return prev;
+      return updater(prev);
+    });
   };
 
   const logActivity = (details: string) => {
@@ -333,42 +383,32 @@ export default function TasksPage(): React.ReactElement {
 
 
 
-  const handleCreateTask = async () => {
-    if (!taskTitle.trim()) {
-      setTitleError("Task title is required");
-      return;
-    }
+  const handleInstantTaskCreate = (status: TaskStatus = 'TODO', dueDate?: Date) => {
     if (!pid) {
       alert("Project ID is missing. Please reload the page.");
       return;
     }
-
-    setIsCreatingTask(true);
-    setTitleError(null);
-
-    try {
-      await createTask({
-        title: taskTitle.trim(),
-        description: taskDesc.trim() || undefined,
-        status: taskStatus,
-        priority: taskPrio,
-        dueDate: taskDue ? taskDue.toISOString() : undefined,
-        projectId: pid,
-        assigneeId: taskAssigneeId || null
-      });
-      logActivity(`created task: "${taskTitle.trim()}"`);
-
-      // Reset form and close modal smoothly
-      setTaskTitle('');
-      setTaskDesc('');
-      setTaskDue(undefined);
-      setTaskAssigneeId('');
-      setShowTaskForm(false);
-    } catch (err: any) {
-      alert(`Failed to create task: ${err.message || err}`);
-    } finally {
-      setIsCreatingTask(false);
-    }
+    const uuid = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
+    const draftTask: Task = {
+      id: `draft-${uuid}`,
+      title: '',
+      description: '',
+      status: status || 'TODO',
+      priority: 'P2',
+      dueDate: dueDate ? dueDate.toISOString() : undefined,
+      projectId: pid,
+      assigneeId: null,
+      comments: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: {
+        id: user?.id || 'current',
+        name: user?.name || 'You',
+        email: user?.email || '',
+        avatar: user?.avatar || undefined,
+      },
+    };
+    setSelectedTask(draftTask);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -615,6 +655,36 @@ export default function TasksPage(): React.ReactElement {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 py-8">
+        {hasActiveDraft && (
+          <div className="mb-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.03] p-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-lg animate-in fade-in duration-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white">Restore unfinished draft?</h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">You have a saved draft for this project workspace from your last session.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={handleDiscardDraftFromPrompt}
+                className="px-3.5 py-1.5 rounded-xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-slate-400 hover:text-white font-bold text-[10px] transition"
+              >
+                Discard Draft
+              </button>
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] transition shadow-md"
+              >
+                Restore Draft
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Error notification banner */}
         {error && (
           <div className="mb-6 rounded-xl border border-rose-950 bg-rose-950/20 px-4 py-2.5 text-xs text-rose-400">
@@ -624,17 +694,21 @@ export default function TasksPage(): React.ReactElement {
 
         {/* ─── TAB 1: OVERVIEW DASHBOARD ───────────────────────────────────────── */}
         {activeTab === 'dashboard' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-150">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-150 text-left">
             {/* Left Column: Progress circle & Recent Milestones */}
             <div className="lg:col-span-2 space-y-6">
               {/* Workspace Progress Card */}
               <div className="glass-panel rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
-                <div className="space-y-2 text-left">
-                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-indigo-400 leading-none">Workspace Progress</span>
-                  <h2 className="text-xl font-bold text-white">Project Stream Health</h2>
-                  <p className="text-xs text-slate-400 leading-relaxed max-w-md font-medium">
-                    {activeProject?.description || config?.description || 'Your delivery streams are configuring workspace lanes to coordinate project milestones.'}
-                  </p>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">📊 Delivery Stream Progress</span>
+                  <h2 className="text-xl font-bold text-white mt-1">{activeProject?.name || 'Overview'}</h2>
+                  {(activeProject?.description || config?.description) ? (
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-md font-medium mt-1">
+                      {activeProject?.description || config?.description}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic mt-1">No project workspace description provided.</p>
+                  )}
                 </div>
                 {/* Compact Circular progress */}
                 <div className="relative flex-shrink-0 w-24 h-24 flex items-center justify-center">
@@ -655,15 +729,33 @@ export default function TasksPage(): React.ReactElement {
                 </div>
               </div>
 
+              {/* Status Breakdown Stats Overview Card */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { label: '🎯 To Do', count: tasks.filter(t => t.status === 'TODO').length, color: 'text-slate-400 border-white/[0.03] bg-white/[0.01]' },
+                  { label: '⚡ In Progress', count: tasks.filter(t => t.status === 'IN_PROGRESS').length, color: 'text-cyan-400 border-cyan-500/10 bg-cyan-500/[0.02]' },
+                  { label: '👀 In Review', count: tasks.filter(t => t.status === 'IN_REVIEW').length, color: 'text-purple-400 border-purple-500/10 bg-purple-500/[0.02]' },
+                  { label: '✅ Completed', count: tasks.filter(t => t.status === 'DONE').length, color: 'text-emerald-400 border-emerald-500/10 bg-emerald-500/[0.02]' },
+                ].map(stat => (
+                  <div key={stat.label} className={`p-4 rounded-2xl border ${stat.color} text-center space-y-1`}>
+                    <span className="text-[9px] uppercase font-mono tracking-wider font-extrabold text-slate-500 block">{stat.label}</span>
+                    <p className="text-2xl font-black text-white">{stat.count}</p>
+                  </div>
+                ))}
+              </div>
+
               {/* Recent Tasks Panel */}
-              <div className="glass-panel rounded-2xl p-6 space-y-4 text-left">
-                <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Recent Milestones</h3>
+              <div className="glass-panel rounded-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">⚡ Recent Deliverables</h3>
+                  <span className="text-[10px] text-slate-500 font-bold">Showing last 4 updates</span>
+                </div>
                 <div className="divide-y divide-white/[0.03]">
                   {tasks.length === 0 ? (
                     <div className="text-center py-8 space-y-2.5">
                       <p className="text-xs text-slate-500 italic">No milestones built yet.</p>
                       {canCreateTask && (
-                        <button type="button" onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }} className="px-3 py-1.5 border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-indigo-400 font-bold rounded-lg text-[10px] transition">
+                        <button type="button" onClick={() => void handleInstantTaskCreate('TODO')} className="px-3 py-1.5 border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-indigo-400 font-bold rounded-lg text-[10px] transition">
                           + Create Task
                         </button>
                       )}
@@ -696,13 +788,15 @@ export default function TasksPage(): React.ReactElement {
             </div>
 
             {/* Right Column: Deadlines, Team, Quick Commands */}
-            <div className="space-y-6 text-left">
+            <div className="space-y-6">
               {/* Quick actions grid */}
               <div className="glass-panel rounded-2xl p-5 space-y-3.5">
-                <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400">Commands</h3>
+                <div className="flex items-center gap-1.5 border-b border-white/[0.04] pb-2">
+                  <span className="text-[10px] font-mono font-extrabold text-slate-500 uppercase tracking-widest">⚙️ Navigation</span>
+                </div>
                 <div className="grid grid-cols-2 gap-2 text-center text-xs">
                   {canCreateTask ? (
-                    <button type="button" onClick={() => { setTaskStatus('TODO'); setShowTaskForm(true); }} className="p-2.5 bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 text-indigo-300 font-bold rounded-xl transition">
+                    <button type="button" onClick={() => void handleInstantTaskCreate('TODO')} className="p-2.5 bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 text-indigo-300 font-bold rounded-xl transition">
                       + New Task
                     </button>
                   ) : (
@@ -716,13 +810,15 @@ export default function TasksPage(): React.ReactElement {
 
               {/* Deadlines Widget */}
               <div className="glass-panel rounded-2xl p-5 space-y-3">
-                <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Upcoming Deadlines</h3>
+                <div className="flex items-center gap-1.5 border-b border-white/[0.04] pb-2">
+                  <span className="text-[10px] font-mono font-extrabold text-slate-500 uppercase tracking-widest">⏰ Upcoming Deadlines</span>
+                </div>
                 <div className="space-y-2">
                   {upcomingDeadlines.length === 0 ? (
                     <p className="text-[11px] text-slate-500 italic py-2 text-center">No upcoming deadlines.</p>
                   ) : (
                     upcomingDeadlines.map(task => (
-                      <div key={task.id} className="flex justify-between items-center text-xs p-2 border border-white/[0.04] rounded-lg bg-black/10" onClick={() => setSelectedTask(task)}>
+                      <div key={task.id} className="flex justify-between items-center text-xs p-2 border border-white/[0.04] rounded-lg bg-black/10 cursor-pointer hover:border-indigo-500/20 transition" onClick={() => setSelectedTask(task)}>
                         <span className="font-bold text-slate-300 truncate max-w-[60%]">{task.title}</span>
                         <span className="flex items-center gap-1 text-[9px] text-amber-400 font-extrabold">
                           <Calendar className="h-3 w-3" />
@@ -736,19 +832,25 @@ export default function TasksPage(): React.ReactElement {
 
               {/* Team Members Widget */}
               <div className="glass-panel rounded-2xl p-5 space-y-3">
-                <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Stream Members</h3>
+                <div className="flex items-center gap-1.5 border-b border-white/[0.04] pb-2">
+                  <span className="text-[10px] font-mono font-extrabold text-slate-500 uppercase tracking-widest">👥 Project Members</span>
+                </div>
                 <div className="space-y-2.5">
-                  {members.slice(0, 3).map(m => (
-                    <div key={m.userId} className="flex items-center justify-between text-xs py-0.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-5.5 h-5.5 rounded-full bg-indigo-650 flex items-center justify-center font-bold text-[8px] text-white">
-                          {(m.user?.name || m.user?.email || '?').charAt(0).toUpperCase()}
+                  {members.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic py-2 text-center">No members available.</p>
+                  ) : (
+                    members.slice(0, 3).map(m => (
+                      <div key={m.userId} className="flex items-center justify-between text-xs py-0.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5.5 h-5.5 rounded-full bg-indigo-650 flex items-center justify-center font-bold text-[8px] text-white">
+                            {(m.user?.name || m.user?.email || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-bold text-slate-300 truncate max-w-[120px]">{m.user?.name || m.user?.email}</span>
                         </div>
-                        <span className="font-bold text-slate-300 truncate max-w-[120px]">{m.user?.name || m.user?.email}</span>
+                        <span className="text-[8px] uppercase font-mono px-1.5 py-0.5 border border-white/[0.04] rounded text-slate-500">{m.role}</span>
                       </div>
-                      <span className="text-[8px] uppercase font-mono px-1.5 py-0.5 border border-white/[0.04] rounded text-slate-500">{m.role}</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -805,7 +907,7 @@ export default function TasksPage(): React.ReactElement {
                 {canCreateTask && (
                   <button
                     type="button"
-                    onClick={() => { setTaskStatus('TODO'); setTaskDue(undefined); setShowTaskForm(true); }}
+                    onClick={() => void handleInstantTaskCreate('TODO')}
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2 text-xs font-bold transition shadow-sm"
                   >
                     <Plus className="h-3.5 w-3.5" /> Create Task
@@ -924,7 +1026,7 @@ export default function TasksPage(): React.ReactElement {
                         config={config}
                         highlightedTaskIds={highlightedTaskIds}
                         onTaskClick={setSelectedTask}
-                        onAddTask={canCreateTask ? (colId) => { setTaskStatus(colId as TaskStatus); setTaskDue(undefined); setShowTaskForm(true); } : undefined}
+                        onAddTask={canCreateTask ? (colId) => void handleInstantTaskCreate(colId as TaskStatus) : undefined}
                       />
                     );
                   })}
@@ -955,11 +1057,7 @@ export default function TasksPage(): React.ReactElement {
                   logActivity(`updated task: "${res.title}"`);
                   return res;
                 }}
-                onDayClick={(date) => {
-                  setTaskStatus('TODO');
-                  setTaskDue(date);
-                  setShowTaskForm(true);
-                }}
+                onDayClick={(date) => void handleInstantTaskCreate('TODO', date)}
               />
             )}
           </div>
@@ -967,7 +1065,7 @@ export default function TasksPage(): React.ReactElement {
 
         {/* ─── TAB 3: TIMELINE AUDIT FEED ──────────────────────────────────────── */}
         {activeTab === 'activity' && canManageAuditFeed && (
-          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-150">
+          <div className="w-full max-w-5xl space-y-6 animate-in fade-in duration-150 text-left pl-2">
             <div className="text-left space-y-1 pb-4 border-b border-white/[0.04] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-white">Timeline Audit Logs</h2>
@@ -1017,26 +1115,75 @@ export default function TasksPage(): React.ReactElement {
               </div>
             </div>
 
-            <div className="relative border-l border-white/[0.04] pl-6 ml-4 space-y-6 py-2 text-left">
+            <div className="relative space-y-6 py-2 text-left">
+              {/* Vertical Glowing Git Branch Line */}
+              <div className="absolute left-[7px] top-4 bottom-8 w-[2px] bg-gradient-to-b from-indigo-500/50 via-purple-500/30 to-slate-800/10 rounded-full" />
+
               {filteredActivities.length === 0 ? (
-                <p className="text-[11px] text-slate-500 italic py-4">No logged entries.</p>
+                <p className="text-[11px] text-slate-500 italic py-4 pl-8">No logged entries.</p>
               ) : (
-                filteredActivities.map(act => (
-                  <div key={act.id} className="relative group">
-                    <span className="absolute -left-[29px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#08090a] border border-indigo-500/40 shadow-sm flex items-center justify-center">
-                      <span className="w-1 h-1 rounded-full bg-cyan-400"></span>
-                    </span>
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-slate-300 font-bold leading-normal">
-                        <span className="text-indigo-400 font-black">{act.userName}</span> {act.details}
-                      </p>
-                      <span className="text-[9px] text-slate-500 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(act.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                filteredActivities.map(act => {
+                  // Determine git diff stats based on details content
+                  const det = act.details.toLowerCase();
+                  let diffText = '1 task modified (~)';
+                  let diffStyle = 'text-cyan-400 bg-cyan-500/10 border-cyan-500/15';
+                  if (det.includes('created task') || det.includes('created project')) {
+                    diffText = '1 task created (+)';
+                    diffStyle = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/15';
+                  } else if (det.includes('deleted task')) {
+                    diffText = '1 task deleted (-)';
+                    diffStyle = 'text-rose-400 bg-rose-500/10 border-rose-500/15';
+                  } else if (det.includes('commented')) {
+                    diffText = '1 comment added (+)';
+                    diffStyle = 'text-indigo-400 bg-indigo-500/10 border-indigo-500/15';
+                  }
+
+                  return (
+                    <div key={act.id} className="relative pl-8 group/commit max-w-4xl">
+                      {/* Glowing Commit Node */}
+                      <span className="absolute left-[3px] top-[14px] w-2.5 h-2.5 rounded-full bg-[#121316] border-[2.5px] border-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)] z-10 flex-shrink-0 group-hover/commit:border-indigo-400 group-hover/commit:scale-110 transition duration-150" />
+                      
+                      {/* Commit Card Container */}
+                      <div className="bg-[#17191d]/50 border border-white/[0.04] rounded-xl p-4 space-y-2.5 hover:bg-[#1c1e23] hover:border-indigo-500/10 transition duration-150 shadow-sm text-left">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.03] pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] uppercase font-black tracking-wider text-slate-500 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded font-mono">
+                              main
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-bold">origin/main</span>
+                          </div>
+                          
+                          {/* Commit Date */}
+                          <span className="text-[9px] text-slate-500 font-semibold flex items-center gap-1 font-mono">
+                            Date: {new Date(act.timestamp).toUTCString().replace('GMT', 'UTC')}
+                          </span>
+                        </div>
+
+                        {/* Commit Message & Author info */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <p className="text-xs text-slate-200 font-bold leading-relaxed tracking-wide font-mono truncate">
+                              {act.details}
+                            </p>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                              <div className="w-4 h-4 rounded-full bg-indigo-650 flex items-center justify-center font-bold text-[7px] text-white">
+                                {act.userName.charAt(0).toUpperCase()}
+                              </div>
+                              <span>
+                                Author: <span className="font-semibold text-slate-350">{act.userName}</span> &lt;{act.userName.toLowerCase().replace(/\s+/g, '')}@devcollab.com&gt;
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Git Diff Stats Pill */}
+                          <span className={`text-[8px] font-mono font-extrabold uppercase px-2 py-0.5 border rounded-full self-start sm:self-center shrink-0 ${diffStyle}`}>
+                            {diffText}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -1381,141 +1528,68 @@ export default function TasksPage(): React.ReactElement {
       </div>
 
       {/* ─── CREATE TASK OVERLAY MODAL ────────────────────────────────── */}
-      {showTaskForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050607]/80 px-4 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-[#17191d] border border-white/[0.04] rounded-2xl p-5 text-white shadow-2xl space-y-4 text-left animate-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center border-b border-white/[0.04] pb-3">
-              <h2 className="text-sm font-bold text-white">Create Workspace Task</h2>
-              <button type="button" onClick={() => setShowTaskForm(false)} className="text-slate-500 hover:text-white transition">✕</button>
-            </div>
-
-            <div className="grid gap-3.5">
-              <div className="grid gap-1">
-                <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Title</label>
-                <input
-                  type="text"
-                  placeholder="Your task title..."
-                  value={taskTitle}
-                  onChange={(e) => {
-                    setTaskTitle(e.target.value);
-                    if (titleError) setTitleError(null);
-                  }}
-                  className={`bg-slate-950 border rounded-xl px-4 py-2.5 text-xs outline-none text-slate-200 placeholder-slate-600 transition ${
-                    titleError ? 'border-rose-500/80 focus:border-rose-500' : 'border-white/[0.04] focus:border-indigo-500/50'
-                  }`}
-                />
-                {titleError && (
-                  <span className="text-[10px] text-rose-400 mt-1 font-semibold">{titleError}</span>
-                )}
-              </div>
-
-              <div className="grid gap-1">
-                <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Lane Status</label>
-                <select
-                  value={taskStatus}
-                  onChange={(e) => setTaskStatus(e.target.value as TaskStatus)}
-                  className="bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition"
-                >
-                  <option value="TODO">To Do</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="IN_REVIEW">In Review</option>
-                  <option value="DONE">Completed</option>
-                </select>
-              </div>
-
-              <div className="grid gap-1">
-                <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Assignee</label>
-                <select
-                  value={taskAssigneeId}
-                  onChange={(e) => setTaskAssigneeId(e.target.value)}
-                  className="bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition"
-                >
-                  <option value="">👤 Unassigned</option>
-                  {members.map((m) => (
-                    <option key={m.userId} value={m.userId}>
-                      👤 {m.user?.name || m.user?.email || 'Unnamed'} ({m.role})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid gap-1">
-                <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Description</label>
-                <textarea
-                  placeholder="Short task description..."
-                  value={taskDesc}
-                  onChange={(e) => setTaskDesc(e.target.value)}
-                  rows={3}
-                  className="bg-slate-950 border border-white/[0.04] rounded-xl px-4 py-2 text-xs outline-none focus:border-indigo-500/50 text-slate-200 placeholder-slate-600 transition resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3.5">
-                <div className="grid gap-1">
-                  <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Priority</label>
-                  <select
-                    value={taskPrio}
-                    onChange={(e) => setTaskPrio(e.target.value as TaskPriority)}
-                    className="bg-slate-950 border border-white/[0.04] rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-500/50 text-slate-400 transition"
-                  >
-                    <option value="P0">P0 (Critical)</option>
-                    <option value="P1">P1 (High)</option>
-                    <option value="P2">P2 (Normal)</option>
-                  </select>
-                </div>
-
-                <div className="grid gap-1 text-xs">
-                  <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">Due Date</label>
-                  <DatePicker date={taskDue} setDate={setTaskDue} placeholder="Choose deadline" disablePastDates={true} />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.04]">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowTaskForm(false);
-                  setTitleError(null);
-                }}
-                disabled={isCreatingTask}
-                className="rounded-xl border border-white/[0.04] px-4 py-2 text-xs font-bold hover:bg-white/[0.01] transition text-slate-400"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCreateTask()}
-                disabled={isCreatingTask}
-                className="rounded-xl bg-indigo-650 hover:bg-indigo-600 disabled:opacity-40 disabled:pointer-events-none text-white px-5 py-2 text-xs font-bold transition shadow-sm flex items-center gap-1.5"
-              >
-                {isCreatingTask ? (
-                  <>
-                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    Creating...
-                  </>
-                ) : (
-                  'Create Task'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-
-      {/* Task detail drawer modal */}
       {selectedTask && (
         <TaskModal
           task={selectedTask}
           config={config}
           onUpdateMetadata={handleUpdateMetadata}
-          onClose={() => setSelectedTask(null)}
-          onSave={async updates => {
-            const res = await updateTask(selectedTask.id, { ...updates, dueDate: updates.dueDate === null ? undefined : updates.dueDate });
-            logActivity(`updated task: "${res.title}"`);
-            return res;
+          onClose={() => {
+            if (selectedTask && selectedTask.id.startsWith('draft-')) {
+              // Re-check sessionStorage to update the banner state
+              const keys = Object.keys(sessionStorage);
+              const draftKey = keys.find(k => k.startsWith(`devcollab_draft_task_${pid}_`));
+              if (draftKey) {
+                setHasActiveDraft(true);
+                setDraftRecoveryKey(draftKey);
+              } else {
+                setHasActiveDraft(false);
+                setDraftRecoveryKey(null);
+              }
+            }
+            setSelectedTask(null);
+          }}
+          onSave={async (updates: any) => {
+            if (selectedTask.id.startsWith('draft-')) {
+              const res = await createTask({
+                title: updates.title || 'Untitled Task',
+                description: updates.description,
+                status: updates.status || 'TODO',
+                priority: updates.priority || 'P2',
+                dueDate: updates.dueDate === null ? undefined : updates.dueDate,
+                projectId: pid!,
+                assigneeId: updates.assigneeId || null,
+              });
+
+              if (updates.assigneeId) {
+                const memberUser = members.find(m => m.userId === updates.assigneeId)?.user;
+                if (memberUser) {
+                  handleUpdateMetadata(res.id, 'assignees', memberUser);
+                }
+              }
+              if (updates.tags && updates.tags.length > 0) {
+                handleUpdateMetadata(res.id, 'tags', updates.tags);
+              }
+              if (updates.attachments && updates.attachments.length > 0) {
+                handleUpdateMetadata(res.id, 'attachments', updates.attachments);
+              }
+              if (updates.checklist && updates.checklist.length > 0) {
+                handleUpdateMetadata(res.id, 'checklists', updates.checklist);
+              }
+
+              const draftKey = `devcollab_draft_task_${pid}_${selectedTask.id}`;
+              sessionStorage.removeItem(draftKey);
+              setHasActiveDraft(false);
+              setDraftRecoveryKey(null);
+
+              logActivity(`created task: "${res.title}"`);
+              setSelectedTask(res);
+              return res;
+            } else {
+              const res = await updateTask(selectedTask.id, { ...updates, dueDate: updates.dueDate === null ? undefined : updates.dueDate });
+              logActivity(`updated task: "${res.title}"`);
+              setSelectedTask(res);
+              return res;
+            }
           }}
           onDelete={async id => {
             await deleteTask(id);
@@ -1548,10 +1622,10 @@ export default function TasksPage(): React.ReactElement {
 
             {/* List current project members */}
             <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 premium-scrollbar">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block text-left font-mono">Current Members ({currentProjectMembers.length})</label>
+              <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block text-left font-mono">Current Members ({activeProjMembers.length})</label>
               
               <div className="space-y-2">
-                {currentProjectMembers.map((member) => (
+                {activeProjMembers.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.03] hover:border-white/[0.06] transition duration-150">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-1 ring-white/[0.04] flex-shrink-0">
@@ -1621,7 +1695,7 @@ export default function TasksPage(): React.ReactElement {
                 
                 {(() => {
                   const unassignedWorkspaceMembers = members.filter(
-                    (wm) => !currentProjectMembers.some((pm) => pm.userId === wm.userId)
+                    (wm) => !activeProjMembers.some((pm) => pm.userId === wm.userId)
                   );
 
                   if (unassignedWorkspaceMembers.length === 0) {
