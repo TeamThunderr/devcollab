@@ -1,0 +1,99 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DevCollab — render.yaml  (Render Blueprint)
+#
+# This file defines ALL Render services as code.
+# Commit it to your repo root — Render reads it automatically.
+#
+# Usage:
+#   Render dashboard → New → Blueprint → connect repo
+#   Render reads this file and creates all services automatically.
+#
+# Variables marked  sync: false  must be set manually in the Render dashboard
+# after the Blueprint is applied (Render will prompt you for them).
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Backend Web Service ─────────────────────────────────────────────────────
+  - type: web
+    name: devcollab-backend
+    runtime: docker
+    # Build context = monorepo root; Render sets this as the build root
+    dockerfilePath: apps/backend/Dockerfile
+    dockerContext: .
+    plan: starter          # Free tier available; upgrade to Standard for no cold starts
+    region: singapore      # Closest to India — change to: oregon, ohio, frankfurt
+    branch: main
+    autoDeploy: true       # Auto-redeploy on push to main
+    healthCheckPath: /api/health
+
+    envVars:
+      # ── Server ────────────────────────────────────────────────────────────
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+
+      # ── Database — auto-linked from the postgres service below ────────────
+      - key: DATABASE_URL
+        fromDatabase:
+          name: devcollab-postgres
+          property: connectionString
+
+      # ── Redis — auto-linked from the redis service below ──────────────────
+      - key: REDIS_URL
+        fromService:
+          name: devcollab-redis
+          type: redis
+          property: connectionString
+
+      # ── Secrets — sync:false means you set these in the Render dashboard ──
+      # Render will prompt you for these when you apply the Blueprint.
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+
+      # ── CORS — set to your Vercel URL after deploying frontend ────────────
+      - key: FRONTEND_URL
+        sync: false
+
+      # ── AI ────────────────────────────────────────────────────────────────
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3-flash-preview
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-3.1-flash-lite
+      - key: AI_MOCK_MODE
+        value: "false"
+
+      # ── Payments ──────────────────────────────────────────────────────────
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+
+      # ── Email ─────────────────────────────────────────────────────────────
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  - type: redis
+    name: devcollab-redis
+    plan: starter          # 25MB — upgrade to Standard for 100MB + persistence
+    region: singapore
+    maxmemoryPolicy: allkeys-lru   # Evict least recently used keys when full
+
+# ── PostgreSQL ─────────────────────────────────────────────────────────────────
+databases:
+  - name: devcollab-postgres
+    databaseName: devcollab
+    user: devcollab
+    plan: starter          # 256MB RAM, 1GB storage — free 90 days, then $7/mo
+    region: singapore

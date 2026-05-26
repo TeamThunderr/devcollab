@@ -99,38 +99,36 @@ jobs:
           tags: devcollab-backend:ci
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 4: Deploy backend to Railway
+  # JOB 4: Deploy backend to Render
   #   Only runs when ALL CI jobs pass AND we're on the main branch
   # ─────────────────────────────────────────────────────────────────────────────
   deploy-backend:
-    name: "Deploy → Railway"
+    name: "Deploy → Render"
     runs-on: ubuntu-latest
     needs: [typecheck-backend, build-frontend, docker-validate-backend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: production
-      url: ${{ secrets.RAILWAY_BACKEND_URL }}
+      url: ${{ secrets.RENDER_BACKEND_URL }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Trigger Render deploy
+        # Render Deploy Hook — a single POST to this URL starts a new deploy.
+        # Get the URL from: Render dashboard → Service → Settings → Deploy Hook
+        run: |
+          curl --silent --show-error --fail-with-body \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        # --detach: don't wait for deploy to complete (Railway streams logs separately)
-        run: railway up --service=backend --detach
+      - name: Wait for Render to deploy
+        # Render typically takes 2–4 minutes for a Docker deploy
+        run: sleep 180
 
       - name: Verify deployment health
-        # Wait 45 seconds for Railway to spin up the new instance, then hit health endpoint
         run: |
-          sleep 45
           curl --fail --silent --show-error \
-            "${{ secrets.RAILWAY_BACKEND_URL }}/api/health" | \
+            "${{ secrets.RENDER_BACKEND_URL }}/api/health" | \
             python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status')=='ok' else 1)"
-        continue-on-error: true  # Don't fail the workflow if health check is slow
+        continue-on-error: true  # Don't fail the workflow if Render is still warming up
 
   # ─────────────────────────────────────────────────────────────────────────────
   # JOB 5: Notify on failure
@@ -157,6 +155,6 @@ jobs:
 # automatically when CI passes. Configure in: vercel.com/project/settings/git
 #
 # Required GitHub Secrets (Settings → Secrets and variables → Actions):
-#   RAILWAY_TOKEN       — from railway.app → Account → Tokens
-#   RAILWAY_BACKEND_URL — your Railway public domain (e.g. https://xyz.up.railway.app)
+#   RENDER_DEPLOY_HOOK_URL — Render dashboard → Service → Settings → Deploy Hook
+#   RENDER_BACKEND_URL     — your Render public URL (e.g. https://devcollab-backend.onrender.com)
 # ─────────────────────────────────────────────────────────────────────────────
