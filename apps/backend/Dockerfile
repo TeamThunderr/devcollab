@@ -20,7 +20,7 @@ COPY package.json package-lock.json ./
 COPY apps/backend/package.json ./apps/backend/
 
 # Install full workspace (including devDependencies for tsc)
-RUN npm ci --workspace=apps/backend --include=workspace-root
+RUN npm ci --workspace=apps/backend
 
 # ── Stage 2: Build TypeScript → JavaScript ────────────────────────────────────
 FROM node:20-alpine AS build
@@ -29,6 +29,7 @@ WORKDIR /app
 
 # Copy installed modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/backend/node_module[s] ./apps/backend/node_modules/
 
 # Copy source
 COPY apps/backend/ ./apps/backend/
@@ -48,7 +49,7 @@ WORKDIR /app
 # Non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodeapp -u 1001 -G nodejs
 
-# Copy root workspace manifest (needed for npm workspaces path resolution)
+# Copy root workspace manifest and lockfile (needed for npm ci and workspaces)
 COPY package.json package-lock.json ./
 
 # Copy backend production manifest and install ONLY production deps
@@ -57,6 +58,9 @@ RUN npm ci --workspace=apps/backend --omit=dev
 
 # Copy the compiled JavaScript output from the build stage
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
+
+# Copy the raw SQL migrations (tsc ignores them, so they must be copied manually)
+COPY --from=build /app/apps/backend/src/db/migrations ./apps/backend/dist/db/migrations
 
 # Switch to non-root user
 USER nodeapp

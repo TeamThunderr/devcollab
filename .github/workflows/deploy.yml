@@ -109,7 +109,6 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: production
-      url: ${{ secrets.RENDER_BACKEND_URL }}
 
     steps:
       - name: Trigger Render deploy
@@ -124,9 +123,11 @@ jobs:
         run: sleep 180
 
       - name: Verify deployment health
+        env:
+          BACKEND_URL: ${{ secrets.RENDER_BACKEND_URL }}
         run: |
           curl --fail --silent --show-error \
-            "${{ secrets.RENDER_BACKEND_URL }}/api/health" | \
+            "$BACKEND_URL/api/health" | \
             python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status')=='ok' else 1)"
         continue-on-error: true  # Don't fail the workflow if Render is still warming up
 
