@@ -1,0 +1,58 @@
+name: CI / Deploy to Production
+
+# Runs on every push to main; PRs get CI only (no deploy)
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Build & type-check ──────────────────────────────────────────────────────
+  build:
+    name: Build & Type-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check backend
+        run: npm run build --workspace=apps/backend
+
+      - name: Type-check frontend (vite build)
+        env:
+          # Provide a placeholder so Vite doesn't error on missing var
+          VITE_API_URL: https://placeholder.example.com
+        run: npm run build --workspace=apps/frontend
+
+  # ── Deploy backend to Railway (only on push to main) ──────────────────────
+  deploy-backend:
+    name: Deploy Backend → Railway
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        # Deploys using apps/backend/Dockerfile automatically
+        run: railway up --service=backend --detach
+
+  # ── Frontend deploys automatically via Vercel GitHub integration ───────────
+  # No extra step needed — Vercel watches the `main` branch.
+  # Make sure VITE_API_URL is set in the Vercel environment variables dashboard.
