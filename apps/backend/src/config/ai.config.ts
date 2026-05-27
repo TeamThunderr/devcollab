@@ -10,7 +10,7 @@ export const aiConfig = {
   apiKey: process.env.GEMINI_API_KEY ?? "",
 
   /** Primary model — highest capability */
-  model: process.env.GEMINI_MODEL ?? "gemini-3-flash-preview",
+  model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
 
   /** Fallback model — used when the primary hits rate limits (500 RPD free tier) */
   fallbackModel:

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, Component, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/authStore';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -28,6 +28,8 @@ export default function ProfilePage(): React.ReactElement {
   const [isEditing, setIsEditing] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     avatar_url: '',
@@ -35,6 +37,22 @@ export default function ProfilePage(): React.ReactElement {
     skillsStr: '',
     github_url: '',
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 1.5 * 1024 * 1024) {
+      alert("Image size limit exceeded. Please upload an image under 1.5 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData(prev => ({ ...prev, avatar_url: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (user) {
@@ -150,7 +168,18 @@ export default function ProfilePage(): React.ReactElement {
         <div className="px-6 sm:px-10 pb-10">
           {/* Avatar and Name */}
           <div className="relative flex items-end -mt-16 mb-8">
-            <div className="relative w-32 h-32 rounded-full border-4 border-white dark:border-gray-900 bg-gray-200 dark:bg-gray-800 overflow-hidden flex items-center justify-center">
+            <div 
+              className={`relative w-32 h-32 rounded-full border-4 border-white dark:border-gray-900 bg-gray-200 dark:bg-gray-800 overflow-hidden flex items-center justify-center ${isEditing ? 'group cursor-pointer hover:border-blue-500 transition-all duration-200' : ''}`}
+              onClick={isEditing ? () => fileInputRef.current?.click() : undefined}
+              title={isEditing ? "Click to upload a custom avatar photo" : undefined}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
+              />
               {formData.avatar_url || user.avatar ? (
                 <img 
                   src={isEditing ? formData.avatar_url : (user.avatar || undefined)} 
@@ -164,6 +193,14 @@ export default function ProfilePage(): React.ReactElement {
                 />
               ) : (
                 <span className="text-4xl font-bold text-gray-500 dark:text-gray-400">{userInitials}</span>
+              )}
+
+              {/* Hover overlay with camera icon in edit mode */}
+              {isEditing && (
+                <div className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <Camera className="w-6 h-6 mb-1" />
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Change</span>
+                </div>
               )}
             </div>
             
@@ -279,7 +316,7 @@ export default function ProfilePage(): React.ReactElement {
                         <Camera className="h-5 w-5 text-gray-400" />
                       </div>
                       <input
-                        type="url"
+                        type="text"
                         name="avatar_url"
                         value={formData.avatar_url}
                         onChange={handleChange}

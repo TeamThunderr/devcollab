@@ -110,8 +110,13 @@ export async function streamGeminiResponse(
       return true; // success
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      // 429 / quota — signal caller to retry with fallback model
-      if (message.includes("429") || message.toLowerCase().includes("quota")) {
+      // 429 / quota / 503 — signal caller to retry with fallback model
+      if (
+        message.includes("429") ||
+        message.toLowerCase().includes("quota") ||
+        message.includes("503") ||
+        message.toLowerCase().includes("unavailable")
+      ) {
         return false;
       }
       // Any other error (invalid model, network, parse failure etc.)
