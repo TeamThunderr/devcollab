@@ -19,5 +19,29 @@ export const activityController = {
       if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
       return reply.status(500).send({ error: 'Internal Server Error' });
     }
+  },
+
+  async getProjectActivity(
+    request: FastifyRequest<{
+      Params: { projectId: string };
+      Querystring: { page?: string; limit?: string };
+    }>,
+    reply: FastifyReply
+  ) {
+    try {
+      const { projectId } = request.params;
+      const page = Math.max(1, Number(request.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, Number(request.query.limit) || 20));
+
+      const feed = await activityService.getProjectActivities(
+        projectId,
+        request.user!.userId,
+        { page, limit }
+      );
+      return reply.send(feed);
+    } catch (error: any) {
+      if (error.message?.startsWith('Forbidden')) return reply.status(403).send({ error: error.message });
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
   }
 };

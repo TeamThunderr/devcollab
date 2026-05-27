@@ -136,4 +136,52 @@ export const activityService = {
       },
     };
   },
+
+  async getProjectActivities(projectId: string, userId: string, filters: {
+    page: number;
+    limit: number;
+  }) {
+    // Verify user has access to the project
+    const accessCheck = await query(
+      `SELECT pm.user_id FROM project_members pm WHERE pm.project_id = $1 AND pm.user_id = $2
+       UNION
+       SELECT wm.user_id FROM projects p
+       JOIN workspace_members wm ON wm.workspace_id = p.workspace_id
+       WHERE p.id = $1 AND wm.user_id = $2 AND wm.role IN ('owner', 'admin')
+       LIMIT 1`,
+      [projectId, userId]
+    );
+    if (!accessCheck.rowCount) {
+      throw new Error('Forbidden: No access to this project');
+    }
+
+    const skip = (filters.page - 1) * filters.limit;
+
+    const [activities, totalCount] = await Promise.all([
+      query(
+        `SELECT a.*, u.email, u.name, u.avatar_url
+         FROM activity_feed a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.project_id = $1
+         ORDER BY a.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [projectId, filters.limit, skip]
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM activity_feed WHERE project_id = $1`,
+        [projectId]
+      ),
+    ]);
+
+    const total = Number(totalCount.rows[0]?.count ?? 0);
+    return {
+      data: activities.rows.map(mapActivity),
+      meta: {
+        total,
+        page: filters.page,
+        limit: filters.limit,
+        totalPages: Math.ceil(total / filters.limit),
+      },
+    };
+  },
 };

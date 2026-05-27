@@ -12,6 +12,12 @@ const activityRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [verifyRole([Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER])] }, 
     activityController.getWorkspaceActivity as any
   );
+
+  // Project-scoped activity — any authenticated user (access checked in service)
+  fastify.get<{ Params: { projectId: string } }>(
+    '/project/:projectId',
+    activityController.getProjectActivity as any
+  );
 };
 
 export default activityRoutes;

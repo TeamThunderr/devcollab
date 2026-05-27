@@ -1,6 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { summarizePage } from '../ai/ai.service';
 import { WikiService } from './wiki.service';
+import { activityService } from '../activity/activity.service';
+import { emitToProject } from '../../socket/socket';
 
 const wikiService = new WikiService();
 
@@ -47,6 +49,23 @@ export async function createPageHandler(
     const userId = request.user!.userId;
     const data = { ...request.body, projectId, createdBy: userId };
     const newPage = await wikiService.createPage(data, userId);
+
+    // Log DOC_UPDATED activity
+    if (request.body.workspaceId) {
+      const activity = await activityService.createActivity({
+        workspaceId: request.body.workspaceId,
+        projectId,
+        userId,
+        action: 'DOC_UPDATED',
+        entityType: 'WIKI_PAGE',
+        entityId: newPage.id,
+        metadata: { pageId: newPage.id, pageTitle: newPage.title, operation: 'created' },
+      });
+      if (activity) {
+        emitToProject(projectId, 'activity:new', activity);
+      }
+    }
+
     return reply.status(201).send(newPage);
   } catch (error) {
     request.log.error(error);
@@ -65,6 +84,25 @@ export async function updatePageHandler(
     const { id } = request.params;
     const userId = request.user!.userId;
     const updatedPage = await wikiService.updatePage(id, { ...request.body, updatedBy: userId }, userId);
+
+    // Log DOC_UPDATED activity (only if title or content changed — not just icon/cover)
+    if (request.body.title !== undefined || request.body.content !== undefined) {
+      if (updatedPage.workspaceId) {
+        const activity = await activityService.createActivity({
+          workspaceId: updatedPage.workspaceId,
+          projectId: updatedPage.projectId,
+          userId,
+          action: 'DOC_UPDATED',
+          entityType: 'WIKI_PAGE',
+          entityId: updatedPage.id,
+          metadata: { pageId: updatedPage.id, pageTitle: updatedPage.title, operation: 'updated' },
+        });
+        if (activity) {
+          emitToProject(updatedPage.projectId, 'activity:new', activity);
+        }
+      }
+    }
+
     return reply.send(updatedPage);
   } catch (error) {
     request.log.error(error);

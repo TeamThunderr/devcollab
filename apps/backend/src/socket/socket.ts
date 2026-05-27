@@ -54,6 +54,7 @@ interface ServerToClientEvents {
   'snippet:created': (data: unknown) => void;
   'snippet:updated': (data: unknown) => void;
   'snippet:deleted': (data: { snippetId: string }) => void;
+  'activity:new': (data: unknown) => void;
   error: (data: { message: string }) => void;
   [event: string]: (...args: any[]) => void;
 }

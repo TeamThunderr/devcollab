@@ -10,6 +10,7 @@ import {
 } from './task.schema';
 import { notificationService } from '../notification/notification.service';
 import { emitToUser, emitToProject } from '../../socket/socket';
+import { activityService } from '../activity/activity.service';
 
 const taskService = new TaskService();
 
@@ -87,6 +88,26 @@ export class TaskController {
           status: task.status,
           position: 0
         });
+
+        // Log TASK_MOVED activity & broadcast to project feed
+        const workspaceRow = await import('../../db/client').then(m =>
+          m.query<{ workspace_id: string }>('SELECT workspace_id FROM projects WHERE id = $1', [task.projectId])
+        );
+        const workspaceId = workspaceRow.rows[0]?.workspace_id;
+        if (workspaceId) {
+          const activity = await activityService.createActivity({
+            workspaceId,
+            projectId: task.projectId,
+            userId: request.user!.userId,
+            action: 'TASK_MOVED',
+            entityType: 'TASK',
+            entityId: task.id,
+            metadata: { taskId: task.id, taskTitle: task.title, fromStatus: oldTask.status, toStatus: task.status },
+          });
+          if (activity) {
+            emitToProject(task.projectId, 'activity:new', activity);
+          }
+        }
       } else {
         emitToProject(task.projectId, 'task:updated', task);
       }
@@ -158,6 +179,26 @@ export class TaskController {
           taskId: id,
           comment
         });
+
+        // Log COMMENT_ADDED activity & broadcast to project feed
+        const workspaceRow = await import('../../db/client').then(m =>
+          m.query<{ workspace_id: string }>('SELECT workspace_id FROM projects WHERE id = $1', [task.projectId])
+        );
+        const workspaceId = workspaceRow.rows[0]?.workspace_id;
+        if (workspaceId) {
+          const activity = await activityService.createActivity({
+            workspaceId,
+            projectId: task.projectId,
+            userId: request.user!.userId,
+            action: 'COMMENT_ADDED',
+            entityType: 'TASK',
+            entityId: id,
+            metadata: { taskId: id, taskTitle: task.title, commentPreview: data.content.slice(0, 80) },
+          });
+          if (activity) {
+            emitToProject(task.projectId, 'activity:new', activity);
+          }
+        }
       }
 
       return reply.status(201).send(comment);
