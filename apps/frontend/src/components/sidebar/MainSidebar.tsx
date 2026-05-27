@@ -274,6 +274,7 @@ export default function MainSidebar(): React.ReactElement {
   if (workspaceId && projectId) {
     const projectNav: NavItem[] = [
       { label: 'Board',       to: `/w/${workspaceId}/p/${projectId}/board`,         icon: <Kanban className="w-4 h-4" />    },
+      { label: 'Activity',    to: `/w/${workspaceId}/p/${projectId}/activity`,      icon: <Activity className="w-4 h-4" />  },
       { label: 'Wiki',        to: `/w/${workspaceId}/p/${projectId}/wiki`,          icon: <BookOpen className="w-4 h-4" />  },
       { label: 'Snippets',    to: `/w/${workspaceId}/p/${projectId}/board?tab=snippets`, icon: <Code2 className="w-4 h-4" />    },
       { label: 'Editor',      to: `/w/${workspaceId}/p/${projectId}/editor`,        icon: <Code2 className="w-4 h-4" />     },
@@ -281,7 +282,7 @@ export default function MainSidebar(): React.ReactElement {
       { label: 'Members',     to: `/w/${workspaceId}/p/${projectId}/members`,       icon: <Users className="w-4 h-4" />     },
     ].filter(item => {
       if (isViewer) {
-        return item.label === "Board";
+        return item.label === "Board" || item.label === "Activity";
       }
       return true;
     });

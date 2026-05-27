@@ -28,5 +28,20 @@ export const activityService = {
     
     const response = await api.get<PaginatedResponse<Activity>>(url);
     return response.data;
-  }
+  },
+
+  async getProjectActivities(
+    projectId: string,
+    filters?: { page?: number; limit?: number }
+  ): Promise<PaginatedResponse<Activity>> {
+    const params = new URLSearchParams();
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+
+    const queryString = params.toString();
+    const url = `/api/activity/project/${projectId}${queryString ? `?${queryString}` : ''}`;
+
+    const response = await api.get<PaginatedResponse<Activity>>(url);
+    return response.data;
+  },
 };

@@ -57,6 +57,7 @@ interface ServerToClientEvents {
   "project:member:assigned": (data: any) => void;
   "project:member:removed": (data: any) => void;
   "project:access:revoked": (data: any) => void;
+  "activity:new": (data: unknown) => void;
   error: (data: { message: string }) => void;
 }
 

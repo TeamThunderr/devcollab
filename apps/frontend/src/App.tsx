@@ -35,6 +35,7 @@ import SnippetsView from "./pages/snippets/SnippetsView";
 import SnippetEditorPage from "./pages/snippets/SnippetEditorPage";
 import WikiView from "./pages/wiki/WikiView";
 import ProjectMembersPage from "./pages/project/ProjectMembersPage";
+import ProjectActivityPage from "./pages/project/ProjectActivityPage";
 
 // ─── Root redirect ────────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ function App(): React.ReactElement {
           <Route path="p/:projectId" element={<ProjectLayout />}>
             <Route index element={<Navigate to="board" replace />} />
             <Route path="board" element={<TasksView />} />
+            <Route path="activity" element={<ProjectActivityPage />} />
             <Route path="editor" element={<EditorView />} />
             <Route path="ai" element={<AIAssistantView />} />
             <Route path="snippets" element={<SnippetsView />} />

@@ -4,6 +4,7 @@ import { Role } from '../../middleware/rbac.middleware';
 import { requireProjectAccess } from '../../middleware/projectAccess';
 import { AppError } from '../../utils/errors';
 import { emitToProject, kickUserFromProject } from '../../socket/socket';
+import { activityService } from '../activity/activity.service';
 
 function mapProject(project: any) {
   return {
@@ -225,6 +226,26 @@ export class ProjectService {
     };
 
     emitToProject(projectId, 'project:member:assigned', member);
+
+    // Log MEMBER_JOINED activity
+    const wsRow = await query<{ workspace_id: string }>(
+      'SELECT workspace_id FROM projects WHERE id = $1', [projectId]
+    );
+    const workspaceId = wsRow.rows[0]?.workspace_id;
+    if (workspaceId) {
+      const activity = await activityService.createActivity({
+        workspaceId,
+        projectId,
+        userId: assignerId,
+        action: 'MEMBER_JOINED',
+        entityType: 'PROJECT_MEMBER',
+        entityId: member.id,
+        metadata: { targetUserId: data.userId, targetName: userRow?.name || userRow?.email, role: member.role },
+      });
+      if (activity) {
+        emitToProject(projectId, 'activity:new', activity);
+      }
+    }
 
     return member;
   }
