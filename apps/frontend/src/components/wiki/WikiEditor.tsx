@@ -160,8 +160,9 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const data = response.data;
+      const API_BASE = import.meta.env.VITE_API_URL || '';
       if (data.url) {
-        editor.chain().focus().setImage({ src: `http://localhost:3000${data.url}` }).run();
+        editor.chain().focus().setImage({ src: `${API_BASE}${data.url}` }).run();
       }
     } catch (err) {
       console.error('Image upload failed', err);
@@ -183,8 +184,9 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const data = response.data;
+      const API_BASE = import.meta.env.VITE_API_URL || '';
       if (data.url) {
-        updatePage(activePage.id, { coverImage: `http://localhost:3000${data.url}` });
+        updatePage(activePage.id, { coverImage: `${API_BASE}${data.url}` });
       }
     } catch (err) {
       console.error('Cover upload failed', err);
