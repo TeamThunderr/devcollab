@@ -30,7 +30,8 @@
 
 <br>
 
-[![View Demo](https://img.shields.io/badge/🚀_View_Live_Demo-FF6B6B?style=for-the-badge)](https://devcollab.demo.link)
+[![View Demo](https://img.shields.io/badge/🚀_View_Live_Demo-FF6B6B?style=for-the-badge)](https://devcollab-gamma.vercel.app/)
+[![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://devcollab-gamma.vercel.app/)
 [![Postman Collection](https://img.shields.io/badge/Postman_Collection-FF6C37?style=for-the-badge&logo=postman&logoColor=white)](./DevCollab_Full.postman_collection.json)
 
 <br>
@@ -42,6 +43,8 @@
 ## 📸 Preview
 
 <div align="center">
+
+**🌐 Live at → [devcollab-gamma.vercel.app](https://devcollab-gamma.vercel.app/)**
 
 <!-- Add your demo GIF here -->
 ![DevCollab Demo](./docs/demo.gif)
@@ -371,16 +374,42 @@ docker-compose ps                # Check service health
 
 ---
 
-## 👥 Team
+## 👥 Contributors
 
 <div align="center">
 
-| 👤 Member | 🏗 Modules |
-|-----------|-----------|
-| **Member 1** | Auth system · Workspace management · Database schema & migrations |
-| **Member 2** | Real-time engine (Socket.IO) · AI Intelligence Center (Gemini) · Notifications |
-| **Member 3** | Kanban UI · Documentation Wiki · Code Snippet Manager |
-| **Member 4** | App shell & routing · Monaco Code Editor · Billing (Razorpay) |
+<table>
+  <tr>
+    <td align="center" width="220">
+      <b>Smith C</b><br/>
+      <sub>✉️ <a href="mailto:smithc.cse2024@citchennai.net">smithc.cse2024@citchennai.net</a></sub><br/><br/>
+      <a href="https://drive.google.com/file/d/1nvl57ugXpAbS856mIFg0pE6FGqDGxOh1/view?usp=sharing">📄 Resume</a> ·
+      <a href="https://www.linkedin.com/in/mrsmithc">💼 LinkedIn</a> ·
+      <a href="https://github.com/SmithC05">🐙 GitHub</a>
+    </td>
+    <td align="center" width="220">
+      <b>Libin Anto E</b><br/>
+      <sub>✉️ <a href="mailto:libinantoe.aids2024@citchennai.net">libinantoe.aids2024@citchennai.net</a></sub><br/><br/>
+      <a href="https://drive.google.com/file/d/1susBTsCvb3TKb7fRi892R-nGFSNp7TgZ/view?usp=drivesdk">📄 Resume</a> ·
+      <a href="https://www.linkedin.com/in/libin-anto-064838327">💼 LinkedIn</a> ·
+      <a href="https://github.com/Libin-anto">🐙 GitHub</a>
+    </td>
+    <td align="center" width="220">
+      <b>Sanjay Balan M</b><br/>
+      <sub>✉️ <a href="mailto:sanjaybalanm.cse2024@citchennai.net">sanjaybalanm.cse2024@citchennai.net</a></sub><br/><br/>
+      <a href="https://drive.google.com/file/d/1gW7amqvx6YhkYjz9A4mYl3f0_gp5EDyQ/view?usp=drivesdk">📄 Resume</a> ·
+      <a href="https://www.linkedin.com/in/sanjay-balan-m-558747316">💼 LinkedIn</a> ·
+      <a href="https://github.com/sanjaybalanm">🐙 GitHub</a>
+    </td>
+    <td align="center" width="220">
+      <b>Balaji V</b><br/>
+      <sub>✉️ <a href="mailto:balajiv.cse2024@citchennai.net">balajiv.cse2024@citchennai.net</a></sub><br/><br/>
+      <a href="https://drive.google.com/file/d/1VkErWY7qjJoouy6c_RLmxbp3Oe_qOGRS/view?usp=sharing">📄 Resume</a> ·
+      <a href="https://www.linkedin.com/in/balajiv0506/">💼 LinkedIn</a> ·
+      <a href="https://github.com/BalajiVadivel0">🐙 GitHub</a>
+    </td>
+  </tr>
+</table>
 
 </div>
 
