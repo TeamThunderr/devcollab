@@ -11,6 +11,7 @@ import WorkspaceLayout from "./layouts/WorkspaceLayout";
 import ProjectLayout from "./layouts/ProjectLayout";
 
 import AuthPage from "./pages/auth/AuthPage";
+import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 // ─── Global pages ─────────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ function App(): React.ReactElement {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<AuthPage />} />
           <Route path="/register" element={<AuthPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Route>
 
         {/* Public Invite Accept Route */}
