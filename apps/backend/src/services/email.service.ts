@@ -1,18 +1,6 @@
-import nodemailer from 'nodemailer';
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_PORT === '465',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
-
 export const emailService = {
   async sendVerificationEmail(to: string, token: string) {
-    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
 
     if (process.env.NODE_ENV === 'development') {
@@ -30,34 +18,48 @@ export const emailService = {
         <div style="text-align: center; margin: 30px 0;">
           <a href="${verifyUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Verify Email</a>
         </div>
-        <p style="font-size: 14px; color: #666;">If the button above does not work, copy and paste the following link into your browser:</p>
-        <p style="font-size: 14px; color: #2563eb; word-break: break-all;">
-          <a href="${verifyUrl}">${verifyUrl}</a>
-        </p>
+
         <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
         <p style="font-size: 12px; color: #999; text-align: center;">This link will expire in 24 hours.</p>
         <p style="font-size: 12px; color: #999; text-align: center;">If you didn't request this email, you can safely ignore it.</p>
       </div>
     `;
 
-    // Only attempt to send if SMTP user is defined (or we can always attempt, and handle errors)
-    if (process.env.SMTP_USER) {
+    if (process.env.BREVO_API_KEY) {
       try {
-        await transporter.sendMail({
-          from: `"DevCollab" <${process.env.SMTP_USER}>`,
-          to,
-          subject: 'Verify your DevCollab account',
-          html: htmlContent,
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'accept': 'application/json',
+            'api-key': process.env.BREVO_API_KEY,
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: {
+              name: "DevCollab",
+              email: process.env.BREVO_SENDER_EMAIL || "smithc.cse2024@citchennai.net"
+            },
+            to: [{ email: to }],
+            subject: 'Verify your DevCollab account',
+            htmlContent: htmlContent
+          })
         });
+
+        const data: any = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(`Brevo API Error: ${JSON.stringify(data)}`);
+        }
+        
+        console.log('✅ Brevo email accepted:', data);
       } catch (error) {
         console.error('Failed to send verification email:', error);
-        // We do not throw in development mode to allow local testing
         if (process.env.NODE_ENV !== 'development') {
           throw new Error('Failed to send verification email');
         }
       }
     } else if (process.env.NODE_ENV !== 'development') {
-      console.warn('SMTP_USER not configured. Email not sent.');
+      console.warn('BREVO_API_KEY not configured. Email not sent.');
     }
   }
 };
