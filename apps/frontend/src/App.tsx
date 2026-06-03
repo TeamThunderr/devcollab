@@ -12,6 +12,7 @@ import ProjectLayout from "./layouts/ProjectLayout";
 
 import AuthPage from "./pages/auth/AuthPage";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import InviteAcceptPage from "./pages/workspace/InviteAcceptPage";
 
 // ─── Global pages ─────────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ function App(): React.ReactElement {
           <Route path="/login" element={<AuthPage />} />
           <Route path="/register" element={<AuthPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
 
         {/* Public Invite Accept Route */}

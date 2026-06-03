@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { query } from '../../db/client';
 import { AppError } from '../../utils/errors';
-import { RegisterInput, LoginInput, UpdateUserInput } from './auth.schema';
+import { RegisterInput, LoginInput, UpdateUserInput, ForgotPasswordInput, ResetPasswordInput } from './auth.schema';
 import { emailService } from '../../services/email.service';
 
 interface UserRow {
@@ -19,6 +19,7 @@ interface UserRow {
   github_id: string | null;
   platform_role: 'USER' | 'SUPER_ADMIN';
   is_verified: boolean;
+  token_version: number;
 }
 
 function publicUser(user: Pick<UserRow, 'id' | 'email' | 'name' | 'avatar_url' | 'bio' | 'skills' | 'github_url' | 'platform_role'>) {
@@ -34,12 +35,13 @@ function publicUser(user: Pick<UserRow, 'id' | 'email' | 'name' | 'avatar_url' |
   };
 }
 
-const generateTokens = (user: Pick<UserRow, 'id' | 'email' | 'name' | 'platform_role'>) => {
+const generateTokens = (user: Pick<UserRow, 'id' | 'email' | 'name' | 'platform_role' | 'token_version'>) => {
   const payload = {
     userId: user.id,
     email: user.email,
     name: user.name,
     platformRole: user.platform_role,
+    tokenVersion: user.token_version || 1,
   };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: '15m' });
   const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, { expiresIn: '7d' });
@@ -50,6 +52,10 @@ export const authService = {
   async register(data: RegisterInput) {
     const existingUser = await query<UserRow>('SELECT * FROM users WHERE email = $1', [data.email]);
     if (existingUser.rowCount) {
+      const user = existingUser.rows[0];
+      if (!user.password_hash && (user.google_id || user.github_id)) {
+        throw new AppError(400, 'Account already exists. Please sign in with Google/GitHub.');
+      }
       throw new AppError(400, 'User already exists');
     }
 
@@ -139,6 +145,7 @@ export const authService = {
         userId: string;
         email: string;
         name: string;
+        tokenVersion: number;
       };
 
       const result = await query<UserRow>('SELECT * FROM users WHERE id = $1 AND email = $2', [
@@ -146,7 +153,7 @@ export const authService = {
         decoded.email,
       ]);
       const user = result.rows[0];
-      if (!user) {
+      if (!user || (user.token_version && user.token_version !== decoded.tokenVersion)) {
         throw new AppError(401, 'Invalid refresh token');
       }
 
@@ -258,6 +265,72 @@ export const authService = {
     );
 
     await emailService.sendVerificationEmail(user.email, token);
+
+    return { success: true };
+  },
+
+  async forgotPassword(data: ForgotPasswordInput) {
+    const result = await query<UserRow>('SELECT * FROM users WHERE email = $1', [data.email]);
+    if (result.rowCount === 0) {
+      return { message: 'If an account exists with this email, a password reset link has been sent.' };
+    }
+    const user = result.rows[0];
+
+    // Rate limiting
+    const recentToken = await query<{ created_at: Date }>(
+      'SELECT created_at FROM password_reset_tokens WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [user.id]
+    );
+
+    if (recentToken.rowCount && recentToken.rowCount > 0) {
+      const lastSent = recentToken.rows[0].created_at;
+      const timeDiffSeconds = (Date.now() - new Date(lastSent).getTime()) / 1000;
+      if (timeDiffSeconds < 60) {
+        throw new AppError(429, 'Please wait 60 seconds before requesting another email');
+      }
+    }
+
+    // Invalidate existing reset tokens for this user
+    await query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await query(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+      [user.id, tokenHash, expiresAt]
+    );
+
+    await emailService.sendPasswordResetEmail(user.email, token);
+
+    return { message: 'If an account exists with this email, a password reset link has been sent.' };
+  },
+
+  async resetPassword(data: ResetPasswordInput) {
+    const tokenHash = crypto.createHash('sha256').update(data.token).digest('hex');
+
+    // Clean up expired tokens globally
+    await query('DELETE FROM password_reset_tokens WHERE expires_at < NOW()');
+
+    const result = await query<{ user_id: string }>(
+      'SELECT user_id FROM password_reset_tokens WHERE token_hash = $1 AND expires_at > NOW()',
+      [tokenHash]
+    );
+
+    if (result.rowCount === 0) {
+      throw new AppError(400, 'Invalid or expired password reset token');
+    }
+
+    const userId = result.rows[0].user_id;
+    const passwordHash = await bcrypt.hash(data.newPassword, 10);
+
+    await query(
+      'UPDATE users SET password_hash = $1, token_version = COALESCE(token_version, 1) + 1 WHERE id = $2',
+      [passwordHash, userId]
+    );
+
+    await query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
 
     return { success: true };
   }

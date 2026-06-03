@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { authService } from './auth.service';
-import { registerSchema, loginSchema, updateUserSchema } from './auth.schema';
 import { AppError } from '../../utils/errors';
+import { forgotPasswordSchema, resetPasswordSchema, registerSchema, loginSchema, updateUserSchema } from './auth.schema';
 
 export const authController = {
   async register(request: FastifyRequest, reply: FastifyReply) {
@@ -165,6 +165,34 @@ export const authController = {
     } catch (error) {
       console.error(error);
       reply.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/login?error=oauth_failed`);
+    }
+  },
+
+  async forgotPassword(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = forgotPasswordSchema.parse(request.body);
+      const result = await authService.forgotPassword(data);
+      return reply.send(result);
+    } catch (error: any) {
+      if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
+      if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  },
+
+  async resetPassword(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = resetPasswordSchema.parse(request.body);
+      await authService.resetPassword(data);
+      
+      // Clear refresh token to log out current session
+      reply.clearCookie('refreshToken', { path: '/' });
+      
+      return reply.send({ message: 'Password reset successfully' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
+      if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });
+      return reply.status(500).send({ error: 'Internal Server Error' });
     }
   },
 

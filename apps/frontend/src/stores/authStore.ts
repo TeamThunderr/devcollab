@@ -19,6 +19,8 @@ export interface AuthStore {
   clearAuth: () => void;
   verifyEmail: (token: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ message: string }>;
+  resetPassword: (token: string, newPassword: string) => Promise<{ message: string }>;
 }
 
 export const useAuthStore = create<AuthStore>()((set) => ({
@@ -129,6 +131,34 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     } catch (error: any) {
       const errData = error.response?.data?.error;
       const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to resend verification email");
+      set({ error: errMsg, isLoading: false });
+      throw error;
+    }
+  },
+
+  forgotPassword: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authService.forgotPassword(email);
+      set({ isLoading: false });
+      return res;
+    } catch (error: any) {
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to request password reset");
+      set({ error: errMsg, isLoading: false });
+      throw error;
+    }
+  },
+
+  resetPassword: async (token: string, newPassword: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authService.resetPassword(token, newPassword);
+      set({ isLoading: false });
+      return res;
+    } catch (error: any) {
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to reset password");
       set({ error: errMsg, isLoading: false });
       throw error;
     }

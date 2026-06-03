@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import useAuthStore from "../../stores/authStore";
+import { toast } from "../../stores/toastStore";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import { workspaceService } from "../../services/api/workspace.service";
 
@@ -11,6 +12,8 @@ export default function AuthPage(): React.ReactElement {
 
   const [isSignUp, setIsSignUp] = useState(isRegisterRoute);
   const [isRegistrationSuccess, setIsRegistrationSuccess] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
 
   useEffect(() => {
     setIsSignUp(location.pathname === "/register");
@@ -18,7 +21,7 @@ export default function AuthPage(): React.ReactElement {
 
   const fromState = location.state?.from;
   const from = typeof fromState === 'string' ? fromState : (fromState?.pathname || "/");
-  const { login, register, isLoading, error } = useAuthStore();
+  const { login, register, forgotPassword, isLoading } = useAuthStore();
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || "";
   const handleGoogleLogin = () => {
@@ -46,8 +49,10 @@ export default function AuthPage(): React.ReactElement {
       await login(email, password);
       await handleInviteToken();
       navigate(from, { replace: true });
-    } catch (err) {
-      // Error handled by store
+    } catch (err: any) {
+      const errData = err.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : err.message || "Failed to login");
+      toast.error("Login Failed", errMsg);
     }
   }
 
@@ -56,8 +61,22 @@ export default function AuthPage(): React.ReactElement {
     try {
       await register(email, password, name || undefined, githubLink || undefined);
       setIsRegistrationSuccess(true);
-    } catch (err) {
-      // Error handled by store
+    } catch (err: any) {
+      const errData = err.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : err.message || "Registration failed");
+      toast.error("Registration Failed", errMsg);
+    }
+  }
+
+  async function handleForgotPasswordSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    try {
+      await forgotPassword(email);
+      setForgotPasswordSuccess(true);
+    } catch (err: any) {
+      const errData = err.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : err.message || "Failed to request password reset");
+      toast.error("Error", errMsg);
     }
   }
 
@@ -118,12 +137,6 @@ export default function AuthPage(): React.ReactElement {
             {socialButtons}
             <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Register with E-mail</span>
           </div>
-
-          {error && isSignUp && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400 text-center">
-              {error}
-            </div>
-          )}
 
           {isRegistrationSuccess ? (
             <div className="text-center mt-6 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
@@ -202,46 +215,97 @@ export default function AuthPage(): React.ReactElement {
             <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Sign in With Email & Password</span>
           </div>
 
-          {error && !isSignUp && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400 text-center">
-              {error}
-            </div>
+          {isForgotPassword ? (
+            forgotPasswordSuccess ? (
+              <div className="text-center mt-2 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                <svg className="w-12 h-12 text-blue-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Check your email</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  If an account exists with <span className="font-semibold text-blue-600 dark:text-blue-400">{email}</span>, a password reset link has been sent.
+                </p>
+                <button 
+                  onClick={() => { setIsForgotPassword(false); setForgotPasswordSuccess(false); }}
+                  className="mt-6 text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 text-center">
+                    Enter your email address and we'll send you a link to reset your password.
+                  </p>
+                </div>
+                <input
+                  type="email"
+                  required
+                  placeholder="Enter E-mail"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                  className="w-full px-4 py-3 text-sm rounded-xl bg-gray-100/50 dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex justify-center py-3 px-4 text-sm font-semibold rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md shadow-blue-500/30 hover:shadow-blue-500/50"
+                >
+                  {isLoading ? <LoadingSpinner size="sm" /> : "SEND RESET LINK"}
+                </button>
+                <div className="text-center pt-2 pb-1">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsForgotPassword(false)} 
+                    className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              </form>
+            )
+          ) : (
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <input
+                type="email"
+                required
+                placeholder="Enter E-mail"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                className="w-full px-4 py-3 text-sm rounded-xl bg-gray-100/50 dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all disabled:opacity-50"
+              />
+              <input
+                type="password"
+                required
+                placeholder="Enter Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="w-full px-4 py-3 text-sm rounded-xl bg-gray-100/50 dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all disabled:opacity-50"
+              />
+
+              <div className="text-center pt-2 pb-1">
+                <button 
+                  type="button" 
+                  onClick={() => setIsForgotPassword(true)} 
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  Forget Password?
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex justify-center py-3 px-4 text-sm font-semibold rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md shadow-blue-500/30 hover:shadow-blue-500/50"
+              >
+                {isLoading ? <LoadingSpinner size="sm" /> : "SIGN IN"}
+              </button>
+            </form>
           )}
-
-          <form onSubmit={handleSignIn} className="space-y-4">
-            <input
-              type="email"
-              required
-              placeholder="Enter E-mail"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
-              className="w-full px-4 py-3 text-sm rounded-xl bg-gray-100/50 dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all disabled:opacity-50"
-            />
-            <input
-              type="password"
-              required
-              placeholder="Enter Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              className="w-full px-4 py-3 text-sm rounded-xl bg-gray-100/50 dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all disabled:opacity-50"
-            />
-
-            <div className="text-center pt-2 pb-1">
-              <a href="#" className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-                Forget Password?
-              </a>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 text-sm font-semibold rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md shadow-blue-500/30 hover:shadow-blue-500/50"
-            >
-              {isLoading ? <LoadingSpinner size="sm" /> : "SIGN IN"}
-            </button>
-          </form>
         </div>
 
         {/* Overlay Container */}

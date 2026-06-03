@@ -43,6 +43,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/logout', authController.logout);
   fastify.post('/refresh', authController.refresh);
   
+  fastify.post('/forgot-password', authController.forgotPassword);
+  fastify.post('/reset-password', authController.resetPassword);
+  
   fastify.get('/verify-email', authController.verifyEmail);
   fastify.post('/resend-verification', authController.resendVerification);
 
