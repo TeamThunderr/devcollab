@@ -17,8 +17,8 @@ export interface AuthResponse {
 }
 
 export const authService = {
-  async register(data: { email: string; password: string; name?: string; githubLink?: string }): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/api/auth/register', data);
+  async register(data: { email: string; password: string; name?: string; githubLink?: string }): Promise<{ message: string, user: AuthUser }> {
+    const response = await api.post<{ message: string, user: AuthUser }>('/api/auth/register', data);
     return response.data;
   },
 
@@ -39,5 +39,25 @@ export const authService = {
   async updateProfile(data: Partial<AuthUser>): Promise<AuthUser> {
     const response = await api.patch<{ user: AuthUser }>('/api/auth/me', data);
     return response.data.user;
+  },
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const response = await api.get<{ message: string }>(`/api/auth/verify-email?token=${token}`);
+    return response.data;
+  },
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>('/api/auth/resend-verification', { email });
+    return response.data;
+  },
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>('/api/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>('/api/auth/reset-password', { token, newPassword });
+    return response.data;
   }
 };

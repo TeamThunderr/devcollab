@@ -17,6 +17,10 @@ export interface AuthStore {
   fetchCurrentUser: () => Promise<void>;
   setAuthToken: (token: string) => void;
   clearAuth: () => void;
+  verifyEmail: (token: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ message: string }>;
+  resetPassword: (token: string, newPassword: string) => Promise<{ message: string }>;
 }
 
 export const useAuthStore = create<AuthStore>()((set) => ({
@@ -50,9 +54,8 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     set({ isLoading: true, error: null });
     try {
       await authService.register({ email, password, name, githubLink });
-      
-      const { user, accessToken } = await authService.login({ email, password });
-      set({ user, accessToken, isAuthenticated: true, isInitialized: true, isLoading: false });
+      // Do not auto-login because email verification is required
+      set({ isLoading: false });
     } catch (error: any) {
       const errData = error.response?.data?.error;
       const errMsg = Array.isArray(errData) ? errData[0].message : errData || "Failed to register";
@@ -105,6 +108,60 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   clearAuth: () => {
     disconnectSocket();
     set({ user: null, accessToken: null, isAuthenticated: false });
+  },
+
+  verifyEmail: async (token: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await authService.verifyEmail(token);
+      set({ isLoading: false });
+    } catch (error: any) {
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to verify email");
+      set({ error: errMsg, isLoading: false });
+      throw error;
+    }
+  },
+
+  resendVerification: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await authService.resendVerification(email);
+      set({ isLoading: false });
+    } catch (error: any) {
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to resend verification email");
+      set({ error: errMsg, isLoading: false });
+      throw error;
+    }
+  },
+
+  forgotPassword: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authService.forgotPassword(email);
+      set({ isLoading: false });
+      return res;
+    } catch (error: any) {
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to request password reset");
+      set({ error: errMsg, isLoading: false });
+      throw error;
+    }
+  },
+
+  resetPassword: async (token: string, newPassword: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authService.resetPassword(token, newPassword);
+      set({ isLoading: false });
+      return res;
+    } catch (error: any) {
+      const errData = error.response?.data?.error;
+      const errMsg = Array.isArray(errData) ? errData[0].message : (typeof errData === 'string' ? errData : "Failed to reset password");
+      set({ error: errMsg, isLoading: false });
+      throw error;
+    }
   },
 }));
 

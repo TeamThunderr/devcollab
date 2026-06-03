@@ -47,7 +47,7 @@ api.interceptors.response.use(
     const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
 
     // ── 401: Try token refresh first ─────────────────────────────────────────
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && originalRequest.url !== '/api/auth/refresh') {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && originalRequest.url !== '/api/auth/refresh' && originalRequest.url !== '/api/auth/login') {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -90,8 +90,12 @@ api.interceptors.response.use(
     // Skip if the caller opted out of global error handling
     if (!originalRequest?._silentError) {
       const status = error.response?.status;
-      const data = error.response?.data as Record<string, string> | undefined;
-      const serverMessage = data?.message || data?.error || error.message;
+      const data = error.response?.data as Record<string, any> | undefined;
+      
+      let serverMessage = data?.message || error.message;
+      if (data?.error) {
+        serverMessage = Array.isArray(data.error) ? data.error[0].message : (typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+      }
 
       if (!navigator.onLine) {
         toast.error('No internet connection', 'Check your connection and try again');
