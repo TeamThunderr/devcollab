@@ -39,7 +39,8 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   login: async (email, password) => {
     set({ isLoading: true, error: null });
     try {
-      const { user, accessToken } = await authService.login({ email, password });
+      const { user, accessToken, refreshToken } = await authService.login({ email, password });
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
       set({ user, accessToken, isAuthenticated: true, isInitialized: true, isLoading: false });
     } catch (error: any) {
       set({ 
@@ -72,6 +73,7 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       // ignore errors on logout
     } finally {
       disconnectSocket();
+      localStorage.removeItem("refreshToken");
       set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
     }
   },
@@ -107,6 +109,7 @@ export const useAuthStore = create<AuthStore>()((set) => ({
 
   clearAuth: () => {
     disconnectSocket();
+    localStorage.removeItem("refreshToken");
     set({ user: null, accessToken: null, isAuthenticated: false });
   },
 

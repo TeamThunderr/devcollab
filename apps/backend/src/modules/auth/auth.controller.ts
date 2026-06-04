@@ -29,7 +29,7 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60 // 7 days
       });
 
-      return reply.send({ user, accessToken });
+      return reply.send({ user, accessToken, refreshToken });
     } catch (error: any) {
       if (error.name === 'ZodError') return reply.status(400).send({ error: error.errors });
       if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });
@@ -48,7 +48,7 @@ export const authController = {
 
   async refresh(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const oldRefreshToken = request.cookies.refreshToken;
+      const oldRefreshToken = request.cookies.refreshToken || (request.body as any)?.refreshToken;
       if (!oldRefreshToken) {
         throw new AppError(401, 'No refresh token provided');
       }
@@ -63,7 +63,7 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60
       });
 
-      return reply.send({ accessToken });
+      return reply.send({ accessToken, refreshToken });
     } catch (error: any) {
       if (error instanceof AppError) return reply.status(error.statusCode).send({ error: error.message });
       return reply.status(401).send({ error: 'Invalid refresh token' });
@@ -116,7 +116,7 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60
       });
 
-      reply.redirect(process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app');
+      reply.redirect(`${process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app'}?accessToken=${accessToken}&refreshToken=${refreshToken}`);
     } catch (error) {
       console.error(error);
       reply.redirect(`${process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app'}/login?error=oauth_failed`);
@@ -161,7 +161,7 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60
       });
 
-      reply.redirect(process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app');
+      reply.redirect(`${process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app'}?accessToken=${accessToken}&refreshToken=${refreshToken}`);
     } catch (error) {
       console.error(error);
       reply.redirect(`${process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app'}/login?error=oauth_failed`);

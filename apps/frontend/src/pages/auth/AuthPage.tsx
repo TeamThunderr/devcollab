@@ -14,13 +14,31 @@ export default function AuthPage(): React.ReactElement {
   const [isRegistrationSuccess, setIsRegistrationSuccess] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
-
-  useEffect(() => {
-    setIsSignUp(location.pathname === "/register");
-  }, [location.pathname]);
-
+  
   const fromState = location.state?.from;
   const from = typeof fromState === 'string' ? fromState : (fromState?.pathname || "/");
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const urlAccessToken = params.get("accessToken");
+    const urlRefreshToken = params.get("refreshToken");
+    
+    if (urlAccessToken && urlRefreshToken) {
+      localStorage.setItem("refreshToken", urlRefreshToken);
+      useAuthStore.getState().setAuthToken(urlAccessToken);
+      
+      // Clean up the URL
+      window.history.replaceState({}, document.title, location.pathname);
+      
+      // Fetch user data and redirect
+      useAuthStore.getState().fetchCurrentUser().then(() => {
+        navigate(from, { replace: true });
+      });
+    } else {
+      setIsSignUp(location.pathname === "/register");
+    }
+  }, [location.pathname, location.search, navigate, from]);
+
   const { login, register, forgotPassword, isLoading } = useAuthStore();
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || "https://devcollab-backend-15q8.onrender.com";
