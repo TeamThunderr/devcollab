@@ -46,7 +46,7 @@ export interface SendInviteEmailOptions {
 
 export const sendInviteEmail = async (options: SendInviteEmailOptions) => {
   const { to, inviterName, inviterEmail, workspaceName, role, token } = options;
-  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://devcollab-gamma.vercel.app').replace(/\/+$/, '');
   const inviteLink = `${frontendUrl}/invite/${token}`;
 
   const html = `

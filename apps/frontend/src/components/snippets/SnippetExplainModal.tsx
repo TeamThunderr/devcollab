@@ -10,7 +10,7 @@ import { useAIStream } from "../../hooks/useAIStream";
 import StreamingText from "../ai/StreamingText";
 import { Snippet } from "../../types";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL || "https://devcollab-backend-15q8.onrender.com";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 

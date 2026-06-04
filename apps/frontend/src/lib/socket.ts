@@ -11,7 +11,7 @@ import { io, Socket } from "socket.io-client";
 import useRealtimeStore, { Notification } from "../stores/realtimeStore";
 import { useNotificationStore } from "../stores/notificationStore";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || "";
+const SOCKET_URL = import.meta.env.VITE_API_URL || "https://devcollab-backend-15q8.onrender.com";
 
 // ─── Typed event maps (mirrors backend) ─────────────────────────────────────
 

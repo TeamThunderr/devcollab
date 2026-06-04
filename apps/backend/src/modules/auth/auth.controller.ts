@@ -116,10 +116,10 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60
       });
 
-      reply.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
+      reply.redirect(process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app');
     } catch (error) {
       console.error(error);
-      reply.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/login?error=oauth_failed`);
+      reply.redirect(`${process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app'}/login?error=oauth_failed`);
     }
   },
 
@@ -161,10 +161,10 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60
       });
 
-      reply.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
+      reply.redirect(process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app');
     } catch (error) {
       console.error(error);
-      reply.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/login?error=oauth_failed`);
+      reply.redirect(`${process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://devcollab-gamma.vercel.app'}/login?error=oauth_failed`);
     }
   },
 
