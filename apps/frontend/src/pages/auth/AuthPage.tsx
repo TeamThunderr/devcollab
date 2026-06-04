@@ -23,7 +23,7 @@ export default function AuthPage(): React.ReactElement {
   const from = typeof fromState === 'string' ? fromState : (fromState?.pathname || "/");
   const { login, register, forgotPassword, isLoading } = useAuthStore();
 
-  const apiBaseUrl = import.meta.env.VITE_API_URL || "";
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "https://devcollab-backend-15q8.onrender.com";
   const handleGoogleLogin = () => {
     window.location.href = `${apiBaseUrl}/api/auth/google/login`;
   };

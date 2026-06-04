@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/authStore';
 import { toast } from '../stores/toastStore';
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+const API_BASE = import.meta.env.VITE_API_URL || 'https://devcollab-backend-15q8.onrender.com'
 
 export const api = axios.create({
   baseURL: API_BASE,

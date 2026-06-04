@@ -10,7 +10,7 @@
 import { useState, useCallback } from "react";
 import useAuthStore from "../stores/authStore";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL || "https://devcollab-backend-15q8.onrender.com";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

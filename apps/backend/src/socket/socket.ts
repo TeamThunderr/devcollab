@@ -78,7 +78,7 @@ type DevCollabSocket = Socket<
 let io: DevCollabServer;
 
 export async function initSocket(httpServer: http.Server): Promise<void> {
-  const rawOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  const rawOrigins = (process.env.FRONTEND_URL || 'https://devcollab-gamma.vercel.app')
     .split(',')
     .map((s) => s.trim().replace(/\/$/, ''));
 

@@ -1,6 +1,6 @@
 export const emailService = {
   async sendVerificationEmail(to: string, token: string) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://devcollab-gamma.vercel.app';
     const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
 
     if (process.env.NODE_ENV === 'development') {
@@ -63,7 +63,7 @@ export const emailService = {
   },
 
   async sendPasswordResetEmail(to: string, token: string) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://devcollab-gamma.vercel.app';
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
     if (process.env.NODE_ENV === 'development') {

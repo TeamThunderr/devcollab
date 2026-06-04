@@ -12,7 +12,7 @@ import React, { useState } from "react";
 import useTaskStore from "../../stores/taskStore";
 import useAuthStore from "../../stores/authStore";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL || "https://devcollab-backend-15q8.onrender.com";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 

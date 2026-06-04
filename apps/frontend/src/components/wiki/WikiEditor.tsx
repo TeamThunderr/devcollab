@@ -160,7 +160,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const data = response.data;
-      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const API_BASE = import.meta.env.VITE_API_URL || 'https://devcollab-backend-15q8.onrender.com';
       if (data.url) {
         editor.chain().focus().setImage({ src: `${API_BASE}${data.url}` }).run();
       }
@@ -184,7 +184,7 @@ export default function WikiEditor({ projectId, onToggleHistory }: { projectId: 
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const data = response.data;
-      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const API_BASE = import.meta.env.VITE_API_URL || 'https://devcollab-backend-15q8.onrender.com';
       if (data.url) {
         updatePage(activePage.id, { coverImage: `${API_BASE}${data.url}` });
       }

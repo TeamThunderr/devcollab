@@ -15,7 +15,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         auth: oauthPlugin.GOOGLE_CONFIGURATION
       },
       startRedirectPath: '/google/login',
-      callbackUri: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/auth/google/callback`,
+      callbackUri: `${process.env.BACKEND_URL || 'https://devcollab-backend-15q8.onrender.com'}/api/auth/google/callback`,
       scope: ['profile', 'email']
     });
     fastify.get('/google/callback', authController.googleCallback);
@@ -32,7 +32,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         auth: oauthPlugin.GITHUB_CONFIGURATION
       },
       startRedirectPath: '/github/login',
-      callbackUri: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/auth/github/callback`,
+      callbackUri: `${process.env.BACKEND_URL || 'https://devcollab-backend-15q8.onrender.com'}/api/auth/github/callback`,
       scope: ['user:email']
     });
     fastify.get('/github/callback', authController.githubCallback);

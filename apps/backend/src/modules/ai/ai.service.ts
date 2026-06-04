@@ -47,7 +47,7 @@ function setSseHeaders(reply: FastifyReply): void {
   void reply.hijack(); // Tell Fastify we're taking over the response
 
   // reply.hijack() bypasses @fastify/cors, so we must set CORS headers manually
-  const rawOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  const rawOrigins = (process.env.FRONTEND_URL || 'https://devcollab-gamma.vercel.app')
     .split(',')
     .map((s) => s.trim().replace(/\/$/, ''));
   const reqOrigin = reply.request.headers.origin;

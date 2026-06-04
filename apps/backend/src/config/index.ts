@@ -12,7 +12,7 @@ export type { AIConfig } from "./ai.config";
 
 export const serverConfig = {
   port: parseInt(process.env.PORT ?? "3000", 10),
-  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+  frontendUrl: process.env.FRONTEND_URL ?? "https://devcollab-gamma.vercel.app",
   jwtSecret: process.env.JWT_SECRET ?? "",
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? "",
   nodeEnv: process.env.NODE_ENV ?? "development",
